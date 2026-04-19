@@ -1,0 +1,12 @@
+.git
+.github
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+bismart.db
+bismart.db-shm
+bismart.db-wal
+render.yaml
+render.*.yaml

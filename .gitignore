@@ -1,0 +1,11 @@
+*.db
+*.db-shm
+*.db-wal
+__pycache__/
+*.pyc
+bismart_flutter/build/
+bismart_flutter/.dart_tool/
+bismart_flutter/.packages
+bismart_flutter/.flutter-plugins
+bismart_flutter/.flutter-plugins-dependencies
+.DS_Store
