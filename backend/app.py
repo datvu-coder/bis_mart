@@ -1332,51 +1332,6 @@ def api_list_comments(pid: int):
 
 
 # ---------------------------------------------------------------------------
-# PERMISSIONS
-# ---------------------------------------------------------------------------
-@app.get("/api/permissions")
-@login_required
-def api_list_permissions():
-    db = get_db()
-    rows = db.execute("SELECT * FROM permissions ORDER BY id").fetchall()
-    return jsonify([{
-        "id": dict(r)["id"], "position": dict(r)["position"],
-        "description": dict(r).get("description", ""),
-        "canAttendance": bool(dict(r).get("can_attendance")),
-        "canReport": bool(dict(r).get("can_report")),
-        "canManageAttendance": bool(dict(r).get("can_manage_attendance")),
-        "canEmployees": bool(dict(r).get("can_employees")),
-        "canMore": bool(dict(r).get("can_more")),
-        "canCrud": bool(dict(r).get("can_crud")),
-        "canSwitchStore": bool(dict(r).get("can_switch_store")),
-        "canStoreList": bool(dict(r).get("can_store_list")),
-        "canProductList": bool(dict(r).get("can_product_list")),
-    } for r in rows])
-
-
-@app.get("/api/permissions/<position>")
-@login_required
-def api_get_permission(position: str):
-    db = get_db()
-    row = db.execute("SELECT * FROM permissions WHERE position = ?", (position,)).fetchone()
-    if not row:
-        return jsonify({"error": "Không tìm thấy quyền"}), 404
-    r = dict(row)
-    return jsonify({
-        "position": r["position"], "description": r.get("description", ""),
-        "canAttendance": bool(r.get("can_attendance")),
-        "canReport": bool(r.get("can_report")),
-        "canManageAttendance": bool(r.get("can_manage_attendance")),
-        "canEmployees": bool(r.get("can_employees")),
-        "canMore": bool(r.get("can_more")),
-        "canCrud": bool(r.get("can_crud")),
-        "canSwitchStore": bool(r.get("can_switch_store")),
-        "canStoreList": bool(r.get("can_store_list")),
-        "canProductList": bool(r.get("can_product_list")),
-    })
-
-
-# ---------------------------------------------------------------------------
 # COURSES (LMS)
 # ---------------------------------------------------------------------------
 @app.get("/api/courses")
