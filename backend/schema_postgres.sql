@@ -338,17 +338,17 @@ CREATE TABLE IF NOT EXISTS training_events (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX idx_employees_code ON employees(employee_code);
-CREATE INDEX idx_employees_position ON employees(position);
-CREATE INDEX idx_employees_store ON employees(store_code);
-CREATE INDEX idx_attendances_date ON attendances(attend_date);
-CREATE INDEX idx_attendances_employee ON attendances(employee_id);
-CREATE INDEX idx_sales_reports_date ON sales_reports(report_date);
-CREATE INDEX idx_sales_reports_store ON sales_reports(store_code);
-CREATE INDEX idx_sale_items_report ON sale_items(report_id);
-CREATE INDEX idx_community_posts_created ON community_posts(created_at);
-CREATE INDEX idx_training_events_date ON training_events(event_date);
-CREATE INDEX idx_store_managers_store ON store_managers(store_id);
-CREATE INDEX idx_course_contents_title ON course_contents(title_id);
-CREATE INDEX idx_quiz_questions_content ON quiz_questions(content_id);
-CREATE INDEX idx_class_attendances_schedule ON class_attendances(schedule_id);
+CREATE INDEX IF NOT EXISTS idx_employees_code ON employees(employee_code);
+CREATE INDEX IF NOT EXISTS idx_employees_position ON employees(position);
+CREATE INDEX IF NOT EXISTS idx_employees_store ON employees(store_code);
+CREATE INDEX IF NOT EXISTS idx_attendances_date ON attendances(attend_date);
+CREATE INDEX IF NOT EXISTS idx_attendances_employee ON attendances(employee_id);
+CREATE INDEX IF NOT EXISTS idx_sales_reports_date ON sales_reports(report_date);
+CREATE INDEX IF NOT EXISTS idx_sales_reports_store ON sales_reports(store_code);
+CREATE INDEX IF NOT EXISTS idx_sale_items_report ON sale_items(report_id);
+CREATE INDEX IF NOT EXISTS idx_community_posts_created ON community_posts(created_at);
+CREATE INDEX IF NOT EXISTS idx_training_events_date ON training_events(event_date);
+CREATE INDEX IF NOT EXISTS idx_store_managers_store ON store_managers(store_id);
+CREATE INDEX IF NOT EXISTS idx_course_contents_title ON course_contents(title_id);
+CREATE INDEX IF NOT EXISTS idx_quiz_questions_content ON quiz_questions(content_id);
+CREATE INDEX IF NOT EXISTS idx_class_attendances_schedule ON class_attendances(schedule_id);
