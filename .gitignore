@@ -5,8 +5,7 @@ __pycache__/
 *.pyd
 .venv/
 
-# SQLite
-bismart.db
+# SQLite (runtime WAL files only)
 bismart.db-shm
 bismart.db-wal
 
