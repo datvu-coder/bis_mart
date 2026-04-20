@@ -225,13 +225,13 @@ class _LoginScreenState extends State<LoginScreen>
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Chào mừng bạn quay lại! Vui lòng đăng nhập.',
+                                'Sử dụng mã nhân viên và mật khẩu để đăng nhập.',
                                 style: AppTextStyles.caption.copyWith(fontSize: 15, height: 1.5),
                               ),
                               const SizedBox(height: 36),
 
-                              // Username
-                              Text('Tên đăng nhập',
+                              // Employee code
+                              Text('Mã nhân viên',
                                   style: AppTextStyles.captionMedium
                                       .copyWith(color: AppColors.textSecondary)),
                               const SizedBox(height: 8),
@@ -239,12 +239,12 @@ class _LoginScreenState extends State<LoginScreen>
                                 controller: _emailController,
                                 keyboardType: TextInputType.text,
                                 decoration: const InputDecoration(
-                                  hintText: 'admin',
-                                  prefixIcon: Icon(Icons.person_outline, size: 20),
+                                  hintText: 'Nhập mã nhân viên',
+                                  prefixIcon: Icon(Icons.badge_outlined, size: 20),
                                 ),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
-                                    return 'Vui lòng nhập tên đăng nhập';
+                                    return 'Vui lòng nhập mã nhân viên';
                                   }
                                   return null;
                                 },
@@ -278,9 +278,6 @@ class _LoginScreenState extends State<LoginScreen>
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'Vui lòng nhập mật khẩu';
-                                  }
-                                  if (value.length < 6) {
-                                    return 'Mật khẩu tối thiểu 6 ký tự';
                                   }
                                   return null;
                                 },

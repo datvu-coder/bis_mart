@@ -6,6 +6,7 @@ import '../../core/constants/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/employee_provider.dart';
+import '../../providers/lms_provider.dart';
 import '../../models/employee.dart';
 
 class CaNhanScreen extends StatefulWidget {
@@ -16,6 +17,17 @@ class CaNhanScreen extends StatefulWidget {
 }
 
 class _CaNhanScreenState extends State<CaNhanScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentUser = context.read<AuthProvider>().currentUser;
+      if (currentUser != null) {
+        context.read<LmsProvider>().loadPermissionForPosition(currentUser.position);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 800;
@@ -118,20 +130,40 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    user?.position ?? '',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.white,
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        user?.positionLabel ?? user?.position ?? '',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.white,
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        user?.employeeCode ?? '',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.white,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -156,11 +188,17 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
   Widget _buildStatsRow(dynamic user) {
     final empProvider = context.watch<EmployeeProvider>();
     final employees = empProvider.employees;
-    final currentEmp = employees.isNotEmpty ? employees.first : null;
+    // Find the current user in the employee list by matching ID
+    final currentEmp = (user != null && employees.isNotEmpty)
+        ? employees.cast<dynamic>().firstWhere(
+            (e) => e.id == user.id,
+            orElse: () => null,
+          )
+        : null;
 
     final stats = [
       _StatItem(Icons.people_rounded, 'Nhân viên', '${employees.length}', AppColors.info, AppColors.infoLight),
-      _StatItem(Icons.star_rounded, 'Điểm KPI', '${currentEmp?.score ?? 0}', AppColors.warning, AppColors.warningLight),
+      _StatItem(Icons.star_rounded, 'Điểm KPI', '${currentEmp?.score ?? user?.score ?? 0}', AppColors.warning, AppColors.warningLight),
       _StatItem(Icons.trending_up_rounded, 'Xếp hạng', '#${currentEmp?.rank ?? '-'}', AppColors.success, AppColors.successLight),
     ];
 
@@ -204,12 +242,18 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
   }
 
   Widget _buildMenuSection(BuildContext context) {
-    final menuItems = [
-      _MenuItem(Icons.people_rounded, AppStrings.danhSachNhanVien, 'Xem danh sách & thông tin nhân viên', AppRoutes.employeeList, AppColors.info, AppColors.infoLight),
-      _MenuItem(Icons.fingerprint_rounded, AppStrings.quanLyChamCong, 'Chấm công, ca làm & xếp hạng', AppRoutes.nhanSu, AppColors.success, AppColors.successLight),
-      _MenuItem(Icons.bar_chart_rounded, AppStrings.quanLyBaoCao, 'Báo cáo doanh thu & thống kê', AppRoutes.kinhDoanh, AppColors.warning, AppColors.warningLight),
-      _MenuItem(Icons.store_rounded, AppStrings.danhSachCuaHang, 'Danh sách cửa hàng trong hệ thống', AppRoutes.storeList, AppColors.primary, AppColors.primaryLight),
-      _MenuItem(Icons.inventory_2_rounded, AppStrings.danhSachSanPham, 'Quản lý sản phẩm & tồn kho', AppRoutes.productList, AppColors.error, AppColors.errorLight),
+    final perm = context.watch<LmsProvider>().currentPermission;
+    final menuItems = <_MenuItem>[
+      if (perm?.canEmployees ?? false)
+        _MenuItem(Icons.people_rounded, AppStrings.danhSachNhanVien, 'Xem danh sách & thông tin nhân viên', AppRoutes.employeeList, AppColors.info, AppColors.infoLight),
+      if (perm?.canAttendance ?? true)
+        _MenuItem(Icons.fingerprint_rounded, AppStrings.quanLyChamCong, 'Chấm công, ca làm & xếp hạng', AppRoutes.nhanSu, AppColors.success, AppColors.successLight),
+      if (perm?.canReport ?? true)
+        _MenuItem(Icons.bar_chart_rounded, AppStrings.quanLyBaoCao, 'Báo cáo doanh thu & thống kê', AppRoutes.kinhDoanh, AppColors.warning, AppColors.warningLight),
+      if (perm?.canStoreList ?? false)
+        _MenuItem(Icons.store_rounded, AppStrings.danhSachCuaHang, 'Danh sách cửa hàng trong hệ thống', AppRoutes.storeList, AppColors.primary, AppColors.primaryLight),
+      if (perm?.canProductList ?? false)
+        _MenuItem(Icons.inventory_2_rounded, AppStrings.danhSachSanPham, 'Quản lý sản phẩm & tồn kho', AppRoutes.productList, AppColors.error, AppColors.errorLight),
     ];
 
     return Container(

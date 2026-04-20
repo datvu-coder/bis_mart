@@ -8,8 +8,10 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/employee_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/lms_provider.dart';
 import '../../models/attendance.dart';
 import '../../models/work_shift.dart';
+import '../../models/permission.dart';
 import '../../services/location_service.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/primary_button.dart';
@@ -32,16 +34,24 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<EmployeeProvider>();
+      final currentUser = context.read<AuthProvider>().currentUser;
       provider.loadEmployees();
       provider.loadAttendances();
-      provider.loadMonthlySummary();
+      // Load monthly summary for current user only
+      provider.loadMonthlySummary(employeeId: currentUser?.id);
       context.read<StoreProvider>().loadStores();
+      // Load permissions for current user's position
+      if (currentUser != null) {
+        context.read<LmsProvider>().loadPermissionForPosition(currentUser.position);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 800;
+    final perm = context.watch<LmsProvider>().currentPermission;
+    final canManage = perm?.canManageAttendance ?? false;
 
     return Consumer<EmployeeProvider>(
       builder: (context, provider, _) {
@@ -69,7 +79,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _buildAttendancePanel(provider)),
+                    Expanded(child: _buildAttendancePanel(provider, canManage)),
                     const SizedBox(width: 16),
                     Expanded(child: _buildShiftPanel(provider)),
                     const SizedBox(width: 16),
@@ -77,7 +87,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
                   ],
                 )
               else ...[
-                _buildAttendancePanel(provider),
+                _buildAttendancePanel(provider, canManage),
                 _buildShiftPanel(provider),
                 _buildRankPanel(provider),
               ],
@@ -88,7 +98,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
     );
   }
 
-  Widget _buildAttendancePanel(EmployeeProvider provider) {
+  Widget _buildAttendancePanel(EmployeeProvider provider, bool canManage) {
     return DataPanel(
       title: AppStrings.chamCong,
       trailing: Row(
@@ -104,19 +114,19 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
       child: Column(
         children: [
           // --- GPS Check-in/out Section ---
-          _buildGpsCheckInSection(provider),
+          _buildGpsCheckInSection(provider, canManage),
           const SizedBox(height: 16),
           // --- Monthly Summary ---
           _buildMonthlySummary(provider),
           const SizedBox(height: 16),
-          // --- Today's Attendance List ---
-          _buildTodayAttendanceList(provider),
+          // --- Today's Attendance List (managers only) ---
+          if (canManage) _buildTodayAttendanceList(provider),
         ],
       ),
     );
   }
 
-  Widget _buildGpsCheckInSection(EmployeeProvider provider) {
+  Widget _buildGpsCheckInSection(EmployeeProvider provider, bool canManage) {
     final currentUser = context.read<AuthProvider>().currentUser;
     final stores = context.watch<StoreProvider>().stores;
     final myStore = (currentUser?.storeCode != null && stores.isNotEmpty)
@@ -331,8 +341,9 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
                   ),
                 ),
               const SizedBox(width: 8),
-              // Admin quick check-in button
-              PopupMenuButton<String>(
+              // Admin quick check-in button (only for managers)
+              if (canManage)
+                PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded),
                 tooltip: 'Chấm công nhân viên',
                 onSelected: (value) {
@@ -611,7 +622,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
         );
       }
       await provider.checkIn(currentUser.id, latitude: pos.latitude, longitude: pos.longitude);
-      await provider.loadMonthlySummary();
+      await provider.loadMonthlySummary(employeeId: currentUser.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -647,7 +658,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
         );
       }
       await provider.checkOut(currentUser.id, latitude: pos.latitude, longitude: pos.longitude);
-      await provider.loadMonthlySummary();
+      await provider.loadMonthlySummary(employeeId: currentUser.id);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

@@ -143,9 +143,15 @@ class Employee {
       case 'ADM':
         return 'Admin / Chủ Shop';
       case 'PG':
-        return 'Promoter Girl';
+        return 'Nhân viên tư vấn';
       case 'TLD':
-        return 'Trưởng Lĩnh Vực';
+        return 'Trưởng nhóm';
+      case 'SM':
+        return 'Cửa hàng trưởng';
+      case 'TMK':
+        return 'Giám sát';
+      case 'ASM':
+        return 'Quản lý khu vực';
       case 'CS':
         return 'Chủ Shop chuỗi';
       default:

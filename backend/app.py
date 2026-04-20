@@ -174,27 +174,58 @@ def api_login():
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
     if not username or not password:
-        return jsonify({"error": "Thiếu tên đăng nhập hoặc mật khẩu"}), 400
+        return jsonify({"error": "Thiếu mã nhân viên hoặc mật khẩu"}), 400
 
     db = get_db()
+    # 1) Try users table (existing admin accounts)
     row = dict(db.execute(
         "SELECT u.id, u.password_hash, u.employee_id, u.is_active, "
         "e.full_name, e.employee_code, e.position, e.work_location, e.score, e.email "
         "FROM users u LEFT JOIN employees e ON u.employee_id = e.id "
         "WHERE u.username = ?", (username,)
     ).fetchone() or {})
-    if not row or not row.get("id"):
-        return jsonify({"error": "Sai tên đăng nhập hoặc mật khẩu"}), 401
-    if not row.get("is_active"):
-        return jsonify({"error": "Tài khoản đã bị khóa"}), 403
-    if not check_password_hash(row["password_hash"], password):
-        return jsonify({"error": "Sai tên đăng nhập hoặc mật khẩu"}), 401
+    if row and row.get("id"):
+        if not row.get("is_active"):
+            return jsonify({"error": "Tài khoản đã bị khóa"}), 403
+        if not check_password_hash(row["password_hash"], password):
+            return jsonify({"error": "Sai mã nhân viên hoặc mật khẩu"}), 401
+        token = create_token(row["id"], row.get("employee_id"))
+        return jsonify({"token": token, "user": _employee_dict(row)})
 
-    token = create_token(row["id"], row.get("employee_id"))
-    return jsonify({
-        "token": token,
-        "user": _employee_dict(row),
-    })
+    # 2) Try employees table by employee_code + plain-text password
+    emp_row = db.execute(
+        "SELECT * FROM employees WHERE employee_code = ? AND is_active = 1",
+        (username,)
+    ).fetchone()
+    if not emp_row:
+        return jsonify({"error": "Sai mã nhân viên hoặc mật khẩu"}), 401
+    emp = dict(emp_row)
+    stored_pw = emp.get("password") or "1111"
+    if password != stored_pw:
+        return jsonify({"error": "Sai mã nhân viên hoặc mật khẩu"}), 401
+
+    # Auto-create user account for this employee
+    pw_hash = generate_password_hash(password, method="pbkdf2:sha256")
+    existing_user = db.execute(
+        "SELECT id FROM users WHERE employee_id = ?", (emp["id"],)
+    ).fetchone()
+    if existing_user:
+        user_id = dict(existing_user)["id"]
+        # Update username to employee_code for consistency
+        db.execute("UPDATE users SET username = ? WHERE id = ?", (username, user_id))
+    else:
+        cur = db.execute(
+            "INSERT INTO users (username, password_hash, employee_id) VALUES (?, ?, ?)",
+            (username, pw_hash, emp["id"]),
+        )
+        user_id = cur.lastrowid if DB_BACKEND == "sqlite" else None
+        if DB_BACKEND == "postgres":
+            u = db.execute("SELECT id FROM users WHERE employee_id = ?", (emp["id"],)).fetchone()
+            user_id = dict(u)["id"]
+    db.commit()
+
+    token = create_token(user_id, emp["id"])
+    return jsonify({"token": token, "user": _employee_dict(emp)})
 
 
 @app.get("/api/auth/me")
