@@ -13,8 +13,8 @@ import 'services/api_service.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Đổi URL khi deploy lên VPS (qua Nginx proxy cùng origin)
-  ApiService().setBaseUrl('http://146.196.64.92:8082');
+  // Frontend Nginx proxy /api/ sang backend container (cùng origin, tránh CORS)
+  ApiService().setBaseUrl('');
   
   runApp(
     MultiProvider(
