@@ -244,4 +244,70 @@ class ApiService {
         queryParameters: {'filter': filter});
     return response.data as Map<String, dynamic>;
   }
+
+  // ---- PERMISSIONS ----
+  Future<List<dynamic>> getPermissions() async {
+    final response = await _dio.get('/api/permissions');
+    return response.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getPermissionByPosition(String position) async {
+    final response = await _dio.get('/api/permissions/$position');
+    return response.data as Map<String, dynamic>;
+  }
+
+  // ---- COURSES (LMS) ----
+  Future<List<dynamic>> getCourses() async {
+    final response = await _dio.get('/api/courses');
+    return response.data as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getCourseEnrollments(String courseId) async {
+    final response = await _dio.get('/api/courses/$courseId/enrollments');
+    return response.data as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getCourseCompletions(String courseId) async {
+    final response = await _dio.get('/api/courses/$courseId/completions');
+    return response.data as List<dynamic>;
+  }
+
+  // ---- QUIZ ----
+  Future<List<dynamic>> getQuizQuestions(String contentId) async {
+    final response = await _dio.get('/api/quiz/$contentId');
+    return response.data as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getQuizResults({String? contentId, String? employeeCode}) async {
+    final params = <String, dynamic>{};
+    if (contentId != null) params['contentId'] = contentId;
+    if (employeeCode != null) params['employeeCode'] = employeeCode;
+    final response = await _dio.get('/api/quiz-results', queryParameters: params);
+    return response.data as List<dynamic>;
+  }
+
+  // ---- CLASS SCHEDULES ----
+  Future<List<dynamic>> getClassSchedules() async {
+    final response = await _dio.get('/api/class-schedules');
+    return response.data as List<dynamic>;
+  }
+
+  // ---- AI TOOLS ----
+  Future<List<dynamic>> getAiTools() async {
+    final response = await _dio.get('/api/ai-tools');
+    return response.data as List<dynamic>;
+  }
+
+  Future<List<dynamic>> getAiUsage({String? employeeCode}) async {
+    final params = <String, dynamic>{};
+    if (employeeCode != null) params['employeeCode'] = employeeCode;
+    final response = await _dio.get('/api/ai-usage', queryParameters: params);
+    return response.data as List<dynamic>;
+  }
+
+  // ---- COMMENTS ----
+  Future<List<dynamic>> getComments(int postId) async {
+    final response = await _dio.get('/api/posts/$postId/comments');
+    return response.data as List<dynamic>;
+  }
 }

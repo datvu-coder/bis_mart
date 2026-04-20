@@ -12,12 +12,15 @@ class EmployeeProvider extends ChangeNotifier {
   List<Attendance> _historyAttendances = [];
   List<WorkShift> _shifts = [];
   bool _isLoading = false;
+  String? _error;
 
   List<Employee> get employees => _employees;
   List<Attendance> get attendances => _attendances;
   List<Attendance> get historyAttendances => _historyAttendances;
   List<WorkShift> get shifts => _shifts;
   bool get isLoading => _isLoading;
+  String? get error => _error;
+  void clearError() { _error = null; notifyListeners(); }
 
   List<Employee> get rankedEmployees {
     final sorted = List<Employee>.from(_employees);
@@ -33,16 +36,13 @@ class EmployeeProvider extends ChangeNotifier {
       final data = await _api.getEmployees();
       _employees = data.map((e) => Employee.fromJson(e as Map<String, dynamic>)).toList();
       for (var i = 0; i < _employees.length; i++) {
-        final e = _employees[i];
-        _employees[i] = Employee(
-          id: e.id, fullName: e.fullName, employeeCode: e.employeeCode,
-          position: e.position, workLocation: e.workLocation,
-          score: e.score, rank: i + 1, email: e.email,
-        );
+        _employees[i] = _employees[i].copyWith(rank: i + 1);
       }
       final shiftData = await _api.getShifts();
       _shifts = shiftData.map((s) => WorkShift.fromJson(s as Map<String, dynamic>)).toList();
-    } catch (_) {}
+    } catch (e) {
+      _error = 'Không thể tải dữ liệu nhân viên';
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -55,7 +55,9 @@ class EmployeeProvider extends ChangeNotifier {
     try {
       final data = await _api.getAttendances();
       _attendances = data.map((a) => Attendance.fromJson(a as Map<String, dynamic>)).toList();
-    } catch (_) {}
+    } catch (e) {
+      _error = 'Không thể tải dữ liệu chấm công';
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -76,14 +78,20 @@ class EmployeeProvider extends ChangeNotifier {
     try {
       await _api.checkIn(int.parse(employeeId));
       await loadAttendances();
-    } catch (_) {}
+    } catch (e) {
+      _error = 'Chấm công thất bại';
+      notifyListeners();
+    }
   }
 
   Future<void> checkOut(String employeeId) async {
     try {
       await _api.checkOut(int.parse(employeeId));
       await loadAttendances();
-    } catch (_) {}
+    } catch (e) {
+      _error = 'Check-out thất bại';
+      notifyListeners();
+    }
   }
 
   Future<void> addShift(WorkShift shift) async {
@@ -143,17 +151,7 @@ class EmployeeProvider extends ChangeNotifier {
   void _recalcRanks() {
     _employees.sort((a, b) => b.score.compareTo(a.score));
     for (var i = 0; i < _employees.length; i++) {
-      final e = _employees[i];
-      _employees[i] = Employee(
-        id: e.id,
-        fullName: e.fullName,
-        employeeCode: e.employeeCode,
-        position: e.position,
-        workLocation: e.workLocation,
-        score: e.score,
-        rank: i + 1,
-        email: e.email,
-      );
+      _employees[i] = _employees[i].copyWith(rank: i + 1);
     }
   }
 }

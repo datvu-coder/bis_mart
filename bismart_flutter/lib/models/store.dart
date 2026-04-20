@@ -6,6 +6,16 @@ class Store {
   final List<StoreManager> managers;
   final double? latitude;
   final double? longitude;
+  final String? province;
+  final String? sup;
+  final String? status;
+  final String? openDate;
+  final String? closeDate;
+  final String? storeType;
+  final String? address;
+  final String? phone;
+  final String? owner;
+  final String? taxCode;
 
   Store({
     required this.id,
@@ -15,6 +25,16 @@ class Store {
     this.managers = const [],
     this.latitude,
     this.longitude,
+    this.province,
+    this.sup,
+    this.status,
+    this.openDate,
+    this.closeDate,
+    this.storeType,
+    this.address,
+    this.phone,
+    this.owner,
+    this.taxCode,
   });
 
   factory Store.fromJson(Map<String, dynamic> json) {
@@ -29,6 +49,16 @@ class Store {
           [],
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
+      province: json['province'] as String?,
+      sup: json['sup'] as String?,
+      status: json['status'] as String?,
+      openDate: json['openDate'] as String?,
+      closeDate: json['closeDate'] as String?,
+      storeType: json['storeType'] as String?,
+      address: json['address'] as String?,
+      phone: json['phone'] as String?,
+      owner: json['owner'] as String?,
+      taxCode: json['taxCode'] as String?,
     );
   }
 
@@ -40,6 +70,12 @@ class Store {
         'managers': managers.map((m) => m.toJson()).toList(),
         'latitude': latitude,
         'longitude': longitude,
+        'province': province,
+        'status': status,
+        'storeType': storeType,
+        'address': address,
+        'phone': phone,
+        'owner': owner,
       };
 }
 

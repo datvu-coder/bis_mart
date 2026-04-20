@@ -237,14 +237,10 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
             ),
             ElevatedButton(
               onPressed: () {
-                final updated = Employee(
-                  id: _employee.id,
+                final updated = _employee.copyWith(
                   fullName: nameCtrl.text,
-                  employeeCode: _employee.employeeCode,
                   position: selectedPosition,
                   workLocation: locationCtrl.text,
-                  score: _employee.score,
-                  rank: _employee.rank,
                   email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
                 );
                 this.context.read<EmployeeProvider>().updateEmployee(updated);

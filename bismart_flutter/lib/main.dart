@@ -8,6 +8,7 @@ import 'providers/product_provider.dart';
 import 'providers/sales_provider.dart';
 import 'providers/store_provider.dart';
 import 'providers/training_provider.dart';
+import 'providers/lms_provider.dart';
 import 'services/api_service.dart';
 
 void main() {
@@ -26,6 +27,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => StoreProvider()),
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => TrainingProvider()),
+        ChangeNotifierProvider(create: (_) => LmsProvider()),
       ],
       child: const BismartApp(),
     ),

@@ -7,11 +7,14 @@ class DashboardProvider extends ChangeNotifier {
 
   DashboardData? _data;
   bool _isLoading = false;
-  String _filterType = 'today'; // today | week | month
+  String _filterType = 'today';
+  String? _error;
 
   DashboardData? get data => _data;
   bool get isLoading => _isLoading;
   String get filterType => _filterType;
+  String? get error => _error;
+  void clearError() { _error = null; notifyListeners(); }
 
   void setFilter(String filter) {
     _filterType = filter;
@@ -26,7 +29,9 @@ class DashboardProvider extends ChangeNotifier {
     try {
       final json = await _api.getDashboard(filter: _filterType);
       _data = DashboardData.fromJson(json);
-    } catch (_) {}
+    } catch (e) {
+      _error = 'Không thể tải dashboard';
+    }
 
     _isLoading = false;
     notifyListeners();

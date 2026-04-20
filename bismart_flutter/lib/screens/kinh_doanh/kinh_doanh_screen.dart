@@ -356,7 +356,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen> {
                   _detailRow('Ngày', DateFormatter.formatDate(report.date)),
                   _detailRow('PG', report.pgName),
                   _detailRow('NU', '${report.nu}'),
-                  _detailRow('Doanh số N1', CurrencyFormatter.formatVND(report.revenueN1)),
+                  _detailRow('Sale Out', CurrencyFormatter.formatVND(report.saleOut)),
                   _detailRow('Doanh thu', CurrencyFormatter.formatVND(report.revenue)),
                   if (report.products.isNotEmpty) ...[
                     const SizedBox(height: 16),

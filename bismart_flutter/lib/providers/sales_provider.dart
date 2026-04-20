@@ -8,10 +8,13 @@ class SalesProvider extends ChangeNotifier {
   List<SalesReport> _reports = [];
   bool _isLoading = false;
   String _filterType = 'today';
+  String? _error;
 
   List<SalesReport> get reports => _reports;
   bool get isLoading => _isLoading;
   String get filterType => _filterType;
+  String? get error => _error;
+  void clearError() { _error = null; notifyListeners(); }
 
   List<SalesReport> get filteredReports {
     final now = DateTime.now();
@@ -48,7 +51,9 @@ class SalesProvider extends ChangeNotifier {
     try {
       final data = await _api.getReports(filter: _filterType);
       _reports = data.map((r) => SalesReport.fromJson(r as Map<String, dynamic>)).toList();
-    } catch (_) {}
+    } catch (e) {
+      _error = 'Không thể tải báo cáo';
+    }
 
     _isLoading = false;
     notifyListeners();

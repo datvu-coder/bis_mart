@@ -19,7 +19,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   final _formKey = GlobalKey<FormState>();
   DateTime _selectedDate = DateTime.now();
   int _nu = 0;
-  final _revenueN1Controller = TextEditingController();
+  final _saleOutController = TextEditingController();
   final _revenueController = TextEditingController();
   final List<SaleItem> _products = [];
   bool _isSubmitting = false;
@@ -34,7 +34,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         _editingReport = arg;
         _selectedDate = arg.date;
         _nu = arg.nu;
-        _revenueN1Controller.text = arg.revenueN1.toStringAsFixed(0);
+        _saleOutController.text = arg.saleOut.toStringAsFixed(0);
         _revenueController.text = arg.revenue.toStringAsFixed(0);
         _products.addAll(arg.products);
       }
@@ -43,7 +43,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
   @override
   void dispose() {
-    _revenueN1Controller.dispose();
+    _saleOutController.dispose();
     _revenueController.dispose();
     super.dispose();
   }
@@ -149,13 +149,13 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Doanh số N1
-                _buildLabel(AppStrings.doanhSoN1),
+                // Sale Out
+                _buildLabel('Sale Out'),
                 TextFormField(
-                  controller: _revenueN1Controller,
+                  controller: _saleOutController,
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
-                    hintText: 'Nhập doanh số N1',
+                    hintText: 'Nhập Sale Out',
                     suffixText: 'đ',
                   ),
                 ),
@@ -377,7 +377,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         date: _selectedDate,
         pgName: user?.fullName ?? '',
         nu: _nu,
-        revenueN1: double.tryParse(_revenueN1Controller.text) ?? 0,
+        saleOut: double.tryParse(_saleOutController.text) ?? 0,
         products: _products,
         revenue: double.tryParse(_revenueController.text) ?? 0,
       );

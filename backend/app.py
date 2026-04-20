@@ -259,10 +259,14 @@ def api_create_employee():
     db = get_db()
     try:
         cur = db.execute(
-            "INSERT INTO employees (full_name, employee_code, position, work_location, score, email) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO employees (full_name, employee_code, position, work_location, "
+            "score, email, phone, department, province, area, store_code, status) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (data["fullName"], data["employeeCode"], data["position"],
-             data.get("workLocation", ""), data.get("score", 0), data.get("email")),
+             data.get("workLocation", ""), data.get("score", 0), data.get("email"),
+             data.get("phone"), data.get("department", "Kinh doanh"),
+             data.get("province"), data.get("area"),
+             data.get("storeCode"), data.get("status", "Chính thức")),
         )
         db.commit()
         new_id = cur.lastrowid if DB_BACKEND == "sqlite" else None
@@ -294,7 +298,10 @@ def api_update_employee(eid: int):
     fields, params = [], []
     for col, key in [("full_name", "fullName"), ("employee_code", "employeeCode"),
                      ("position", "position"), ("work_location", "workLocation"),
-                     ("score", "score"), ("email", "email")]:
+                     ("score", "score"), ("email", "email"), ("phone", "phone"),
+                     ("department", "department"), ("province", "province"),
+                     ("area", "area"), ("store_code", "storeCode"),
+                     ("status", "status"), ("address", "address")]:
         if key in data:
             fields.append(f"{col} = ?")
             params.append(data[key])
@@ -454,10 +461,14 @@ def api_create_store():
     db = get_db()
     try:
         cur = db.execute(
-            "INSERT INTO stores (name, store_code, store_group, latitude, longitude) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO stores (name, store_code, store_group, latitude, longitude, "
+            "province, address, phone, owner, status, store_type) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (data["name"], data["storeCode"], data.get("group", "I"),
-             data.get("latitude"), data.get("longitude")),
+             data.get("latitude"), data.get("longitude"),
+             data.get("province"), data.get("address"),
+             data.get("phone"), data.get("owner"),
+             data.get("status", "Hoạt động"), data.get("storeType")),
         )
         db.commit()
         new_id = cur.lastrowid if DB_BACKEND == "sqlite" else None
@@ -479,7 +490,10 @@ def api_update_store(sid: int):
     fields, params = [], []
     for col, key in [("name", "name"), ("store_code", "storeCode"),
                      ("store_group", "group"), ("latitude", "latitude"),
-                     ("longitude", "longitude")]:
+                     ("longitude", "longitude"), ("province", "province"),
+                     ("address", "address"), ("phone", "phone"),
+                     ("owner", "owner"), ("status", "status"),
+                     ("store_type", "storeType")]:
         if key in data:
             fields.append(f"{col} = ?")
             params.append(data[key])
@@ -611,11 +625,15 @@ def api_create_report():
     db = get_db()
     user_id = g.current_user.get("user_id")
     cur = db.execute(
-        "INSERT INTO sales_reports (report_date, pg_name, nu, revenue_n1, revenue, created_by) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO sales_reports (report_date, pg_name, store_name, nu, sale_out, "
+        "store_code, report_month, revenue, points, employee_code, created_by) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (data.get("date", datetime.now(tz=VN_TZ).strftime("%Y-%m-%d")),
-         data.get("pgName", ""), data.get("nu", 0),
-         data.get("revenueN1", 0), data.get("revenue", 0), user_id),
+         data.get("pgName", ""), data.get("storeName", ""),
+         data.get("nu", 0), data.get("saleOut", 0),
+         data.get("storeCode", ""), data.get("reportMonth"),
+         data.get("revenue", 0), data.get("points", 0),
+         data.get("employeeCode", ""), user_id),
     )
     db.commit()
     report_id = cur.lastrowid if DB_BACKEND == "sqlite" else None
@@ -653,9 +671,11 @@ def api_update_report(rid: int):
     data = request.get_json(silent=True) or {}
     db = get_db()
     db.execute(
-        "UPDATE sales_reports SET report_date=?, pg_name=?, nu=?, revenue_n1=?, revenue=? WHERE id=?",
-        (data.get("date"), data.get("pgName"), data.get("nu", 0),
-         data.get("revenueN1", 0), data.get("revenue", 0), rid),
+        "UPDATE sales_reports SET report_date=?, pg_name=?, store_name=?, nu=?, "
+        "sale_out=?, store_code=?, revenue=? WHERE id=?",
+        (data.get("date"), data.get("pgName"), data.get("storeName", ""),
+         data.get("nu", 0), data.get("saleOut", 0),
+         data.get("storeCode", ""), data.get("revenue", 0), rid),
     )
     db.execute("DELETE FROM sale_items WHERE report_id = ?", (rid,))
     for item in data.get("products", []):
@@ -881,161 +901,37 @@ def api_dashboard():
 # Seed data
 # ---------------------------------------------------------------------------
 def _seed_data(db: DBCompatConnection) -> None:
-    # Check if already seeded
+    """Seed minimal admin user if database was imported from Excel and has employees but no users."""
     row = db.execute("SELECT COUNT(*) AS cnt FROM users").fetchone()
     if dict(row)["cnt"] > 0:
         return
-
-    # Seed employees
-    employees = [
-        ("Nguyễn Văn A", "0002601020", "MNG", "Head Office", 1000, "admin@bismart.vn"),
-        ("Nguyễn Thị Lan", "0002601001", "PG", "Bi'S MART Sa Đéc", 960, "lan@bismart.vn"),
-        ("Trần Văn Minh", "0002601002", "PG", "Bi'S MART Đồng Thánh", 920, "minh@bismart.vn"),
-        ("Lê Thị Hương", "0002601003", "ADM", "Bi'S MART Long Hựu", 880, "huong@bismart.vn"),
-        ("Phạm Đức Anh", "0002601004", "TLD", "Bi'S MART Phước Vân", 840, "anh@bismart.vn"),
-        ("Võ Thị Mai", "0002601005", "PG", "Bi'S MART Cầu Tràm", 800, "mai@bismart.vn"),
-        ("Hoàng Văn Tùng", "0002601006", "PG", "Bi'S MART Cần Đước", 760, "tung@bismart.vn"),
-        ("Đặng Thị Ngọc", "0002601007", "ADM", "Bi'S MART Phước Lại", 720, "ngoc@bismart.vn"),
-        ("Bùi Quang Hải", "0002601008", "PG", "Bi'S MART Cần Giuộc", 680, "hai@bismart.vn"),
-        ("Ngô Thị Thanh", "0002601009", "PG", "Bi'S MART Hiệp Phước", 640, "thanh@bismart.vn"),
-        ("Trịnh Văn Long", "0002601010", "TLD", "Bi'S MART Tân Tập", 600, "long@bismart.vn"),
-        ("Phan Thị Yến", "0002601011", "PG", "Bi'S MART Hưng Long", 560, "yen@bismart.vn"),
-        ("Lý Văn Đức", "0002601012", "CS", "Bi'S MART Phước Kiến", 520, "duc@bismart.vn"),
-        ("Hồ Thị Kim", "0002601013", "PG", "Bi'S MART Sa Đéc", 480, "kim@bismart.vn"),
-        ("Dương Văn Nam", "0002601014", "PG", "Bi'S MART Đồng Thánh", 440, "nam@bismart.vn"),
-        ("Cao Thị Linh", "0002601015", "ADM", "Head Office", 400, "linh@bismart.vn"),
-        ("Đinh Văn Phúc", "0002601016", "PG", "Bi'S MART Long Hựu", 360, "phuc@bismart.vn"),
-        ("Tô Thị Hà", "0002601017", "PG", "Bi'S MART Phước Vân", 320, "ha@bismart.vn"),
-        ("Vũ Văn Sơn", "0002601018", "TLD", "Head Office", 280, "son@bismart.vn"),
-        ("Mai Thị Dung", "0002601019", "PG", "Bi'S MART Cầu Tràm", 240, "dung@bismart.vn"),
-    ]
-    for emp in employees:
+    # Check if employees exist (from import)
+    emp_row = db.execute("SELECT COUNT(*) AS cnt FROM employees").fetchone()
+    if dict(emp_row)["cnt"] > 0:
+        # Find a MNG employee for admin
+        mgr = db.execute("SELECT id FROM employees WHERE position = 'MNG' AND is_active = 1 LIMIT 1").fetchone()
+        emp_id = dict(mgr)["id"] if mgr else 1
+        admin_username = os.getenv("SEED_ADMIN_USERNAME", "admin")
+        admin_password = os.getenv("SEED_ADMIN_PASSWORD", "admin123")
         db.execute(
-            "INSERT INTO employees (full_name, employee_code, position, work_location, score, email) "
-            "VALUES (?, ?, ?, ?, ?, ?)", emp
+            "INSERT INTO users (username, password_hash, employee_id) VALUES (?, ?, ?)",
+            (admin_username, generate_password_hash(admin_password, method="pbkdf2:sha256"), emp_id),
         )
+        db.commit()
+        return
 
-    # Seed admin user (password: admin123)
+    # Fallback: seed basic data if no Excel import was done
     admin_username = os.getenv("SEED_ADMIN_USERNAME", "admin")
     admin_password = os.getenv("SEED_ADMIN_PASSWORD", "admin123")
+    db.execute(
+        "INSERT INTO employees (full_name, employee_code, position, work_location, score, email) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        ("Admin", "ADMIN001", "MNG", "Head Office", 1000, "admin@bismart.vn"),
+    )
     db.execute(
         "INSERT INTO users (username, password_hash, employee_id) VALUES (?, ?, 1)",
         (admin_username, generate_password_hash(admin_password, method="pbkdf2:sha256")),
     )
-
-    # Seed stores
-    stores = [
-        ("Bi'S MART Sa Đéc", "101", "I", 10.2898, 105.7558),
-        ("Bi'S MART Đồng Thánh", "102", "I", 10.3500, 106.4500),
-        ("Bi'S MART Long Hựu", "103", "I", None, None),
-        ("Bi'S MART Phước Vân", "104", "I", None, None),
-        ("Bi'S MART Cầu Tràm", "105", "I", None, None),
-        ("Bi'S MART Cần Đước", "106", "I", None, None),
-        ("Bi'S MART Phước Lại", "107", "I", None, None),
-        ("Bi'S MART Cần Giuộc", "108", "I", None, None),
-        ("Bi'S MART Hiệp Phước", "109", "I", None, None),
-        ("Bi'S MART Tân Tập", "110", "I", None, None),
-        ("Bi'S MART Hưng Long", "111", "I", None, None),
-        ("Bi'S MART Phước Kiến", "112", "I", None, None),
-        ("Head Office", "000", "HO", None, None),
-        ("Chủ Shop", "CS", "CS", None, None),
-    ]
-    for s in stores:
-        db.execute(
-            "INSERT INTO stores (name, store_code, store_group, latitude, longitude) "
-            "VALUES (?, ?, ?, ?, ?)", s
-        )
-
-    # Seed products
-    products = [
-        ("SPDD CÔNG THỨC DELIMIL PRO+", "Lon", 450000, "DELI"),
-        ("SPDD DELIVIE SMART", "Lon", 420000, "DELI"),
-        ("SPDD DELIVIE PEDIA GAIN", "Lon", 398000, "DELI"),
-        ("TPBS DELIVIE GLUSURE", "Lon", 520000, "DELIMIL"),
-        ("TPBS DELIVIE CANXI NANO", "Hộp", 380000, "DELIMIL"),
-        ("SPDD CÔNG THỨC DELIMIL PRO+ 400G", "Lon", 285000, "DELIMIL"),
-        ("TPBS AUMIL AVI SURE 750G", "Lon", 668000, "AUMIL"),
-        ("TPBS AUMIL AVI MOM 750G", "Lon", 678000, "AUMIL"),
-        ("GOODLIFE CANXI PL", "Hộp", 350000, "GOODLIFE"),
-        ("TP DÙNG CHO CHẾ ĐỘ", "Gói", 150000, "TP"),
-    ]
-    for p in products:
-        db.execute(
-            "INSERT INTO products (name, unit, price_with_vat, product_group) "
-            "VALUES (?, ?, ?, ?)", p
-        )
-
-    # Seed work shifts
-    shifts = [
-        ("Ca gãy sáng", 7, 30, 11, 30),
-        ("Ca gãy chiều", 17, 0, 21, 0),
-        ("Ca ngày", 11, 0, 19, 0),
-        ("Ca sáng", 8, 30, 12, 30),
-        ("Ca chiều", 15, 0, 19, 0),
-    ]
-    for s in shifts:
-        db.execute(
-            "INSERT INTO work_shifts (name, start_hour, start_minute, end_hour, end_minute) "
-            "VALUES (?, ?, ?, ?, ?)", s
-        )
-
-    # Seed community posts
-    posts = [
-        ("Nguyễn Thị Lan", "Hôm nay đạt target doanh số! 🎉 Cảm ơn cả team đã hỗ trợ.", 12, 5),
-        ("Trần Văn Minh", "Chia sẻ tips bán hàng sữa DELIMIL PRO+ hiệu quả...", 8, 3),
-        ("Lê Thị Hương", "Chương trình khuyến mãi mới cho GOODLIFE CANXI bắt đầu từ tuần sau!", 15, 7),
-    ]
-    for p in posts:
-        db.execute(
-            "INSERT INTO community_posts (author_name, content, like_count, comment_count) "
-            "VALUES (?, ?, ?, ?)", p
-        )
-
-    # Seed lessons
-    lessons_data = [
-        ("Kiến thức sản phẩm DELIMIL PRO+", "", "PG", 0),
-        ("Kỹ năng bán hàng nâng cao", "", "ALL", 0),
-        ("Quản lý cửa hàng hiệu quả", "", "ADM", 1),
-        ("Chăm sóc khách hàng chuyên nghiệp", "", "ALL", 0),
-    ]
-    for l in lessons_data:
-        db.execute(
-            "INSERT INTO lessons (title, thumbnail_url, target_role, is_restricted) "
-            "VALUES (?, ?, ?, ?)", l
-        )
-
-    # Seed sample sales reports
-    for i in range(5):
-        d = (now - timedelta(days=i)).strftime("%Y-%m-%d")
-        db.execute(
-            "INSERT INTO sales_reports (report_date, pg_name, nu, revenue_n1, revenue, created_by) "
-            "VALUES (?, ?, ?, ?, ?, 1)",
-            (d, f"PG {i+1}", 3 + i, 2000000 + i * 500000, 3500000 + i * 700000),
-        )
-
-    for rid in range(1, 6):
-        db.execute(
-            "INSERT INTO sale_items (report_id, product_name, quantity, unit_price) "
-            "VALUES (?, 'DELIMIL PRO+', ?, 450000)",
-            (rid, 2 + rid - 1),
-        )
-        db.execute(
-            "INSERT INTO sale_items (report_id, product_name, quantity, unit_price) "
-            "VALUES (?, 'GOODLIFE CANXI', ?, 380000)",
-            (rid, 1 + rid - 1),
-        )
-
-    # Seed training events
-    for day_offset, titles in [(1, ["Đào tạo PG mới"]),
-                               (3, ["Họp nhóm bán hàng", "Kiểm tra sản phẩm"]),
-                               (5, ["Workshop kỹ năng bán hàng"]),
-                               (7, ["Đánh giá tháng"])]:
-        d = (now + timedelta(days=day_offset)).strftime("%Y-%m-%d")
-        for t in titles:
-            db.execute(
-                "INSERT INTO training_events (event_date, title) VALUES (?, ?)", (d, t)
-            )
-
     db.commit()
 
 
@@ -1050,11 +946,27 @@ def _employee_dict(row: dict) -> dict:
         "id": str(row.get("id", row.get("employee_id", ""))),
         "fullName": row.get("full_name", ""),
         "employeeCode": row.get("employee_code", ""),
+        "dateOfBirth": row.get("date_of_birth"),
+        "cccd": row.get("cccd"),
+        "address": row.get("address"),
+        "status": row.get("status", "Chính thức"),
         "position": row.get("position", ""),
+        "department": row.get("department", "Kinh doanh"),
         "workLocation": row.get("work_location", ""),
-        "score": row.get("score", 0),
-        "rank": row.get("rank", 0),
+        "province": row.get("province"),
+        "area": row.get("area"),
+        "createdDate": row.get("created_date"),
+        "probationDate": row.get("probation_date"),
+        "officialDate": row.get("official_date"),
+        "resignDate": row.get("resign_date"),
+        "resignReason": row.get("resign_reason"),
+        "phone": row.get("phone"),
         "email": row.get("email"),
+        "avatarUrl": row.get("avatar_url"),
+        "storeCode": row.get("store_code"),
+        "score": row.get("score", 0),
+        "rankLevel": row.get("rank_level"),
+        "rank": row.get("rank", 0),
     }
 
 
@@ -1066,6 +978,16 @@ def _store_dict(row: dict) -> dict:
         "group": row["store_group"],
         "latitude": row.get("latitude"),
         "longitude": row.get("longitude"),
+        "province": row.get("province"),
+        "sup": row.get("sup"),
+        "status": row.get("status", "Hoạt động"),
+        "openDate": row.get("open_date"),
+        "closeDate": row.get("close_date"),
+        "storeType": row.get("store_type"),
+        "address": row.get("address"),
+        "phone": row.get("phone"),
+        "owner": row.get("owner"),
+        "taxCode": row.get("tax_code"),
         "managers": [],
     }
 
@@ -1076,6 +998,7 @@ def _product_dict(row: dict) -> dict:
         "name": row["name"],
         "unit": row["unit"],
         "priceWithVAT": row["price_with_vat"],
+        "productCondition": row.get("product_condition"),
         "productGroup": row["product_group"],
     }
 
@@ -1085,9 +1008,14 @@ def _report_dict(row: dict) -> dict:
         "id": str(row["id"]),
         "date": row["report_date"],
         "pgName": row["pg_name"],
+        "storeName": row.get("store_name", ""),
         "nu": row["nu"],
-        "revenueN1": row["revenue_n1"],
+        "saleOut": row.get("sale_out", 0),
+        "storeCode": row.get("store_code", ""),
+        "reportMonth": row.get("report_month"),
         "revenue": row["revenue"],
+        "points": row.get("points", 0),
+        "employeeCode": row.get("employee_code", ""),
         "products": [],
     }
 
@@ -1096,8 +1024,10 @@ def _sale_item_dict(row: dict) -> dict:
     return {
         "productId": str(row.get("product_id") or ""),
         "productName": row["product_name"],
+        "unit": row.get("unit", ""),
         "quantity": row["quantity"],
         "unitPrice": row["unit_price"],
+        "productGroup": row.get("product_group", ""),
     }
 
 
@@ -1106,9 +1036,19 @@ def _attendance_dict(row: dict) -> dict:
         "id": str(row["id"]),
         "date": row["attend_date"],
         "employeeId": str(row["employee_id"]),
+        "employeeName": row.get("full_name", ""),
+        "shiftName": row.get("shift_name", ""),
+        "shiftTimeRange": row.get("shift_time_range", ""),
+        "coordinates": row.get("coordinates"),
+        "distanceIn": row.get("distance_in"),
         "isCheckedIn": row.get("check_in_time") is not None,
         "checkInTime": row.get("check_in_time"),
+        "checkInDiff": row.get("check_in_diff"),
+        "checkInStatus": row.get("check_in_status", ""),
+        "distanceOut": row.get("distance_out"),
         "checkOutTime": row.get("check_out_time"),
+        "checkOutDiff": row.get("check_out_diff"),
+        "checkOutStatus": row.get("check_out_status", ""),
     }
 
 
@@ -1116,10 +1056,12 @@ def _shift_dict(row: dict) -> dict:
     return {
         "id": str(row["id"]),
         "name": row["name"],
+        "shiftCode": row.get("shift_code", ""),
         "startHour": row["start_hour"],
         "startMinute": row["start_minute"],
         "endHour": row["end_hour"],
         "endMinute": row["end_minute"],
+        "storeName": row.get("store_name", ""),
     }
 
 
@@ -1145,6 +1087,490 @@ def _lesson_dict(row: dict) -> dict:
         "isRestricted": bool(row.get("is_restricted", 0)),
         "videoUrl": row.get("video_url"),
     }
+
+
+# ---------------------------------------------------------------------------
+# PERMISSIONS
+# ---------------------------------------------------------------------------
+@app.get("/api/permissions")
+@login_required
+def api_list_permissions():
+    db = get_db()
+    rows = db.execute("SELECT * FROM permissions ORDER BY id").fetchall()
+    return jsonify([{
+        "id": dict(r)["id"], "position": dict(r)["position"],
+        "description": dict(r).get("description", ""),
+        "canAttendance": bool(dict(r).get("can_attendance")),
+        "canReport": bool(dict(r).get("can_report")),
+        "canManageAttendance": bool(dict(r).get("can_manage_attendance")),
+        "canEmployees": bool(dict(r).get("can_employees")),
+        "canMore": bool(dict(r).get("can_more")),
+        "canCrud": bool(dict(r).get("can_crud")),
+        "canSwitchStore": bool(dict(r).get("can_switch_store")),
+        "canStoreList": bool(dict(r).get("can_store_list")),
+        "canProductList": bool(dict(r).get("can_product_list")),
+    } for r in rows])
+
+
+@app.get("/api/permissions/<position>")
+@login_required
+def api_get_permission(position: str):
+    db = get_db()
+    row = db.execute("SELECT * FROM permissions WHERE position = ?", (position,)).fetchone()
+    if not row:
+        return jsonify({"error": "Không tìm thấy quyền"}), 404
+    r = dict(row)
+    return jsonify({
+        "position": r["position"], "description": r.get("description", ""),
+        "canAttendance": bool(r.get("can_attendance")),
+        "canReport": bool(r.get("can_report")),
+        "canManageAttendance": bool(r.get("can_manage_attendance")),
+        "canEmployees": bool(r.get("can_employees")),
+        "canMore": bool(r.get("can_more")),
+        "canCrud": bool(r.get("can_crud")),
+        "canSwitchStore": bool(r.get("can_switch_store")),
+        "canStoreList": bool(r.get("can_store_list")),
+        "canProductList": bool(r.get("can_product_list")),
+    })
+
+
+# ---------------------------------------------------------------------------
+# COURSES (LMS)
+# ---------------------------------------------------------------------------
+@app.get("/api/courses")
+@login_required
+def api_list_courses():
+    db = get_db()
+    rows = db.execute("SELECT * FROM course_titles ORDER BY id").fetchall()
+    courses = []
+    for r in rows:
+        d = dict(r)
+        contents = db.execute(
+            "SELECT * FROM course_contents WHERE title_id = ?", (d["excel_id"],)
+        ).fetchall()
+        courses.append({
+            "id": str(d["id"]), "excelId": d["excel_id"],
+            "title": d["title"], "accessLevel": d.get("access_level"),
+            "imageUrl": d.get("image_url"), "description": d.get("description"),
+            "rating": d.get("rating"), "targetGroup": d.get("target_group"),
+            "contents": [{
+                "id": str(dict(c)["id"]), "excelId": dict(c)["excel_id"],
+                "title": dict(c)["title"], "detailHtml": dict(c).get("detail_html"),
+                "points": dict(c).get("points", 0),
+                "attachmentType": dict(c).get("attachment_type"),
+                "imageUrl": dict(c).get("image_url"),
+                "videoUrl": dict(c).get("video_url"),
+                "status": dict(c).get("status"),
+            } for c in contents],
+        })
+    return jsonify(courses)
+
+
+@app.get("/api/courses/<course_id>/enrollments")
+@login_required
+def api_course_enrollments(course_id: str):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM course_enrollments WHERE title_id = ? ORDER BY enrolled_at DESC",
+        (course_id,)
+    ).fetchall()
+    return jsonify([{
+        "id": str(dict(r)["id"]), "employeeCode": dict(r)["employee_code"],
+        "fullName": dict(r)["full_name"], "enrolledAt": dict(r)["enrolled_at"],
+    } for r in rows])
+
+
+@app.get("/api/courses/<course_id>/completions")
+@login_required
+def api_course_completions(course_id: str):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM course_completions WHERE title_id = ? ORDER BY completed_at DESC",
+        (course_id,)
+    ).fetchall()
+    return jsonify([{
+        "id": str(dict(r)["id"]), "contentId": dict(r)["content_id"],
+        "employeeCode": dict(r)["employee_code"], "fullName": dict(r)["full_name"],
+        "completedAt": dict(r)["completed_at"], "points": dict(r).get("points", 0),
+        "contentName": dict(r).get("content_name"),
+    } for r in rows])
+
+
+# ---------------------------------------------------------------------------
+# QUIZ
+# ---------------------------------------------------------------------------
+@app.get("/api/quiz/<content_id>")
+@login_required
+def api_quiz_questions(content_id: str):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM quiz_questions WHERE content_id = ? ORDER BY question_number",
+        (content_id,)
+    ).fetchall()
+    return jsonify([{
+        "id": dict(r)["id"], "type": dict(r)["question_type"],
+        "question": dict(r)["question"],
+        "options": [dict(r).get("option_a"), dict(r).get("option_b"),
+                    dict(r).get("option_c"), dict(r).get("option_d")],
+        "correctAnswer": dict(r).get("correct_answer"),
+        "points": dict(r).get("points", 0),
+    } for r in rows])
+
+
+@app.get("/api/quiz-results")
+@login_required
+def api_quiz_results():
+    content_id = request.args.get("contentId")
+    employee_code = request.args.get("employeeCode")
+    db = get_db()
+    where, params = [], []
+    if content_id:
+        where.append("content_id = ?")
+        params.append(content_id)
+    if employee_code:
+        where.append("employee_code = ?")
+        params.append(employee_code)
+    clause = "WHERE " + " AND ".join(where) if where else ""
+    rows = db.execute(
+        f"SELECT * FROM quiz_results {clause} ORDER BY submitted_at DESC", tuple(params)
+    ).fetchall()
+    return jsonify([{
+        "id": dict(r)["id"], "submittedAt": dict(r)["submitted_at"],
+        "employeeCode": dict(r)["employee_code"], "fullName": dict(r)["full_name"],
+        "storeName": dict(r).get("store_name"), "score": dict(r)["score"],
+        "answersJson": dict(r).get("answers_json"),
+    } for r in rows])
+
+
+# ---------------------------------------------------------------------------
+# CLASS SCHEDULES
+# ---------------------------------------------------------------------------
+@app.get("/api/class-schedules")
+@login_required
+def api_list_class_schedules():
+    db = get_db()
+    rows = db.execute("SELECT * FROM class_schedules ORDER BY start_date DESC").fetchall()
+    schedules = []
+    for r in rows:
+        d = dict(r)
+        attendances = db.execute(
+            "SELECT * FROM class_attendances WHERE schedule_id = ? ORDER BY attend_date, attend_time",
+            (d["excel_id"],)
+        ).fetchall()
+        schedules.append({
+            "id": str(d["id"]), "excelId": d["excel_id"],
+            "startDate": d["start_date"], "startTime": d["start_time"],
+            "endDate": d["end_date"], "endTime": d["end_time"],
+            "content": d["content"], "link": d.get("link"),
+            "attendanceCount": len(attendances),
+            "attendances": [{
+                "id": str(dict(a)["id"]),
+                "employeeCode": dict(a)["employee_code"],
+                "fullName": dict(a)["full_name"],
+                "storeName": dict(a).get("store_name"),
+                "action": dict(a)["action"],
+                "time": dict(a).get("attend_time"),
+                "date": dict(a).get("attend_date"),
+            } for a in attendances],
+        })
+    return jsonify(schedules)
+
+
+# ---------------------------------------------------------------------------
+# AI TOOLS
+# ---------------------------------------------------------------------------
+@app.get("/api/ai-tools")
+@login_required
+def api_list_ai_tools():
+    db = get_db()
+    rows = db.execute("SELECT * FROM ai_tools ORDER BY id").fetchall()
+    return jsonify([{
+        "id": dict(r)["id"], "name": dict(r)["name"], "link": dict(r).get("link"),
+    } for r in rows])
+
+
+@app.get("/api/ai-usage")
+@login_required
+def api_ai_usage():
+    employee_code = request.args.get("employeeCode")
+    db = get_db()
+    if employee_code:
+        rows = db.execute(
+            "SELECT * FROM ai_usage_logs WHERE employee_code = ? ORDER BY used_at DESC",
+            (employee_code,)
+        ).fetchall()
+    else:
+        rows = db.execute("SELECT * FROM ai_usage_logs ORDER BY used_at DESC LIMIT 100").fetchall()
+    return jsonify([{
+        "id": dict(r)["id"], "employeeCode": dict(r)["employee_code"],
+        "fullName": dict(r)["full_name"], "storeName": dict(r).get("store_name"),
+        "aiName": dict(r)["ai_name"], "usedAt": dict(r)["used_at"],
+        "points": dict(r).get("points", 0),
+    } for r in rows])
+
+
+# ---------------------------------------------------------------------------
+# COMMENTS
+# ---------------------------------------------------------------------------
+@app.get("/api/posts/<int:pid>/comments")
+@login_required
+def api_list_comments(pid: int):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM comments WHERE post_id = ? ORDER BY created_at", (pid,)
+    ).fetchall()
+    return jsonify([{
+        "id": str(dict(r)["id"]), "content": dict(r).get("content"),
+        "authorName": dict(r).get("author_name", ""),
+        "employeeCode": dict(r).get("employee_code"),
+        "imageUrl": dict(r).get("image_url"),
+        "videoUrl": dict(r).get("video_url"),
+        "points": dict(r).get("points", 0),
+        "likeCount": dict(r).get("like_count", 0),
+        "createdAt": dict(r).get("created_at"),
+    } for r in rows])
+
+
+# ---------------------------------------------------------------------------
+# PERMISSIONS
+# ---------------------------------------------------------------------------
+@app.get("/api/permissions")
+@login_required
+def api_list_permissions():
+    db = get_db()
+    rows = db.execute("SELECT * FROM permissions ORDER BY id").fetchall()
+    return jsonify([{
+        "id": dict(r)["id"], "position": dict(r)["position"],
+        "description": dict(r).get("description", ""),
+        "canAttendance": bool(dict(r).get("can_attendance")),
+        "canReport": bool(dict(r).get("can_report")),
+        "canManageAttendance": bool(dict(r).get("can_manage_attendance")),
+        "canEmployees": bool(dict(r).get("can_employees")),
+        "canMore": bool(dict(r).get("can_more")),
+        "canCrud": bool(dict(r).get("can_crud")),
+        "canSwitchStore": bool(dict(r).get("can_switch_store")),
+        "canStoreList": bool(dict(r).get("can_store_list")),
+        "canProductList": bool(dict(r).get("can_product_list")),
+    } for r in rows])
+
+
+@app.get("/api/permissions/<position>")
+@login_required
+def api_get_permission(position: str):
+    db = get_db()
+    row = db.execute("SELECT * FROM permissions WHERE position = ?", (position,)).fetchone()
+    if not row:
+        return jsonify({"error": "Không tìm thấy quyền"}), 404
+    r = dict(row)
+    return jsonify({
+        "position": r["position"], "description": r.get("description", ""),
+        "canAttendance": bool(r.get("can_attendance")),
+        "canReport": bool(r.get("can_report")),
+        "canManageAttendance": bool(r.get("can_manage_attendance")),
+        "canEmployees": bool(r.get("can_employees")),
+        "canMore": bool(r.get("can_more")),
+        "canCrud": bool(r.get("can_crud")),
+        "canSwitchStore": bool(r.get("can_switch_store")),
+        "canStoreList": bool(r.get("can_store_list")),
+        "canProductList": bool(r.get("can_product_list")),
+    })
+
+
+# ---------------------------------------------------------------------------
+# COURSES (LMS)
+# ---------------------------------------------------------------------------
+@app.get("/api/courses")
+@login_required
+def api_list_courses():
+    db = get_db()
+    rows = db.execute("SELECT * FROM course_titles ORDER BY id").fetchall()
+    courses = []
+    for r in rows:
+        d = dict(r)
+        contents = db.execute(
+            "SELECT * FROM course_contents WHERE title_id = ?", (d["excel_id"],)
+        ).fetchall()
+        courses.append({
+            "id": str(d["id"]), "excelId": d["excel_id"],
+            "title": d["title"], "accessLevel": d.get("access_level"),
+            "imageUrl": d.get("image_url"), "description": d.get("description"),
+            "rating": d.get("rating"), "targetGroup": d.get("target_group"),
+            "contents": [{
+                "id": str(dict(c)["id"]), "excelId": dict(c)["excel_id"],
+                "title": dict(c)["title"], "detailHtml": dict(c).get("detail_html"),
+                "points": dict(c).get("points", 0),
+                "attachmentType": dict(c).get("attachment_type"),
+                "imageUrl": dict(c).get("image_url"),
+                "videoUrl": dict(c).get("video_url"),
+                "status": dict(c).get("status"),
+            } for c in contents],
+        })
+    return jsonify(courses)
+
+
+@app.get("/api/courses/<course_id>/enrollments")
+@login_required
+def api_course_enrollments(course_id: str):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM course_enrollments WHERE title_id = ? ORDER BY enrolled_at DESC",
+        (course_id,)
+    ).fetchall()
+    return jsonify([{
+        "id": str(dict(r)["id"]), "employeeCode": dict(r)["employee_code"],
+        "fullName": dict(r)["full_name"], "enrolledAt": dict(r)["enrolled_at"],
+    } for r in rows])
+
+
+@app.get("/api/courses/<course_id>/completions")
+@login_required
+def api_course_completions(course_id: str):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM course_completions WHERE title_id = ? ORDER BY completed_at DESC",
+        (course_id,)
+    ).fetchall()
+    return jsonify([{
+        "id": str(dict(r)["id"]), "contentId": dict(r)["content_id"],
+        "employeeCode": dict(r)["employee_code"], "fullName": dict(r)["full_name"],
+        "completedAt": dict(r)["completed_at"], "points": dict(r).get("points", 0),
+        "contentName": dict(r).get("content_name"),
+    } for r in rows])
+
+
+# ---------------------------------------------------------------------------
+# QUIZ
+# ---------------------------------------------------------------------------
+@app.get("/api/quiz/<content_id>")
+@login_required
+def api_quiz_questions(content_id: str):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM quiz_questions WHERE content_id = ? ORDER BY question_number",
+        (content_id,)
+    ).fetchall()
+    return jsonify([{
+        "id": dict(r)["id"], "type": dict(r)["question_type"],
+        "question": dict(r)["question"],
+        "options": [dict(r).get("option_a"), dict(r).get("option_b"),
+                    dict(r).get("option_c"), dict(r).get("option_d")],
+        "correctAnswer": dict(r).get("correct_answer"),
+        "points": dict(r).get("points", 0),
+    } for r in rows])
+
+
+@app.get("/api/quiz-results")
+@login_required
+def api_quiz_results():
+    content_id = request.args.get("contentId")
+    employee_code = request.args.get("employeeCode")
+    db = get_db()
+    where, params = [], []
+    if content_id:
+        where.append("content_id = ?")
+        params.append(content_id)
+    if employee_code:
+        where.append("employee_code = ?")
+        params.append(employee_code)
+    clause = "WHERE " + " AND ".join(where) if where else ""
+    rows = db.execute(
+        f"SELECT * FROM quiz_results {clause} ORDER BY submitted_at DESC", tuple(params)
+    ).fetchall()
+    return jsonify([{
+        "id": dict(r)["id"], "submittedAt": dict(r)["submitted_at"],
+        "employeeCode": dict(r)["employee_code"], "fullName": dict(r)["full_name"],
+        "storeName": dict(r).get("store_name"), "score": dict(r)["score"],
+        "answersJson": dict(r).get("answers_json"),
+    } for r in rows])
+
+
+# ---------------------------------------------------------------------------
+# CLASS SCHEDULES
+# ---------------------------------------------------------------------------
+@app.get("/api/class-schedules")
+@login_required
+def api_list_class_schedules():
+    db = get_db()
+    rows = db.execute("SELECT * FROM class_schedules ORDER BY start_date DESC").fetchall()
+    schedules = []
+    for r in rows:
+        d = dict(r)
+        attendances = db.execute(
+            "SELECT * FROM class_attendances WHERE schedule_id = ? ORDER BY attend_date, attend_time",
+            (d["excel_id"],)
+        ).fetchall()
+        schedules.append({
+            "id": str(d["id"]), "excelId": d["excel_id"],
+            "startDate": d["start_date"], "startTime": d["start_time"],
+            "endDate": d["end_date"], "endTime": d["end_time"],
+            "content": d["content"], "link": d.get("link"),
+            "attendanceCount": len(attendances),
+            "attendances": [{
+                "id": str(dict(a)["id"]),
+                "employeeCode": dict(a)["employee_code"],
+                "fullName": dict(a)["full_name"],
+                "storeName": dict(a).get("store_name"),
+                "action": dict(a)["action"],
+                "time": dict(a).get("attend_time"),
+                "date": dict(a).get("attend_date"),
+            } for a in attendances],
+        })
+    return jsonify(schedules)
+
+
+# ---------------------------------------------------------------------------
+# AI TOOLS
+# ---------------------------------------------------------------------------
+@app.get("/api/ai-tools")
+@login_required
+def api_list_ai_tools():
+    db = get_db()
+    rows = db.execute("SELECT * FROM ai_tools ORDER BY id").fetchall()
+    return jsonify([{
+        "id": dict(r)["id"], "name": dict(r)["name"], "link": dict(r).get("link"),
+    } for r in rows])
+
+
+@app.get("/api/ai-usage")
+@login_required
+def api_ai_usage():
+    employee_code = request.args.get("employeeCode")
+    db = get_db()
+    if employee_code:
+        rows = db.execute(
+            "SELECT * FROM ai_usage_logs WHERE employee_code = ? ORDER BY used_at DESC",
+            (employee_code,)
+        ).fetchall()
+    else:
+        rows = db.execute("SELECT * FROM ai_usage_logs ORDER BY used_at DESC LIMIT 100").fetchall()
+    return jsonify([{
+        "id": dict(r)["id"], "employeeCode": dict(r)["employee_code"],
+        "fullName": dict(r)["full_name"], "storeName": dict(r).get("store_name"),
+        "aiName": dict(r)["ai_name"], "usedAt": dict(r)["used_at"],
+        "points": dict(r).get("points", 0),
+    } for r in rows])
+
+
+# ---------------------------------------------------------------------------
+# COMMENTS
+# ---------------------------------------------------------------------------
+@app.get("/api/posts/<int:pid>/comments")
+@login_required
+def api_list_comments(pid: int):
+    db = get_db()
+    rows = db.execute(
+        "SELECT * FROM comments WHERE post_id = ? ORDER BY created_at", (pid,)
+    ).fetchall()
+    return jsonify([{
+        "id": str(dict(r)["id"]), "content": dict(r).get("content"),
+        "authorName": dict(r).get("author_name", ""),
+        "employeeCode": dict(r).get("employee_code"),
+        "imageUrl": dict(r).get("image_url"),
+        "videoUrl": dict(r).get("video_url"),
+        "points": dict(r).get("points", 0),
+        "likeCount": dict(r).get("like_count", 0),
+        "createdAt": dict(r).get("created_at"),
+    } for r in rows])
 
 
 # ---------------------------------------------------------------------------

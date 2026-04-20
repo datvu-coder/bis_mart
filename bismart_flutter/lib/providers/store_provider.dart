@@ -9,9 +9,12 @@ class StoreProvider extends ChangeNotifier {
   bool _isLoading = false;
   String _selectedGroup = 'Tất cả';
   String _searchQuery = '';
+  String? _error;
 
   List<Store> get stores => _stores;
   bool get isLoading => _isLoading;
+  String? get error => _error;
+  void clearError() { _error = null; notifyListeners(); }
   String get selectedGroup => _selectedGroup;
   String get searchQuery => _searchQuery;
 
@@ -45,7 +48,9 @@ class StoreProvider extends ChangeNotifier {
     try {
       final data = await _api.getStores();
       _stores = data.map((s) => Store.fromJson(s as Map<String, dynamic>)).toList();
-    } catch (_) {}
+    } catch (e) {
+      _error = 'Không thể tải dữ liệu cửa hàng';
+    }
 
     _isLoading = false;
     notifyListeners();

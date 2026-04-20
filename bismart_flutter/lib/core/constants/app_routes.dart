@@ -12,5 +12,4 @@ class AppRoutes {
   static const storeList = '/ca-nhan/cua-hang';
   static const employeeList = '/ca-nhan/nhan-vien';
   static const productList = '/ca-nhan/san-pham';
-  static const info = '/info';
 }

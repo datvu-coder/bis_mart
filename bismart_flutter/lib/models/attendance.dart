@@ -5,6 +5,16 @@ class Attendance {
   final bool isCheckedIn;
   final DateTime? checkInTime;
   final DateTime? checkOutTime;
+  final String? employeeName;
+  final String? shiftName;
+  final String? shiftTimeRange;
+  final String? coordinates;
+  final double? distanceIn;
+  final String? checkInDiff;
+  final String? checkInStatus;
+  final double? distanceOut;
+  final String? checkOutDiff;
+  final String? checkOutStatus;
 
   Attendance({
     required this.id,
@@ -13,6 +23,16 @@ class Attendance {
     this.isCheckedIn = false,
     this.checkInTime,
     this.checkOutTime,
+    this.employeeName,
+    this.shiftName,
+    this.shiftTimeRange,
+    this.coordinates,
+    this.distanceIn,
+    this.checkInDiff,
+    this.checkInStatus,
+    this.distanceOut,
+    this.checkOutDiff,
+    this.checkOutStatus,
   });
 
   factory Attendance.fromJson(Map<String, dynamic> json) {
@@ -27,6 +47,16 @@ class Attendance {
       checkOutTime: json['checkOutTime'] != null
           ? DateTime.parse(json['checkOutTime'] as String)
           : null,
+      employeeName: json['employeeName'] as String?,
+      shiftName: json['shiftName'] as String?,
+      shiftTimeRange: json['shiftTimeRange'] as String?,
+      coordinates: json['coordinates'] as String?,
+      distanceIn: (json['distanceIn'] as num?)?.toDouble(),
+      checkInDiff: json['checkInDiff'] as String?,
+      checkInStatus: json['checkInStatus'] as String?,
+      distanceOut: (json['distanceOut'] as num?)?.toDouble(),
+      checkOutDiff: json['checkOutDiff'] as String?,
+      checkOutStatus: json['checkOutStatus'] as String?,
     );
   }
 

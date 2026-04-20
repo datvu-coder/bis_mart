@@ -69,15 +69,11 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     } catch (_) {
       // fallback: update locally
-      _currentUser = Employee(
-        id: _currentUser!.id,
-        fullName: fullName ?? _currentUser!.fullName,
-        employeeCode: _currentUser!.employeeCode,
-        position: position ?? _currentUser!.position,
-        workLocation: workLocation ?? _currentUser!.workLocation,
-        score: _currentUser!.score,
-        rank: _currentUser!.rank,
-        email: email ?? _currentUser!.email,
+      _currentUser = _currentUser!.copyWith(
+        fullName: fullName,
+        email: email,
+        position: position,
+        workLocation: workLocation,
       );
       notifyListeners();
     }

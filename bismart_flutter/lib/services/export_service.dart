@@ -1,8 +1,8 @@
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import '../models/sales_report.dart';
 import '../core/utils/currency_formatter.dart';
+import 'export_service_stub.dart'
+    if (dart.library.html) 'export_service_web.dart';
 
 class ExportService {
   ExportService._();
@@ -17,19 +17,14 @@ class ExportService {
         '${r.date.day}/${r.date.month}/${r.date.year},'
         '${r.pgName},'
         '${r.nu},'
-        '${r.revenueN1},'
+        '${r.saleOut},'
         '${r.revenue},'
         '"$productNames"',
       );
     }
 
     final bytes = utf8.encode(buffer.toString());
-    final blob = html.Blob([bytes], 'text/csv;charset=utf-8');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', 'bao_cao_ban_hang.csv')
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    downloadFile(bytes, 'bao_cao_ban_hang.csv', 'text/csv;charset=utf-8');
   }
 
   static void exportToHtmlTable(List<SalesReport> reports) {
@@ -58,7 +53,7 @@ tr:nth-child(even) { background: #f9f9f9; }
         '<td>${r.date.day}/${r.date.month}/${r.date.year}</td>'
         '<td>${r.pgName}</td>'
         '<td>${r.nu}</td>'
-        '<td>${CurrencyFormatter.formatVND(r.revenueN1)}</td>'
+        '<td>${CurrencyFormatter.formatVND(r.saleOut)}</td>'
         '<td>${CurrencyFormatter.formatVND(r.revenue)}</td>'
         '<td>$productNames</td>'
         '</tr>',
@@ -68,11 +63,6 @@ tr:nth-child(even) { background: #f9f9f9; }
     buffer.writeln('</table></body></html>');
 
     final bytes = utf8.encode(buffer.toString());
-    final blob = html.Blob([bytes], 'text/html;charset=utf-8');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    html.AnchorElement(href: url)
-      ..setAttribute('download', 'bao_cao_ban_hang.html')
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    downloadFile(bytes, 'bao_cao_ban_hang.html', 'text/html;charset=utf-8');
   }
 }

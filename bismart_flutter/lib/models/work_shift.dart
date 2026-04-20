@@ -5,12 +5,16 @@ class WorkShift {
   final String name;
   final TimeOfDay startTime;
   final TimeOfDay endTime;
+  final String? shiftCode;
+  final String? storeName;
 
   WorkShift({
     required this.id,
     required this.name,
     required this.startTime,
     required this.endTime,
+    this.shiftCode,
+    this.storeName,
   });
 
   String get timeRange =>
@@ -31,6 +35,8 @@ class WorkShift {
         hour: json['endHour'] as int,
         minute: json['endMinute'] as int,
       ),
+      shiftCode: json['shiftCode'] as String?,
+      storeName: json['storeName'] as String?,
     );
   }
 

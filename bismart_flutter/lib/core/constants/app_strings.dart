@@ -64,7 +64,7 @@ class AppStrings {
   static const ngay = 'Ngày';
   static const pg = 'PG';
   static const nu = 'NU';
-  static const doanhSoN1 = 'Doanh số N1';
+  static const doanhSoN1 = 'Sale Out';
   static const danhSachSanPhamField = 'Danh sách sản phẩm';
   static const doanhThu = 'Doanh thu';
   static const luu = 'Lưu';

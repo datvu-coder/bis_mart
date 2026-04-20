@@ -10,11 +10,14 @@ class TrainingProvider extends ChangeNotifier {
   List<Lesson> _lessons = [];
   Map<DateTime, List<String>> _events = {};
   bool _isLoading = false;
+  String? _error;
 
   List<CommunityPost> get posts => _posts;
   List<Lesson> get lessons => _lessons;
   Map<DateTime, List<String>> get events => _events;
   bool get isLoading => _isLoading;
+  String? get error => _error;
+  void clearError() { _error = null; notifyListeners(); }
 
   Future<void> loadTrainingData() async {
     _isLoading = true;
@@ -36,7 +39,9 @@ class TrainingProvider extends ChangeNotifier {
           _events[key] = (titles as List<dynamic>).map((t) => t as String).toList();
         }
       });
-    } catch (_) {}
+    } catch (e) {
+      _error = 'Không thể tải dữ liệu đào tạo';
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -103,8 +108,9 @@ class TrainingProvider extends ChangeNotifier {
 
   void removeEvent(DateTime date, String title) async {
     final key = DateTime.utc(date.year, date.month, date.day);
-    // Find event id from API if possible, then delete
-    try { /* API event deletion needs event id - for now just local */ } catch (_) {}
+    try {
+      await _api.deleteEvent({'title': title, 'date': key.toIso8601String()});
+    } catch (_) {}
     _events[key]?.remove(title);
     if (_events[key]?.isEmpty ?? false) {
       _events.remove(key);
