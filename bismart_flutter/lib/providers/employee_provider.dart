@@ -14,12 +14,16 @@ class EmployeeProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // Monthly summary
+  Map<String, dynamic> _monthlySummary = {};
+
   List<Employee> get employees => _employees;
   List<Attendance> get attendances => _attendances;
   List<Attendance> get historyAttendances => _historyAttendances;
   List<WorkShift> get shifts => _shifts;
   bool get isLoading => _isLoading;
   String? get error => _error;
+  Map<String, dynamic> get monthlySummary => _monthlySummary;
   void clearError() { _error = null; notifyListeners(); }
 
   List<Employee> get rankedEmployees {
@@ -74,9 +78,9 @@ class EmployeeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> checkIn(String employeeId) async {
+  Future<void> checkIn(String employeeId, {double? latitude, double? longitude}) async {
     try {
-      await _api.checkIn(int.parse(employeeId));
+      await _api.checkIn(int.parse(employeeId), latitude: latitude, longitude: longitude);
       await loadAttendances();
     } catch (e) {
       _error = 'Chấm công thất bại';
@@ -84,14 +88,26 @@ class EmployeeProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> checkOut(String employeeId) async {
+  Future<void> checkOut(String employeeId, {double? latitude, double? longitude}) async {
     try {
-      await _api.checkOut(int.parse(employeeId));
+      await _api.checkOut(int.parse(employeeId), latitude: latitude, longitude: longitude);
       await loadAttendances();
     } catch (e) {
       _error = 'Check-out thất bại';
       notifyListeners();
     }
+  }
+
+  Future<void> loadMonthlySummary({String? month, String? employeeId}) async {
+    try {
+      _monthlySummary = await _api.getMonthlyAttendanceSummary(
+        month: month,
+        employeeId: employeeId != null ? int.parse(employeeId) : null,
+      );
+    } catch (_) {
+      _monthlySummary = {};
+    }
+    notifyListeners();
   }
 
   Future<void> addShift(WorkShift shift) async {

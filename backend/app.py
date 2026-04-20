@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -349,23 +350,38 @@ def api_checkin():
     emp_id = data.get("employeeId")
     if not emp_id:
         return jsonify({"error": "Thiếu employeeId"}), 400
+    lat = data.get("latitude")
+    lng = data.get("longitude")
     db = get_db()
     now = datetime.now(tz=VN_TZ)
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%Y-%m-%dT%H:%M:%S")
+    coords_str = f"{lat},{lng}" if lat is not None and lng is not None else None
+    distance_in = None
+    if lat is not None and lng is not None:
+        store_row = db.execute(
+            "SELECT s.latitude, s.longitude FROM employees e "
+            "JOIN stores s ON e.store_code = s.store_code "
+            "WHERE e.id = ?", (emp_id,)
+        ).fetchone()
+        if store_row:
+            sr = dict(store_row)
+            slat, slng = sr.get("latitude"), sr.get("longitude")
+            if slat and slng:
+                distance_in = _haversine_distance(lat, lng, slat, slng)
     try:
         db.execute(
-            "INSERT INTO attendances (employee_id, attend_date, check_in_time) VALUES (?, ?, ?)",
-            (emp_id, date_str, time_str),
+            "INSERT INTO attendances (employee_id, attend_date, check_in_time, coordinates, distance_in) VALUES (?, ?, ?, ?, ?)",
+            (emp_id, date_str, time_str, coords_str, distance_in),
         )
         db.commit()
     except DBIntegrityError:
         db.execute(
-            "UPDATE attendances SET check_in_time = ? WHERE employee_id = ? AND attend_date = ?",
-            (time_str, emp_id, date_str),
+            "UPDATE attendances SET check_in_time = ?, coordinates = ?, distance_in = ? WHERE employee_id = ? AND attend_date = ?",
+            (time_str, coords_str, distance_in, emp_id, date_str),
         )
         db.commit()
-    return jsonify({"ok": True, "checkInTime": time_str})
+    return jsonify({"ok": True, "checkInTime": time_str, "distanceIn": distance_in, "coordinates": coords_str})
 
 
 @app.post("/api/attendances/checkout")
@@ -375,16 +391,71 @@ def api_checkout():
     emp_id = data.get("employeeId")
     if not emp_id:
         return jsonify({"error": "Thiếu employeeId"}), 400
+    lat = data.get("latitude")
+    lng = data.get("longitude")
     db = get_db()
     now = datetime.now(tz=VN_TZ)
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%Y-%m-%dT%H:%M:%S")
+    distance_out = None
+    if lat is not None and lng is not None:
+        store_row = db.execute(
+            "SELECT s.latitude, s.longitude FROM employees e "
+            "JOIN stores s ON e.store_code = s.store_code "
+            "WHERE e.id = ?", (emp_id,)
+        ).fetchone()
+        if store_row:
+            sr = dict(store_row)
+            slat, slng = sr.get("latitude"), sr.get("longitude")
+            if slat and slng:
+                distance_out = _haversine_distance(lat, lng, slat, slng)
     db.execute(
-        "UPDATE attendances SET check_out_time = ? WHERE employee_id = ? AND attend_date = ?",
-        (time_str, emp_id, date_str),
+        "UPDATE attendances SET check_out_time = ?, distance_out = ? WHERE employee_id = ? AND attend_date = ?",
+        (time_str, distance_out, emp_id, date_str),
     )
     db.commit()
-    return jsonify({"ok": True, "checkOutTime": time_str})
+    return jsonify({"ok": True, "checkOutTime": time_str, "distanceOut": distance_out})
+
+
+@app.get("/api/attendances/monthly-summary")
+@login_required
+def api_monthly_attendance_summary():
+    month = request.args.get("month")  # "2026-04"
+    employee_id = request.args.get("employeeId")
+    db = get_db()
+    if not month:
+        month = datetime.now(tz=VN_TZ).strftime("%Y-%m")
+    query = (
+        "SELECT a.*, e.full_name FROM attendances a "
+        "JOIN employees e ON a.employee_id = e.id "
+        "WHERE a.attend_date LIKE ?"
+    )
+    params: list[Any] = [f"{month}%"]
+    if employee_id:
+        query += " AND a.employee_id = ?"
+        params.append(employee_id)
+    query += " ORDER BY a.attend_date, a.check_in_time"
+    rows = db.execute(query, params).fetchall()
+    attendances = [_attendance_dict(dict(r)) for r in rows]
+    total_minutes = 0.0
+    days_worked = 0
+    for att in attendances:
+        ci, co = att.get("checkInTime"), att.get("checkOutTime")
+        if ci and co:
+            try:
+                t_in = datetime.fromisoformat(ci)
+                t_out = datetime.fromisoformat(co)
+                total_minutes += (t_out - t_in).total_seconds() / 60
+                days_worked += 1
+            except Exception:
+                pass
+    return jsonify({
+        "attendances": attendances,
+        "totalMinutes": round(total_minutes, 1),
+        "totalHours": round(total_minutes / 60, 1),
+        "daysWorked": days_worked,
+        "totalRecords": len(attendances),
+    })
 
 
 # ---------------------------------------------------------------------------
@@ -1050,6 +1121,16 @@ def _attendance_dict(row: dict) -> dict:
         "checkOutDiff": row.get("check_out_diff"),
         "checkOutStatus": row.get("check_out_status", ""),
     }
+
+
+def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Return distance in meters between two GPS points (Haversine formula)."""
+    R = 6371000.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
 def _shift_dict(row: dict) -> dict:

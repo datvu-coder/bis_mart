@@ -109,12 +109,28 @@ class ApiService {
     return response.data as List<dynamic>;
   }
 
-  Future<void> checkIn(int employeeId) async {
-    await _dio.post('/api/attendances/checkin', data: {'employeeId': employeeId});
+  Future<Map<String, dynamic>> checkIn(int employeeId, {double? latitude, double? longitude}) async {
+    final data = <String, dynamic>{'employeeId': employeeId};
+    if (latitude != null) data['latitude'] = latitude;
+    if (longitude != null) data['longitude'] = longitude;
+    final response = await _dio.post('/api/attendances/checkin', data: data);
+    return response.data as Map<String, dynamic>;
   }
 
-  Future<void> checkOut(int employeeId) async {
-    await _dio.post('/api/attendances/checkout', data: {'employeeId': employeeId});
+  Future<Map<String, dynamic>> checkOut(int employeeId, {double? latitude, double? longitude}) async {
+    final data = <String, dynamic>{'employeeId': employeeId};
+    if (latitude != null) data['latitude'] = latitude;
+    if (longitude != null) data['longitude'] = longitude;
+    final response = await _dio.post('/api/attendances/checkout', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getMonthlyAttendanceSummary({String? month, int? employeeId}) async {
+    final params = <String, dynamic>{};
+    if (month != null) params['month'] = month;
+    if (employeeId != null) params['employeeId'] = employeeId;
+    final response = await _dio.get('/api/attendances/monthly-summary', queryParameters: params);
+    return response.data as Map<String, dynamic>;
   }
 
   // ---- SHIFTS ----

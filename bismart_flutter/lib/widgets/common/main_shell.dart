@@ -21,11 +21,19 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   late int _selectedIndex;
+  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: _selectedIndex);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   static const _navItems = [
@@ -55,6 +63,11 @@ class _MainShellState extends State<MainShell> {
 
   void _onNavTap(int index) {
     setState(() => _selectedIndex = index);
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _handleLogout() {
@@ -83,9 +96,17 @@ class _MainShellState extends State<MainShell> {
               isExpanded: width >= 1100,
             ),
             Expanded(
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: _buildPage(_selectedIndex),
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                onPageChanged: (i) => setState(() => _selectedIndex = i),
+                children: const [
+                  DashboardScreen(),
+                  NhanSuScreen(),
+                  KinhDoanhScreen(),
+                  DaoTaoScreen(),
+                  CaNhanScreen(),
+                ],
               ),
             ),
           ],
@@ -95,9 +116,17 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Align(
-        alignment: Alignment.topLeft,
-        child: _buildPage(_selectedIndex),
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
+        onPageChanged: (i) => setState(() => _selectedIndex = i),
+        children: const [
+          DashboardScreen(),
+          NhanSuScreen(),
+          KinhDoanhScreen(),
+          DaoTaoScreen(),
+          CaNhanScreen(),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
