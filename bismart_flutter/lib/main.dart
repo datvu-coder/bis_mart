@@ -13,8 +13,8 @@ import 'services/api_service.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Gọi trực tiếp backend API (CORS đã bật trên server)
-  ApiService().setBaseUrl('http://146.196.64.92:8001');
+  // Gọi trực tiếp backend API qua domain + HTTPS
+  ApiService().setBaseUrl('https://api.bismart.id.vn');
   
   runApp(
     MultiProvider(
