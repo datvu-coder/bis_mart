@@ -9,11 +9,13 @@ class EmployeeProvider extends ChangeNotifier {
 
   List<Employee> _employees = [];
   List<Attendance> _attendances = [];
+  List<Attendance> _historyAttendances = [];
   List<WorkShift> _shifts = [];
   bool _isLoading = false;
 
   List<Employee> get employees => _employees;
   List<Attendance> get attendances => _attendances;
+  List<Attendance> get historyAttendances => _historyAttendances;
   List<WorkShift> get shifts => _shifts;
   bool get isLoading => _isLoading;
 
@@ -56,6 +58,17 @@ class EmployeeProvider extends ChangeNotifier {
     } catch (_) {}
 
     _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> loadAttendancesByDate(DateTime date) async {
+    try {
+      final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      final data = await _api.getAttendances(date: dateStr);
+      _historyAttendances = data.map((a) => Attendance.fromJson(a as Map<String, dynamic>)).toList();
+    } catch (_) {
+      _historyAttendances = [];
+    }
     notifyListeners();
   }
 

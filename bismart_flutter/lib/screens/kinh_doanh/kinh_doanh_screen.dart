@@ -333,6 +333,17 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen> {
                         ),
                       ),
                       IconButton(
+                        icon: const Icon(Icons.edit_rounded, color: AppColors.primary),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          Navigator.pushNamed(
+                            context,
+                            AppRoutes.createReport,
+                            arguments: report,
+                          );
+                        },
+                      ),
+                      IconButton(
                         icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
                         onPressed: () {
                           Navigator.pop(ctx);

@@ -1,15 +1,29 @@
-*.db
-*.db-shm
-*.db-wal
+# Python
 __pycache__/
 *.pyc
-bismart_flutter/build/android/
-bismart_flutter/build/ios/
-bismart_flutter/build/linux/
-bismart_flutter/build/macos/
-bismart_flutter/build/windows/
+*.pyo
+*.pyd
+.venv/
+
+# SQLite
+bismart.db
+bismart.db-shm
+bismart.db-wal
+
+# macOS
+.DS_Store
+
+# Flutter
 bismart_flutter/.dart_tool/
+bismart_flutter/.idea/
 bismart_flutter/.packages
+bismart_flutter/build/
 bismart_flutter/.flutter-plugins
 bismart_flutter/.flutter-plugins-dependencies
-.DS_Store
+bismart_flutter/android/.gradle/
+bismart_flutter/android/local.properties
+bismart_flutter/ios/Pods/
+bismart_flutter/ios/.symlinks/
+bismart_flutter/.pub-cache/
+bismart_flutter/.pub/
+*.iml

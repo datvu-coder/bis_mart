@@ -23,6 +23,23 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   final _revenueController = TextEditingController();
   final List<SaleItem> _products = [];
   bool _isSubmitting = false;
+  SalesReport? _editingReport;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_editingReport == null) {
+      final arg = ModalRoute.of(context)?.settings.arguments;
+      if (arg is SalesReport) {
+        _editingReport = arg;
+        _selectedDate = arg.date;
+        _nu = arg.nu;
+        _revenueN1Controller.text = arg.revenueN1.toStringAsFixed(0);
+        _revenueController.text = arg.revenue.toStringAsFixed(0);
+        _products.addAll(arg.products);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -38,7 +55,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(AppStrings.taoPhieuBaoCao),
+        title: Text(_editingReport != null ? 'Chỉnh sửa báo cáo' : AppStrings.taoPhieuBaoCao),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -341,10 +358,22 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
   void _submitForm() async {
     if (_formKey.currentState?.validate() ?? false) {
+      if (_revenueController.text.isEmpty || (double.tryParse(_revenueController.text) ?? 0) <= 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Doanh thu phải lớn hơn 0'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+        return;
+      }
+
       setState(() => _isSubmitting = true);
       final user = context.read<AuthProvider>().currentUser;
       final report = SalesReport(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        id: _editingReport?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         date: _selectedDate,
         pgName: user?.fullName ?? '',
         nu: _nu,
@@ -353,14 +382,19 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         revenue: double.tryParse(_revenueController.text) ?? 0,
       );
 
-      final success = await context.read<SalesProvider>().createReport(report);
+      final bool success;
+      if (_editingReport != null) {
+        success = await context.read<SalesProvider>().updateReport(report);
+      } else {
+        success = await context.read<SalesProvider>().createReport(report);
+      }
       if (!mounted) return;
       setState(() => _isSubmitting = false);
 
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Tạo phiếu báo cáo thành công!'),
+            content: Text(_editingReport != null ? 'Cập nhật báo cáo thành công!' : 'Tạo phiếu báo cáo thành công!'),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             backgroundColor: AppColors.success,
@@ -370,7 +404,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Tạo phiếu thất bại. Vui lòng thử lại.'),
+            content: Text(_editingReport != null ? 'Cập nhật thất bại. Vui lòng thử lại.' : 'Tạo phiếu thất bại. Vui lòng thử lại.'),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             backgroundColor: AppColors.error,

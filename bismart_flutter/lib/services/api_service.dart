@@ -188,6 +188,11 @@ class ApiService {
     await _dio.delete('/api/reports/$id');
   }
 
+  Future<Map<String, dynamic>> updateReport(int id, Map<String, dynamic> data) async {
+    final response = await _dio.put('/api/reports/$id', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
   // ---- POSTS ----
   Future<List<dynamic>> getPosts() async {
     final response = await _dio.get('/api/posts');

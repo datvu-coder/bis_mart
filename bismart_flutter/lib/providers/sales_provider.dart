@@ -78,6 +78,21 @@ class SalesProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> updateReport(SalesReport report) async {
+    try {
+      final result = await _api.updateReport(int.parse(report.id), report.toJson());
+      final updated = SalesReport.fromJson(result);
+      final index = _reports.indexWhere((r) => r.id == report.id);
+      if (index != -1) {
+        _reports[index] = updated;
+      }
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   SalesReport? getReportById(String id) {
     try {
       return _reports.firstWhere((r) => r.id == id);
