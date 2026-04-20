@@ -13,8 +13,8 @@ import 'services/api_service.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Frontend Nginx proxy /api/ sang backend container (cùng origin, tránh CORS)
-  ApiService().setBaseUrl('');
+  // Gọi trực tiếp backend API (CORS đã bật trên server)
+  ApiService().setBaseUrl('http://146.196.64.92:8001');
   
   runApp(
     MultiProvider(
