@@ -647,6 +647,32 @@ def api_delete_report(rid: int):
     return jsonify({"ok": True})
 
 
+@app.put("/api/reports/<int:rid>")
+@login_required
+def api_update_report(rid: int):
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    db.execute(
+        "UPDATE sales_reports SET report_date=?, pg_name=?, nu=?, revenue_n1=?, revenue=? WHERE id=?",
+        (data.get("date"), data.get("pgName"), data.get("nu", 0),
+         data.get("revenueN1", 0), data.get("revenue", 0), rid),
+    )
+    db.execute("DELETE FROM sale_items WHERE report_id = ?", (rid,))
+    for item in data.get("products", []):
+        db.execute(
+            "INSERT INTO sale_items (report_id, product_id, product_name, quantity, unit_price) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (rid, item.get("productId"), item.get("productName", ""),
+             item.get("quantity", 0), item.get("unitPrice", 0)),
+        )
+    db.commit()
+    row = db.execute("SELECT * FROM sales_reports WHERE id = ?", (rid,)).fetchone()
+    rd = _report_dict(dict(row))
+    items = db.execute("SELECT * FROM sale_items WHERE report_id = ?", (rid,)).fetchall()
+    rd["products"] = [_sale_item_dict(dict(it)) for it in items]
+    return jsonify(rd)
+
+
 # ---------------------------------------------------------------------------
 # COMMUNITY POSTS
 # ---------------------------------------------------------------------------
