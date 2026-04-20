@@ -3,7 +3,11 @@
 *.db-wal
 __pycache__/
 *.pyc
-bismart_flutter/build/
+bismart_flutter/build/android/
+bismart_flutter/build/ios/
+bismart_flutter/build/linux/
+bismart_flutter/build/macos/
+bismart_flutter/build/windows/
 bismart_flutter/.dart_tool/
 bismart_flutter/.packages
 bismart_flutter/.flutter-plugins
