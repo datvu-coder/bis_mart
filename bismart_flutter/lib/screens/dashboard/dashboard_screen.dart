@@ -18,13 +18,22 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DashboardProvider>().loadDashboard();
     });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -53,25 +62,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
-        return SingleChildScrollView(
-          padding: EdgeInsets.all(isWide ? 24 : 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              _buildHeader(provider, data),
-              const SizedBox(height: 20),
-
-              // Metric cards
-              _buildMetricCards(data, isWide),
-              const SizedBox(height: 20),
-
-              // System announcement
-              _buildAnnouncementBanner(data),
-              const SizedBox(height: 20),
-
-              // Charts + Featured/Top10
-              if (isWide)
+        if (isWide) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(provider, data),
+                const SizedBox(height: 20),
+                _buildMetricCards(data, true),
+                const SizedBox(height: 20),
+                _buildAnnouncementBanner(data),
+                const SizedBox(height: 20),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -79,17 +81,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       flex: 3,
                       child: Column(
                         children: [
-                          _buildChartCard(
-                            AppStrings.bieuDoDoanhSo,
-                            Icons.bar_chart_rounded,
-                            RevenueBarChart(data: data.revenueChart),
-                          ),
+                          _buildChartCard(AppStrings.bieuDoDoanhSo, Icons.bar_chart_rounded, RevenueBarChart(data: data.revenueChart)),
                           const SizedBox(height: 16),
-                          _buildChartCard(
-                            AppStrings.bieuDoSanPham,
-                            Icons.pie_chart_rounded,
-                            ProductHChart(data: data.productChart),
-                          ),
+                          _buildChartCard(AppStrings.bieuDoSanPham, Icons.pie_chart_rounded, ProductHChart(data: data.productChart)),
                         ],
                       ),
                     ),
@@ -98,33 +92,78 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       flex: 2,
                       child: Column(
                         children: [
-                          if (data.featuredPrograms.isNotEmpty)
-                            _buildFeaturedPrograms(data),
+                          if (data.featuredPrograms.isNotEmpty) _buildFeaturedPrograms(data),
                           _buildTopEmployees(data),
                         ],
                       ),
                     ),
                   ],
-                )
-              else ...[
-                _buildChartCard(
-                  AppStrings.bieuDoDoanhSo,
-                  Icons.bar_chart_rounded,
-                  RevenueBarChart(data: data.revenueChart),
                 ),
-                const SizedBox(height: 16),
-                _buildChartCard(
-                  AppStrings.bieuDoSanPham,
-                  Icons.pie_chart_rounded,
-                  ProductHChart(data: data.productChart),
-                ),
-                const SizedBox(height: 16),
-                if (data.featuredPrograms.isNotEmpty)
-                  _buildFeaturedPrograms(data),
-                _buildTopEmployees(data),
               ],
-            ],
-          ),
+            ),
+          );
+        }
+
+        // Mobile: horizontal sub-tabs
+        return Column(
+          children: [
+            Container(
+              color: AppColors.white,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textHint,
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+                tabs: const [
+                  Tab(text: 'Tổng quan'),
+                  Tab(text: 'Biểu đồ'),
+                  Tab(text: 'Xếp hạng'),
+                ],
+              ),
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(provider, data),
+                        const SizedBox(height: 16),
+                        _buildMetricCards(data, false),
+                        const SizedBox(height: 16),
+                        _buildAnnouncementBanner(data),
+                      ],
+                    ),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        _buildChartCard(AppStrings.bieuDoDoanhSo, Icons.bar_chart_rounded, RevenueBarChart(data: data.revenueChart)),
+                        const SizedBox(height: 16),
+                        _buildChartCard(AppStrings.bieuDoSanPham, Icons.pie_chart_rounded, ProductHChart(data: data.productChart)),
+                      ],
+                    ),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        if (data.featuredPrograms.isNotEmpty) _buildFeaturedPrograms(data),
+                        _buildTopEmployees(data),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );

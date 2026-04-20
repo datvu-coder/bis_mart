@@ -18,41 +18,43 @@ class DaoTaoScreen extends StatefulWidget {
   State<DaoTaoScreen> createState() => _DaoTaoScreenState();
 }
 
-class _DaoTaoScreenState extends State<DaoTaoScreen> {
+class _DaoTaoScreenState extends State<DaoTaoScreen> with SingleTickerProviderStateMixin {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TrainingProvider>().loadTrainingData();
     });
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 800;
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.all(isWide ? 24 : 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
-          const SizedBox(height: 4),
-          Text(
-            'Cộng đồng, bài học & lịch đào tạo',
-            style: AppTextStyles.caption,
-          ),
-          const SizedBox(height: 20),
-
-          // MomCare AI banner
-          _buildAiBanner(),
-          const SizedBox(height: 20),
-
-          if (isWide)
+    if (isWide) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
+            const SizedBox(height: 4),
+            Text('Cộng đồng, bài học & lịch đào tạo', style: AppTextStyles.caption),
+            const SizedBox(height: 20),
+            _buildAiBanner(),
+            const SizedBox(height: 20),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -62,14 +64,58 @@ class _DaoTaoScreenState extends State<DaoTaoScreen> {
                 const SizedBox(width: 16),
                 Expanded(child: _buildSchedulePanel()),
               ],
-            )
-          else ...[
-            _buildCommunityPanel(),
-            _buildLessonPanel(),
-            _buildSchedulePanel(),
+            ),
           ],
-        ],
-      ),
+        ),
+      );
+    }
+
+    // Mobile: horizontal sub-tabs
+    return Column(
+      children: [
+        Container(
+          color: AppColors.white,
+          child: TabBar(
+            controller: _tabController,
+            labelColor: AppColors.primary,
+            unselectedLabelColor: AppColors.textHint,
+            indicatorColor: AppColors.primary,
+            indicatorWeight: 3,
+            labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+            tabs: const [
+              Tab(text: 'Cộng đồng'),
+              Tab(text: 'Bài giảng'),
+              Tab(text: 'Lịch học'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    _buildAiBanner(),
+                    const SizedBox(height: 16),
+                    _buildCommunityPanel(),
+                  ],
+                ),
+              ),
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: _buildLessonPanel(),
+              ),
+              SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: _buildSchedulePanel(),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

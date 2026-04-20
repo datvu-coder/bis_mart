@@ -24,14 +24,16 @@ class NhanSuScreen extends StatefulWidget {
   State<NhanSuScreen> createState() => _NhanSuScreenState();
 }
 
-class _NhanSuScreenState extends State<NhanSuScreen> {
+class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderStateMixin {
   bool _isCheckingIn = false;
   String? _locationError;
   double? _lastDistance;
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<EmployeeProvider>();
       final currentUser = context.read<AuthProvider>().currentUser;
@@ -48,6 +50,12 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width > 800;
     final perm = context.watch<LmsProvider>().currentPermission;
@@ -61,21 +69,16 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
           );
         }
 
-        return SingleChildScrollView(
-          padding: EdgeInsets.all(isWide ? 24 : 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
-              const SizedBox(height: 4),
-              Text(
-                'Quản lý nhân viên, chấm công & xếp hạng',
-                style: AppTextStyles.caption,
-              ),
-              const SizedBox(height: 20),
-
-              if (isWide)
+        if (isWide) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
+                const SizedBox(height: 4),
+                Text('Quản lý nhân viên, chấm công & xếp hạng', style: AppTextStyles.caption),
+                const SizedBox(height: 20),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -85,14 +88,52 @@ class _NhanSuScreenState extends State<NhanSuScreen> {
                     const SizedBox(width: 16),
                     Expanded(child: _buildRankPanel(provider)),
                   ],
-                )
-              else ...[
-                _buildAttendancePanel(provider, canManage),
-                _buildShiftPanel(provider),
-                _buildRankPanel(provider),
+                ),
               ],
-            ],
-          ),
+            ),
+          );
+        }
+
+        // Mobile: horizontal sub-tabs
+        return Column(
+          children: [
+            Container(
+              color: AppColors.white,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textHint,
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+                tabs: const [
+                  Tab(text: 'Chấm công'),
+                  Tab(text: 'Ca làm việc'),
+                  Tab(text: 'Xếp hạng'),
+                ],
+              ),
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildAttendancePanel(provider, canManage),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildShiftPanel(provider),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildRankPanel(provider),
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );

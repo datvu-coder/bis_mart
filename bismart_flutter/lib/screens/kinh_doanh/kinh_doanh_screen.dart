@@ -19,13 +19,22 @@ class KinhDoanhScreen extends StatefulWidget {
   State<KinhDoanhScreen> createState() => _KinhDoanhScreenState();
 }
 
-class _KinhDoanhScreenState extends State<KinhDoanhScreen> {
+class _KinhDoanhScreenState extends State<KinhDoanhScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SalesProvider>().loadReports();
     });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -40,63 +49,99 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen> {
           );
         }
 
-        return SingleChildScrollView(
-          padding: EdgeInsets.all(isWide ? 24 : 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header row
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Báo cáo bán hàng & thống kê doanh thu',
-                          style: AppTextStyles.caption,
-                        ),
-                      ],
+        if (isWide) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
+                          const SizedBox(height: 4),
+                          Text('Báo cáo bán hàng & thống kê doanh thu', style: AppTextStyles.caption),
+                        ],
+                      ),
                     ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pushNamed(context, AppRoutes.createReport);
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text(AppStrings.taoPhieuBaoCao),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Stat cards
-              _buildStatCards(provider, isWide),
-              const SizedBox(height: 20),
-
-              if (isWide)
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.pushNamed(context, AppRoutes.createReport),
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text(AppStrings.taoPhieuBaoCao),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _buildStatCards(provider, true),
+                const SizedBox(height: 20),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      flex: 3,
-                      child: _buildReportList(provider),
-                    ),
+                    Expanded(flex: 3, child: _buildReportList(provider)),
                     const SizedBox(width: 20),
-                    Expanded(
-                      flex: 2,
-                      child: _buildFilterPanel(provider),
-                    ),
+                    Expanded(flex: 2, child: _buildFilterPanel(provider)),
                   ],
-                )
-              else ...[
-                _buildReportList(provider),
-                _buildFilterPanel(provider),
+                ),
               ],
-            ],
-          ),
+            ),
+          );
+        }
+
+        // Mobile: horizontal sub-tabs
+        return Column(
+          children: [
+            Container(
+              color: AppColors.white,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textHint,
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+                tabs: const [
+                  Tab(text: 'Báo cáo'),
+                  Tab(text: 'Bộ lọc'),
+                ],
+              ),
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            ElevatedButton.icon(
+                              onPressed: () => Navigator.pushNamed(context, AppRoutes.createReport),
+                              icon: const Icon(Icons.add_rounded, size: 18),
+                              label: const Text(AppStrings.taoPhieuBaoCao),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildStatCards(provider, false),
+                        const SizedBox(height: 12),
+                        _buildReportList(provider),
+                      ],
+                    ),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _buildFilterPanel(provider),
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );

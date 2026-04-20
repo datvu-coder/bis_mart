@@ -116,6 +116,44 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        leading: Builder(
+          builder: (ctx) => IconButton(
+            icon: const Icon(Icons.menu_rounded, color: AppColors.textDark),
+            onPressed: () => Scaffold.of(ctx).openDrawer(),
+          ),
+        ),
+        title: Text(
+          _navItems[_selectedIndex].label,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textDark,
+          ),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: AppColors.textHint, size: 22),
+            onPressed: _handleLogout,
+            tooltip: AppStrings.dangXuat,
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+      drawer: _MobileDrawer(
+        selectedIndex: _selectedIndex,
+        onItemTap: (i) {
+          _onNavTap(i);
+          Navigator.pop(context);
+        },
+        onLogout: () {
+          Navigator.pop(context);
+          _handleLogout();
+        },
+      ),
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
@@ -128,88 +166,175 @@ class _MainShellState extends State<MainShell> {
           CaNhanScreen(),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 20,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: List.generate(_navItems.length, (i) {
-                final item = _navItems[i];
-                final isSelected = _selectedIndex == i;
-                return _MobileNavItem(
-                  icon: isSelected ? item.selectedIcon : item.icon,
-                  label: item.label,
-                  isSelected: isSelected,
-                  onTap: () => _onNavTap(i),
-                );
-              }),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
 
-class _MobileNavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+// --- Mobile Drawer ---
+class _MobileDrawer extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onItemTap;
+  final VoidCallback onLogout;
 
-  const _MobileNavItem({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
+  const _MobileDrawer({
+    required this.selectedIndex,
+    required this.onItemTap,
+    required this.onLogout,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.symmetric(
-          horizontal: isSelected ? 16 : 12,
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryLight : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+    final user = context.watch<AuthProvider>().currentUser;
+
+    return Drawer(
+      backgroundColor: AppColors.sidebarBg,
+      child: SafeArea(
+        child: Column(
           children: [
-            Icon(
-              icon,
-              size: 22,
-              color: isSelected ? AppColors.primary : AppColors.textHint,
+            const SizedBox(height: 24),
+            // Logo
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Center(
+                      child: Text('B',
+                        style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  const Text(AppStrings.appName,
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.white)),
+                ],
+              ),
             ),
-            if (isSelected) ...[
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+            const SizedBox(height: 28),
+
+            // User info
+            if (user != null)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.sidebarSurface,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Center(
+                        child: Text(
+                          user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
+                          style: const TextStyle(color: AppColors.white, fontSize: 16, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(user.fullName,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.sidebarActive),
+                            overflow: TextOverflow.ellipsis),
+                          const SizedBox(height: 2),
+                          Text(user.positionLabel,
+                            style: TextStyle(fontSize: 12, color: AppColors.sidebarText.withValues(alpha: 0.7))),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            const SizedBox(height: 20),
+
+            // Nav items
+            ...List.generate(_MainShellState._navItems.length, (i) {
+              final item = _MainShellState._navItems[i];
+              final isSelected = selectedIndex == i;
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                child: InkWell(
+                  onTap: () => onItemTap(i),
+                  borderRadius: BorderRadius.circular(14),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.sidebarSurface : Colors.transparent,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      children: [
+                        if (isSelected)
+                          Container(
+                            width: 3, height: 20,
+                            margin: const EdgeInsets.only(right: 12),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        Icon(
+                          isSelected ? item.selectedIcon : item.icon,
+                          color: isSelected ? AppColors.sidebarActive : AppColors.sidebarText,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 14),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                            color: isSelected ? AppColors.sidebarActive : AppColors.sidebarText,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+
+            const Spacer(),
+
+            // Logout
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+              child: InkWell(
+                onTap: onLogout,
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.logout_rounded, color: AppColors.error, size: 22),
+                      const SizedBox(width: 14),
+                      Text(AppStrings.dangXuat,
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.error)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
