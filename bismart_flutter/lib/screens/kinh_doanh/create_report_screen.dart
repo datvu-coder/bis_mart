@@ -4,8 +4,10 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../models/product.dart';
 import '../../models/sales_report.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/product_provider.dart';
 import '../../providers/sales_provider.dart';
 
 class CreateReportScreen extends StatefulWidget {
@@ -38,6 +40,11 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         _revenueController.text = arg.revenue.toStringAsFixed(0);
         _products.addAll(arg.products);
       }
+    }
+
+    final productProvider = context.read<ProductProvider>();
+    if (!productProvider.isLoading && productProvider.products.isEmpty) {
+      productProvider.loadProducts();
     }
   }
 
@@ -299,58 +306,183 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   }
 
   void _addProduct() {
+    final productProvider = context.read<ProductProvider>();
+    if (!productProvider.isLoading && productProvider.products.isEmpty) {
+      productProvider.loadProducts();
+    }
+
     showDialog(
       context: context,
       builder: (ctx) {
-        final nameCtrl = TextEditingController();
         final qtyCtrl = TextEditingController(text: '1');
         final priceCtrl = TextEditingController();
+        final searchCtrl = TextEditingController();
+        String selectedGroup = 'Tất cả';
+        Product? selectedProduct;
 
-        return AlertDialog(
-          title: const Text('Thêm sản phẩm'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(labelText: 'Tên sản phẩm'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: qtyCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Số lượng'),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Đơn giá'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(AppStrings.huy),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (nameCtrl.text.isNotEmpty) {
-                  setState(() {
-                    _products.add(SaleItem(
-                      productId: DateTime.now().millisecondsSinceEpoch.toString(),
-                      productName: nameCtrl.text,
-                      quantity: int.tryParse(qtyCtrl.text) ?? 1,
-                      unitPrice: double.tryParse(priceCtrl.text) ?? 0,
-                    ));
-                  });
-                  Navigator.pop(ctx);
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Consumer<ProductProvider>(
+              builder: (context, provider, _) {
+                final keyword = searchCtrl.text.trim().toLowerCase();
+                final availableProducts = provider.products.where((product) {
+                  final matchesGroup =
+                      selectedGroup == 'Tất cả' || product.productGroup == selectedGroup;
+                  final matchesSearch = keyword.isEmpty ||
+                      product.name.toLowerCase().contains(keyword);
+                  return matchesGroup && matchesSearch;
+                }).toList()
+                  ..sort((a, b) => a.name.compareTo(b.name));
+
+                if (selectedProduct != null &&
+                    !availableProducts.any((product) => product.id == selectedProduct!.id)) {
+                  selectedProduct = null;
+                  priceCtrl.clear();
                 }
+
+                return AlertDialog(
+                  title: const Text('Thêm sản phẩm'),
+                  content: SizedBox(
+                    width: 520,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (provider.isLoading)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 12),
+                            child: LinearProgressIndicator(color: AppColors.primary),
+                          ),
+                        if (provider.error != null)
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.errorLight,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              provider.error!,
+                              style: AppTextStyles.caption.copyWith(color: AppColors.error),
+                            ),
+                          ),
+                        TextField(
+                          controller: searchCtrl,
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: const InputDecoration(
+                            labelText: 'Tìm sản phẩm',
+                            prefixIcon: Icon(Icons.search_rounded, size: 20),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: ['Tất cả', 'DELI', 'DELIMIL', 'AUMIL', 'GOODLIFE', 'TP']
+                                .map((group) => Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: ChoiceChip(
+                                        label: Text(group),
+                                        selected: selectedGroup == group,
+                                        selectedColor: AppColors.primaryLight,
+                                        onSelected: (_) {
+                                          setDialogState(() {
+                                            selectedGroup = group;
+                                          });
+                                        },
+                                      ),
+                                    ))
+                                .toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 220),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: availableProducts.isEmpty
+                              ? const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.all(16),
+                                    child: Text('Không có sản phẩm phù hợp'),
+                                  ),
+                                )
+                              : ListView.separated(
+                                  shrinkWrap: true,
+                                  itemCount: availableProducts.length,
+                                  separatorBuilder: (_, __) => const Divider(height: 1),
+                                  itemBuilder: (context, index) {
+                                    final product = availableProducts[index];
+                                    final isSelected = selectedProduct?.id == product.id;
+                                    return ListTile(
+                                      dense: true,
+                                      selected: isSelected,
+                                      selectedTileColor: AppColors.primaryLight,
+                                      title: Text(product.name),
+                                      subtitle: Text(
+                                        '${product.productGroup} • ${product.unit} • ${CurrencyFormatter.formatVND(product.priceWithVAT)}',
+                                        style: AppTextStyles.caption,
+                                      ),
+                                      trailing: isSelected
+                                          ? const Icon(Icons.check_circle_rounded,
+                                              color: AppColors.primary, size: 20)
+                                          : null,
+                                      onTap: () {
+                                        setDialogState(() {
+                                          selectedProduct = product;
+                                          priceCtrl.text = product.priceWithVAT.toStringAsFixed(0);
+                                        });
+                                      },
+                                    );
+                                  },
+                                ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: qtyCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Số lượng'),
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: priceCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Đơn giá'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text(AppStrings.huy),
+                    ),
+                    ElevatedButton(
+                      onPressed: selectedProduct == null
+                          ? null
+                          : () {
+                              final quantity = int.tryParse(qtyCtrl.text) ?? 1;
+                              final unitPrice =
+                                  double.tryParse(priceCtrl.text) ?? selectedProduct!.priceWithVAT;
+                              setState(() {
+                                _products.add(SaleItem(
+                                  productId: selectedProduct!.id,
+                                  productName: selectedProduct!.name,
+                                  quantity: quantity > 0 ? quantity : 1,
+                                  unitPrice: unitPrice,
+                                ));
+                              });
+                              Navigator.pop(ctx);
+                            },
+                      child: const Text('Thêm'),
+                    ),
+                  ],
+                );
               },
-              child: const Text('Thêm'),
-            ),
-          ],
+            );
+          },
         );
       },
     );
