@@ -9,7 +9,8 @@ except ImportError:
     print("pip install openpyxl first"); sys.exit(1)
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "bismart.db"
+DEFAULT_SQLITE_DIR = Path(os.getenv("DATABASE_DIR", BASE_DIR / "data")).expanduser()
+DB_PATH = Path(os.getenv("DATABASE_PATH", str(DEFAULT_SQLITE_DIR / "bismart.db"))).expanduser()
 EXCEL = BASE_DIR.parent / "Bismart_standardized.xlsx"
 
 def dt_to_str(v):
@@ -39,6 +40,8 @@ def rows_of(ws, start=2):
 def main():
     if not EXCEL.exists():
         print(f"Excel not found: {EXCEL}"); sys.exit(1)
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
     # Delete old DB to start fresh
     if DB_PATH.exists():

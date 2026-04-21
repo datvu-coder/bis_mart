@@ -5,6 +5,7 @@ __pycache__
 *.pyo
 *.pyd
 .DS_Store
+bismart.db
 bismart.db-shm
 bismart.db-wal
 render.yaml

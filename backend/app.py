@@ -24,7 +24,10 @@ except ImportError:
 # Config
 # ---------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE = Path(os.getenv("DATABASE_PATH", str(BASE_DIR / "bismart.db"))).expanduser()
+DEFAULT_SQLITE_DIR = Path(os.getenv("DATABASE_DIR", "/data")).expanduser()
+DATABASE = Path(
+    os.getenv("DATABASE_PATH", str(DEFAULT_SQLITE_DIR / "bismart.db"))
+).expanduser()
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 DB_BACKEND = "postgres" if DATABASE_URL else "sqlite"
 DB_READY = False
@@ -78,6 +81,7 @@ def create_db_connection() -> DBCompatConnection:
     if DB_BACKEND == "postgres" and psycopg is not None:
         conn = psycopg.connect(DATABASE_URL, row_factory=dict_row, autocommit=False)
         return DBCompatConnection(conn, "postgres")
+    DATABASE.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DATABASE))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
