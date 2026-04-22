@@ -9,8 +9,10 @@ class ApiService {
 
   static const _tokenKey = 'auth_token';
 
-  // Change this to your VPS URL after deployment
-  static const String _defaultBaseUrl = 'http://localhost:5000';
+  static const String _defaultBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://api.bismart.id.vn',
+  );
 
   String get baseUrl => _baseUrl;
   String _baseUrl = _defaultBaseUrl;
@@ -38,8 +40,10 @@ class ApiService {
   }
 
   void setBaseUrl(String url) {
-    _baseUrl = url;
-    _dio.options.baseUrl = url;
+    final normalizedUrl = url.trim().replaceAll(RegExp(r'/+$'), '');
+    if (normalizedUrl.isEmpty) return;
+    _baseUrl = normalizedUrl;
+    _dio.options.baseUrl = normalizedUrl;
   }
 
   // Token management

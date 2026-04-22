@@ -13,8 +13,11 @@ import 'services/api_service.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Gọi trực tiếp backend API qua domain + HTTPS
-  ApiService().setBaseUrl('https://api.bismart.id.vn');
+  const apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://api.bismart.id.vn',
+  );
+  ApiService().setBaseUrl(apiBaseUrl);
   
   runApp(
     MultiProvider(
@@ -26,6 +29,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => StoreProvider()),
         ChangeNotifierProvider(create: (_) => ProductProvider()),
         ChangeNotifierProvider(create: (_) => TrainingProvider()),
+        ChangeNotifierProvider(create: (_) => LmsProvider()),
       ],
       child: const BismartApp(),
     ),
