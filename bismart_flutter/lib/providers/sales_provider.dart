@@ -66,14 +66,15 @@ class SalesProvider extends ChangeNotifier {
     try {
       final result = await _api.createReport(report.toJson());
       _reports.insert(0, SalesReport.fromJson(result));
+      _error = null;
       _isLoading = false;
       notifyListeners();
       return true;
     } catch (_) {
-      _reports.insert(0, report);
+      _error = 'Không thể lưu báo cáo lên máy chủ. Vui lòng thử lại.';
       _isLoading = false;
       notifyListeners();
-      return true;
+      return false;
     }
   }
 
