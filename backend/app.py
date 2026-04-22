@@ -154,6 +154,26 @@ def _report_to_api_json(report_row: dict[str, Any], products: list[dict[str, Any
         "employeeCode": report_row.get("employee_code"),
     }
 
+
+def _dashboard_bounds(filter_type: str, now: datetime) -> tuple[str | None, str | None, list[str]]:
+    today = now.strftime("%Y-%m-%d")
+    if filter_type == "today":
+        return today, today, [today]
+
+    if filter_type == "week":
+        days = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
+        return days[0], days[-1], days
+
+    if filter_type == "month":
+        month_start_dt = now.replace(day=1)
+        day_count = (now - month_start_dt).days + 1
+        days = [(month_start_dt + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(day_count)]
+        return days[0], days[-1], days
+
+    # all
+    days = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(29, -1, -1)]
+    return days[0], days[-1], days
+
 @app.post("/api/auth/login")
 def api_login():
     data = request.get_json(silent=True) or {}
@@ -196,6 +216,95 @@ def api_auth_me():
         return jsonify({"error": "Unauthorized"}), 401
 
     return jsonify({"user": _user_to_api_json(user_row)})
+
+
+@app.get("/api/dashboard")
+@login_required
+def api_dashboard():
+    filter_type = (request.args.get("filter") or "today").strip().lower()
+    now = datetime.now(tz=VN_TZ)
+    start_date, end_date, date_keys = _dashboard_bounds(filter_type, now)
+
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT COALESCE(SUM(revenue), 0) AS total_revenue "
+            "FROM sales_reports WHERE report_date >= %s AND report_date <= %s",
+            (start_date, end_date),
+        )
+        total_revenue = float((cur.fetchone() or {}).get("total_revenue") or 0)
+
+        cur.execute(
+            "SELECT COALESCE(SUM(revenue), 0) AS group_revenue "
+            "FROM sales_reports WHERE report_date >= %s AND report_date <= %s",
+            (start_date, end_date),
+        )
+        group_revenue = float((cur.fetchone() or {}).get("group_revenue") or 0)
+
+        cur.execute(
+            "SELECT report_date, COALESCE(SUM(revenue), 0) AS revenue "
+            "FROM sales_reports WHERE report_date >= %s AND report_date <= %s "
+            "GROUP BY report_date ORDER BY report_date ASC",
+            (start_date, end_date),
+        )
+        revenue_rows = cur.fetchall()
+
+        cur.execute(
+            "SELECT COALESCE(si.product_name, 'Khác') AS product_name, COALESCE(SUM(si.quantity), 0) AS qty "
+            "FROM sale_items si "
+            "JOIN sales_reports sr ON sr.id = si.report_id "
+            "WHERE sr.report_date >= %s AND sr.report_date <= %s "
+            "GROUP BY COALESCE(si.product_name, 'Khác') "
+            "ORDER BY qty DESC, product_name ASC LIMIT 10",
+            (start_date, end_date),
+        )
+        product_rows = cur.fetchall()
+
+        cur.execute(
+            "SELECT COALESCE(full_name, employee_code, 'Nhân viên') AS name "
+            "FROM employees ORDER BY score DESC, id ASC LIMIT 10"
+        )
+        top_rows = cur.fetchall()
+
+    revenue_map = {str(row.get("report_date")): float(row.get("revenue") or 0) for row in revenue_rows}
+    revenue_chart = [
+        {
+            "date": date_str,
+            "revenue": revenue_map.get(date_str, 0),
+            "target": 0,
+        }
+        for date_str in date_keys
+    ]
+
+    top10 = [
+        {"rank": idx + 1, "name": row.get("name") or f"Nhân viên {idx + 1}"}
+        for idx, row in enumerate(top_rows)
+    ]
+
+    product_chart = [
+        {
+            "productName": row.get("product_name") or "Khác",
+            "quantity": int(row.get("qty") or 0),
+        }
+        for row in product_rows
+    ]
+
+    return jsonify(
+        {
+            "date": now.strftime("%Y-%m-%d"),
+            "announcement": "Dữ liệu tổng quan đã được đồng bộ.",
+            "featuredPrograms": [
+                "Bám mục tiêu doanh số theo ngày",
+                "Đẩy mạnh sản phẩm chủ lực tuần này",
+                "Theo dõi hiệu suất nhân sự tại cửa hàng",
+            ],
+            "top10": top10,
+            "groupRevenue": group_revenue,
+            "totalRevenue": total_revenue,
+            "revenueChart": revenue_chart,
+            "productChart": product_chart,
+        }
+    )
 
 @app.post("/api/reports")
 @login_required
