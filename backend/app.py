@@ -29,6 +29,8 @@ DB_READY = False
 VN_TZ = timezone(timedelta(hours=7))
 JWT_SECRET = os.getenv("SECRET_KEY", "bismart-dev-secret-key")
 JWT_EXP_HOURS = 72
+CORS_ALLOW_HEADERS = "Content-Type, Authorization"
+CORS_ALLOW_METHODS = "GET, POST, PUT, DELETE, OPTIONS"
 app = Flask(__name__)
 app.config["SECRET_KEY"] = JWT_SECRET
 DBIntegrityError = psycopg.IntegrityError
@@ -57,7 +59,17 @@ def ensure_database_ready():
 
 @app.before_request
 def _before_request():
+    if request.method == "OPTIONS":
+        return ("", 204)
     ensure_database_ready()
+
+
+@app.after_request
+def _add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = CORS_ALLOW_HEADERS
+    response.headers["Access-Control-Allow-Methods"] = CORS_ALLOW_METHODS
+    return response
 
 def create_token(user_id, employee_id):
     return jwt.encode({
