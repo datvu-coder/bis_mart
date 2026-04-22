@@ -155,6 +155,39 @@ def _report_to_api_json(report_row: dict[str, Any], products: list[dict[str, Any
     }
 
 
+def _product_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row.get("id") or ""),
+        "name": row.get("name") or "",
+        "unit": row.get("unit") or "",
+        "priceWithVAT": float(row.get("price_with_vat") or 0),
+        "productGroup": row.get("product_group") or "DELI",
+        "productCondition": row.get("product_condition"),
+    }
+
+
+def _store_to_api_json(row: dict[str, Any], managers: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "id": str(row.get("id") or ""),
+        "name": row.get("name") or "",
+        "group": row.get("store_group") or "I",
+        "storeCode": row.get("store_code") or "",
+        "managers": managers,
+        "latitude": row.get("latitude"),
+        "longitude": row.get("longitude"),
+        "province": row.get("province"),
+        "sup": row.get("sup"),
+        "status": row.get("status"),
+        "openDate": row.get("open_date"),
+        "closeDate": row.get("close_date"),
+        "storeType": row.get("store_type"),
+        "address": row.get("address"),
+        "phone": row.get("phone"),
+        "owner": row.get("owner"),
+        "taxCode": row.get("tax_code"),
+    }
+
+
 def _dashboard_bounds(filter_type: str, now: datetime) -> tuple[str | None, str | None, list[str]]:
     today = now.strftime("%Y-%m-%d")
     if filter_type == "today":
@@ -318,6 +351,190 @@ def api_dashboard():
             "productChart": product_chart,
         }
     )
+
+
+@app.get("/api/products")
+@login_required
+def api_get_products():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, unit, price_with_vat, product_group, product_condition "
+            "FROM products ORDER BY id ASC"
+        )
+        rows = cur.fetchall()
+    return jsonify([_product_to_api_json(row) for row in rows])
+
+
+@app.post("/api/products")
+@login_required
+def api_create_product():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO products (name, unit, price_with_vat, product_group, product_condition) "
+            "VALUES (%s, %s, %s, %s, %s) RETURNING id, name, unit, price_with_vat, product_group, product_condition",
+            (
+                data.get("name", ""),
+                data.get("unit", "Lon"),
+                data.get("priceWithVAT", 0),
+                data.get("productGroup", "DELI"),
+                data.get("productCondition"),
+            ),
+        )
+        row = cur.fetchone()
+    db.commit()
+    return jsonify(_product_to_api_json(row)), 201
+
+
+@app.put("/api/products/<int:product_id>")
+@login_required
+def api_update_product(product_id: int):
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE products SET name = %s, unit = %s, price_with_vat = %s, product_group = %s, product_condition = %s "
+            "WHERE id = %s RETURNING id, name, unit, price_with_vat, product_group, product_condition",
+            (
+                data.get("name", ""),
+                data.get("unit", "Lon"),
+                data.get("priceWithVAT", 0),
+                data.get("productGroup", "DELI"),
+                data.get("productCondition"),
+                product_id,
+            ),
+        )
+        row = cur.fetchone()
+    db.commit()
+    if not row:
+        return jsonify({"error": "Product not found"}), 404
+    return jsonify(_product_to_api_json(row))
+
+
+@app.delete("/api/products/<int:product_id>")
+@login_required
+def api_delete_product(product_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM products WHERE id = %s", (product_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/stores")
+@login_required
+def api_get_stores():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, store_code, store_group, latitude, longitude, province, sup, status, open_date, close_date, store_type, address, phone, owner, tax_code "
+            "FROM stores ORDER BY id ASC"
+        )
+        rows = cur.fetchall()
+
+        store_ids = [row["id"] for row in rows]
+        managers_by_store: dict[int, list[dict[str, Any]]] = {sid: [] for sid in store_ids}
+        if store_ids:
+            cur.execute(
+                "SELECT sm.store_id, e.id AS employee_id, e.full_name, e.employee_code, e.email "
+                "FROM store_managers sm JOIN employees e ON e.id = sm.employee_id "
+                "WHERE sm.store_id = ANY(%s::int[]) ORDER BY sm.id ASC",
+                (store_ids,),
+            )
+            for m in cur.fetchall():
+                managers_by_store[m["store_id"]].append(
+                    {
+                        "employeeId": str(m.get("employee_id") or ""),
+                        "name": m.get("full_name") or "",
+                        "employeeCode": m.get("employee_code") or "",
+                        "email": m.get("email"),
+                    }
+                )
+
+    return jsonify([
+        _store_to_api_json(row, managers_by_store.get(row["id"], []))
+        for row in rows
+    ])
+
+
+@app.post("/api/stores")
+@login_required
+def api_create_store():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO stores (name, store_code, store_group, latitude, longitude, province, sup, status, open_date, close_date, store_type, address, phone, owner, tax_code) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING id, name, store_code, store_group, latitude, longitude, province, sup, status, open_date, close_date, store_type, address, phone, owner, tax_code",
+            (
+                data.get("name", ""),
+                data.get("storeCode", ""),
+                data.get("group", "I"),
+                data.get("latitude"),
+                data.get("longitude"),
+                data.get("province"),
+                data.get("sup"),
+                data.get("status", "Hoạt động"),
+                data.get("openDate"),
+                data.get("closeDate"),
+                data.get("storeType"),
+                data.get("address"),
+                data.get("phone"),
+                data.get("owner"),
+                data.get("taxCode"),
+            ),
+        )
+        row = cur.fetchone()
+    db.commit()
+    return jsonify(_store_to_api_json(row, [])), 201
+
+
+@app.put("/api/stores/<int:store_id>")
+@login_required
+def api_update_store(store_id: int):
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE stores SET name = %s, store_code = %s, store_group = %s, latitude = %s, longitude = %s, province = %s, sup = %s, status = %s, open_date = %s, close_date = %s, store_type = %s, address = %s, phone = %s, owner = %s, tax_code = %s "
+            "WHERE id = %s RETURNING id, name, store_code, store_group, latitude, longitude, province, sup, status, open_date, close_date, store_type, address, phone, owner, tax_code",
+            (
+                data.get("name", ""),
+                data.get("storeCode", ""),
+                data.get("group", "I"),
+                data.get("latitude"),
+                data.get("longitude"),
+                data.get("province"),
+                data.get("sup"),
+                data.get("status", "Hoạt động"),
+                data.get("openDate"),
+                data.get("closeDate"),
+                data.get("storeType"),
+                data.get("address"),
+                data.get("phone"),
+                data.get("owner"),
+                data.get("taxCode"),
+                store_id,
+            ),
+        )
+        row = cur.fetchone()
+    db.commit()
+    if not row:
+        return jsonify({"error": "Store not found"}), 404
+    return jsonify(_store_to_api_json(row, []))
+
+
+@app.delete("/api/stores/<int:store_id>")
+@login_required
+def api_delete_store(store_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM stores WHERE id = %s", (store_id,))
+    db.commit()
+    return jsonify({"ok": True})
 
 @app.post("/api/reports")
 @login_required
