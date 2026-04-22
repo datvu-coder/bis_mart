@@ -84,6 +84,33 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+
+def _report_to_api_json(report_row: dict[str, Any], products: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "id": str(report_row["id"]),
+        "date": report_row.get("report_date") or datetime.now(tz=VN_TZ).strftime("%Y-%m-%d"),
+        "pgName": report_row.get("pg_name") or "",
+        "nu": int(report_row.get("nu") or 0),
+        "saleOut": float(report_row.get("sale_out") or 0),
+        "products": [
+            {
+                "productId": str(item.get("product_id") or ""),
+                "productName": item.get("product_name") or "",
+                "quantity": int(item.get("quantity") or 0),
+                "unitPrice": float(item.get("unit_price") or 0),
+                "unit": item.get("unit"),
+                "productGroup": item.get("product_group"),
+            }
+            for item in products
+        ],
+        "revenue": float(report_row.get("revenue") or 0),
+        "storeName": report_row.get("store_name"),
+        "storeCode": report_row.get("store_code"),
+        "reportMonth": str(report_row.get("report_month")) if report_row.get("report_month") is not None else None,
+        "points": int(report_row.get("points") or 0),
+        "employeeCode": report_row.get("employee_code"),
+    }
+
 @app.post("/api/auth/login")
 def api_login():
     data = request.get_json(silent=True) or {}
@@ -155,7 +182,65 @@ def api_create_report():
             )
     db.commit()
     
-    return jsonify({"id": report_id, "status": "created"}), 201
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code "
+            "FROM sales_reports WHERE id = %s",
+            (report_id,),
+        )
+        created_report = cur.fetchone()
+        cur.execute(
+            "SELECT product_id, product_name, quantity, unit_price, unit, product_group "
+            "FROM sale_items WHERE report_id = %s ORDER BY id ASC",
+            (report_id,),
+        )
+        created_items = cur.fetchall()
+
+    return jsonify(_report_to_api_json(created_report, created_items)), 201
+
+
+@app.get("/api/reports")
+@login_required
+def api_get_reports():
+    filter_type = (request.args.get("filter") or "all").strip().lower()
+    now = datetime.now(tz=VN_TZ)
+    where_clause = ""
+    params: list[Any] = []
+
+    if filter_type == "today":
+        where_clause = "WHERE report_date = %s"
+        params = [now.strftime("%Y-%m-%d")]
+    elif filter_type == "week":
+        where_clause = "WHERE report_date >= %s"
+        params = [(now - timedelta(days=7)).strftime("%Y-%m-%d")]
+    elif filter_type == "month":
+        where_clause = "WHERE report_date >= %s AND report_date < %s"
+        month_start = now.replace(day=1).strftime("%Y-%m-%d")
+        next_month = (now.replace(day=28) + timedelta(days=4)).replace(day=1).strftime("%Y-%m-%d")
+        params = [month_start, next_month]
+
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            f"SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code "
+            f"FROM sales_reports {where_clause} ORDER BY report_date DESC, id DESC",
+            tuple(params),
+        )
+        report_rows = cur.fetchall()
+
+        report_ids = [row["id"] for row in report_rows]
+        items_by_report: dict[int, list[dict[str, Any]]] = {rid: [] for rid in report_ids}
+        if report_ids:
+            cur.execute(
+                "SELECT report_id, product_id, product_name, quantity, unit_price, unit, product_group "
+                "FROM sale_items WHERE report_id = ANY(%s::int[]) ORDER BY id ASC",
+                (report_ids,),
+            )
+            for item in cur.fetchall():
+                items_by_report[item["report_id"]].append(item)
+
+    result = [_report_to_api_json(row, items_by_report.get(row["id"], [])) for row in report_rows]
+    return jsonify(result)
 
 @app.post("/api/attendances/checkin")
 @login_required
