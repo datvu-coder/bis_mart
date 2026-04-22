@@ -174,6 +174,19 @@ def _dashboard_bounds(filter_type: str, now: datetime) -> tuple[str | None, str 
     days = [(now - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(29, -1, -1)]
     return days[0], days[-1], days
 
+
+def _normalize_report_date(value: Any) -> str:
+    if isinstance(value, datetime):
+        return value.strftime("%Y-%m-%d")
+    text = str(value or "").strip()
+    if not text:
+        return datetime.now(tz=VN_TZ).strftime("%Y-%m-%d")
+    if "T" in text:
+        text = text.split("T", 1)[0]
+    if " " in text:
+        text = text.split(" ", 1)[0]
+    return text[:10]
+
 @app.post("/api/auth/login")
 def api_login():
     data = request.get_json(silent=True) or {}
@@ -229,22 +242,22 @@ def api_dashboard():
     with db.cursor() as cur:
         cur.execute(
             "SELECT COALESCE(SUM(revenue), 0) AS total_revenue "
-            "FROM sales_reports WHERE report_date >= %s AND report_date <= %s",
+            "FROM sales_reports WHERE LEFT(report_date, 10) >= %s AND LEFT(report_date, 10) <= %s",
             (start_date, end_date),
         )
         total_revenue = float((cur.fetchone() or {}).get("total_revenue") or 0)
 
         cur.execute(
             "SELECT COALESCE(SUM(revenue), 0) AS group_revenue "
-            "FROM sales_reports WHERE report_date >= %s AND report_date <= %s",
+            "FROM sales_reports WHERE LEFT(report_date, 10) >= %s AND LEFT(report_date, 10) <= %s",
             (start_date, end_date),
         )
         group_revenue = float((cur.fetchone() or {}).get("group_revenue") or 0)
 
         cur.execute(
-            "SELECT report_date, COALESCE(SUM(revenue), 0) AS revenue "
-            "FROM sales_reports WHERE report_date >= %s AND report_date <= %s "
-            "GROUP BY report_date ORDER BY report_date ASC",
+            "SELECT LEFT(report_date, 10) AS report_date, COALESCE(SUM(revenue), 0) AS revenue "
+            "FROM sales_reports WHERE LEFT(report_date, 10) >= %s AND LEFT(report_date, 10) <= %s "
+            "GROUP BY LEFT(report_date, 10) ORDER BY LEFT(report_date, 10) ASC",
             (start_date, end_date),
         )
         revenue_rows = cur.fetchall()
@@ -253,7 +266,7 @@ def api_dashboard():
             "SELECT COALESCE(si.product_name, 'Khác') AS product_name, COALESCE(SUM(si.quantity), 0) AS qty "
             "FROM sale_items si "
             "JOIN sales_reports sr ON sr.id = si.report_id "
-            "WHERE sr.report_date >= %s AND sr.report_date <= %s "
+            "WHERE LEFT(sr.report_date, 10) >= %s AND LEFT(sr.report_date, 10) <= %s "
             "GROUP BY COALESCE(si.product_name, 'Khác') "
             "ORDER BY qty DESC, product_name ASC LIMIT 10",
             (start_date, end_date),
@@ -317,6 +330,7 @@ def api_create_report():
     data = request.get_json(silent=True) or {}
     db = get_db()
     user_id = g.current_user.get("user_id")
+    report_date = _normalize_report_date(data.get("date"))
     
     # ATOMIC INSERT - gets report_id immediately, no race condition
     with db.cursor() as cur:
@@ -326,7 +340,7 @@ def api_create_report():
             "report_month, revenue, points, employee_code, created_by) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
             (
-                data.get("date", datetime.now(tz=VN_TZ).strftime("%Y-%m-%d")),
+                report_date,
                 data.get("pgName", ""),
                 data.get("storeName", ""),
                 data.get("nu", 0),
@@ -380,13 +394,13 @@ def api_get_reports():
     params: list[Any] = []
 
     if filter_type == "today":
-        where_clause = "WHERE report_date = %s"
+        where_clause = "WHERE LEFT(report_date, 10) = %s"
         params = [now.strftime("%Y-%m-%d")]
     elif filter_type == "week":
-        where_clause = "WHERE report_date >= %s"
+        where_clause = "WHERE LEFT(report_date, 10) >= %s"
         params = [(now - timedelta(days=7)).strftime("%Y-%m-%d")]
     elif filter_type == "month":
-        where_clause = "WHERE report_date >= %s AND report_date < %s"
+        where_clause = "WHERE LEFT(report_date, 10) >= %s AND LEFT(report_date, 10) < %s"
         month_start = now.replace(day=1).strftime("%Y-%m-%d")
         next_month = (now.replace(day=28) + timedelta(days=4)).replace(day=1).strftime("%Y-%m-%d")
         params = [month_start, next_month]
