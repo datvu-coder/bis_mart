@@ -47565,15 +47565,15 @@ n=A.b([new A.nY(B.j9,"Nh\xe2n vi\xean",""+r,B.cx,B.dR),new A.nY(B.qG,"\u0110i\u1
 l=t.CF
 return A.aC(A.Y(new A.Z(n,new A.auX(n),l),!0,l.h("ac.E")),B.m,B.f,B.h,m)},
 abf(a){var s=null,r=A.c1(a,!0,t.yG).x,q=A.b([],t.Sj),p=r==null,o=p?s:r.r
-if(o===!0)q.push(new A.l1(B.j9,"Danh s\xe1ch nh\xe2n vi\xean","Xem danh s\xe1ch & th\xf4ng tin nh\xe2n vi\xean","/ca-nhan/nhan-vien",B.cx,B.dR))
+if(o!==!1)q.push(new A.l1(B.j9,"Danh s\xe1ch nh\xe2n vi\xean","Xem danh s\xe1ch & th\xf4ng tin nh\xe2n vi\xean","/ca-nhan/nhan-vien",B.cx,B.dR))
 o=p?s:r.d
 if(o!==!1)q.push(new A.l1(B.qA,"Qu\u1ea3n l\xfd ch\u1ea5m c\xf4ng","Ch\u1ea5m c\xf4ng, ca l\xe0m & x\u1ebfp h\u1ea1ng","/nhan-su",B.ao,B.dm))
 o=p?s:r.e
 if(o!==!1)q.push(new A.l1(B.j6,"Qu\u1ea3n l\xfd b\xe1o c\xe1o","B\xe1o c\xe1o doanh thu & th\u1ed1ng k\xea","/kinh-doanh",B.dn,B.eF))
 o=p?s:r.z
-if(o===!0)q.push(new A.l1(B.lZ,"Danh s\xe1ch c\u1eeda h\xe0ng","Danh s\xe1ch c\u1eeda h\xe0ng trong h\u1ec7 th\u1ed1ng","/ca-nhan/cua-hang",B.v,B.at))
+if(o!==!1)q.push(new A.l1(B.lZ,"Danh s\xe1ch c\u1eeda h\xe0ng","Danh s\xe1ch c\u1eeda h\xe0ng trong h\u1ec7 th\u1ed1ng","/ca-nhan/cua-hang",B.v,B.at))
 p=p?s:r.Q
-if(p===!0)q.push(new A.l1(B.qC,"Danh s\xe1ch s\u1ea3n ph\u1ea9m","Qu\u1ea3n l\xfd s\u1ea3n ph\u1ea9m & t\u1ed3n kho","/ca-nhan/san-pham",B.aI,B.eH))
+if(p!==!1)q.push(new A.l1(B.qC,"Danh s\xe1ch s\u1ea3n ph\u1ea9m","Qu\u1ea3n l\xfd s\u1ea3n ph\u1ea9m & t\u1ed3n kho","/ca-nhan/san-pham",B.aI,B.eH))
 p=A.qR()
 o=A.b([new A.an(B.Kj,A.P("Qu\u1ea3n l\xfd",s,s,s,s,B.c_,s,s,s),s)],t.p)
 B.b.P(o,new A.Z(q,new A.auT(this,a),t.PH))
