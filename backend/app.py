@@ -97,6 +97,37 @@ def login_required(f):
     return decorated
 
 
+def _user_to_api_json(user_row: dict[str, Any]) -> dict[str, Any]:
+    employee_id = user_row.get("employee_id") or user_row.get("auth_employee_id") or user_row.get("id") or user_row.get("user_id")
+    username = user_row.get("username") or "admin"
+    return {
+        "id": str(employee_id or user_row.get("user_id") or "0"),
+        "fullName": user_row.get("full_name") or username.upper(),
+        "employeeCode": user_row.get("employee_code") or username,
+        "position": user_row.get("position") or "ADM",
+        "workLocation": user_row.get("work_location") or "",
+        "score": int(user_row.get("score") or 0),
+        "rank": int(user_row.get("rank") or 0),
+        "email": user_row.get("email"),
+        "phone": user_row.get("phone"),
+        "dateOfBirth": user_row.get("date_of_birth"),
+        "cccd": user_row.get("cccd"),
+        "address": user_row.get("address"),
+        "status": user_row.get("status"),
+        "department": user_row.get("department"),
+        "province": user_row.get("province"),
+        "area": user_row.get("area"),
+        "createdDate": user_row.get("created_date"),
+        "probationDate": user_row.get("probation_date"),
+        "officialDate": user_row.get("official_date"),
+        "resignDate": user_row.get("resign_date"),
+        "resignReason": user_row.get("resign_reason"),
+        "avatarUrl": user_row.get("avatar_url"),
+        "storeCode": user_row.get("store_code"),
+        "rankLevel": user_row.get("rank_level"),
+    }
+
+
 def _report_to_api_json(report_row: dict[str, Any], products: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "id": str(report_row["id"]),
@@ -134,7 +165,7 @@ def api_login():
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "SELECT u.id, u.password_hash, e.* FROM users u "
+            "SELECT u.id as user_id, u.username, u.employee_id as auth_employee_id, u.password_hash, e.* FROM users u "
             "LEFT JOIN employees e ON u.employee_id = e.id "
             "WHERE u.username = %s", (username,)
         )
@@ -143,8 +174,28 @@ def api_login():
     if not user_row or not check_password_hash(user_row["password_hash"], password):
         return jsonify({"error": "Invalid credentials"}), 401
     
-    token = create_token(user_row["id"], user_row.get("employee_id"))
-    return jsonify({"token": token})
+    token = create_token(user_row["user_id"], user_row.get("auth_employee_id"))
+    return jsonify({"token": token, "user": _user_to_api_json(user_row)})
+
+
+@app.get("/api/auth/me")
+@login_required
+def api_auth_me():
+    current_user = g.current_user or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT u.id as user_id, u.username, u.employee_id as auth_employee_id, e.* FROM users u "
+            "LEFT JOIN employees e ON u.employee_id = e.id "
+            "WHERE u.id = %s",
+            (current_user.get("user_id"),),
+        )
+        user_row = cur.fetchone()
+
+    if not user_row:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    return jsonify({"user": _user_to_api_json(user_row)})
 
 @app.post("/api/reports")
 @login_required
