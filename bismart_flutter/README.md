@@ -21,6 +21,16 @@ flutter pub get
 flutter run
 ```
 
+## Chay va build Web
+
+```bash
+# Chay web local
+flutter run -d chrome --dart-define=API_BASE_URL=https://api.bismart.id.vn
+
+# Build web production
+flutter build web --release --dart-define=API_BASE_URL=https://api.bismart.id.vn
+```
+
 ## Cấu trúc thư mục
 
 ```

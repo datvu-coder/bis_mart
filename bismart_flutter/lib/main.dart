@@ -14,8 +14,13 @@ import 'services/api_service.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Gọi trực tiếp backend API qua domain + HTTPS
-  ApiService().setBaseUrl('https://api.bismart.id.vn');
+  // Cho phep override API URL khi build web:
+  // flutter build web --dart-define=API_BASE_URL=https://api.bismart.id.vn
+  const apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://api.bismart.id.vn',
+  );
+  ApiService().setBaseUrl(apiBaseUrl);
   
   runApp(
     MultiProvider(
