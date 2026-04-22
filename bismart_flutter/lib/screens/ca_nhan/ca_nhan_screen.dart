@@ -244,15 +244,15 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
   Widget _buildMenuSection(BuildContext context) {
     final perm = context.watch<LmsProvider>().currentPermission;
     final menuItems = <_MenuItem>[
-      if (perm?.canEmployees ?? false)
+      if (perm?.canEmployees ?? true)
         _MenuItem(Icons.people_rounded, AppStrings.danhSachNhanVien, 'Xem danh sách & thông tin nhân viên', AppRoutes.employeeList, AppColors.info, AppColors.infoLight),
       if (perm?.canAttendance ?? true)
         _MenuItem(Icons.fingerprint_rounded, AppStrings.quanLyChamCong, 'Chấm công, ca làm & xếp hạng', AppRoutes.nhanSu, AppColors.success, AppColors.successLight),
       if (perm?.canReport ?? true)
         _MenuItem(Icons.bar_chart_rounded, AppStrings.quanLyBaoCao, 'Báo cáo doanh thu & thống kê', AppRoutes.kinhDoanh, AppColors.warning, AppColors.warningLight),
-      if (perm?.canStoreList ?? false)
+      if (perm?.canStoreList ?? true)
         _MenuItem(Icons.store_rounded, AppStrings.danhSachCuaHang, 'Danh sách cửa hàng trong hệ thống', AppRoutes.storeList, AppColors.primary, AppColors.primaryLight),
-      if (perm?.canProductList ?? false)
+      if (perm?.canProductList ?? true)
         _MenuItem(Icons.inventory_2_rounded, AppStrings.danhSachSanPham, 'Quản lý sản phẩm & tồn kho', AppRoutes.productList, AppColors.error, AppColors.errorLight),
     ];
 

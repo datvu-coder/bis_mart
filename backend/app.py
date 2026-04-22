@@ -188,6 +188,71 @@ def _store_to_api_json(row: dict[str, Any], managers: list[dict[str, Any]]) -> d
     }
 
 
+def _employee_to_api_json(row: dict[str, Any], rank: int = 0) -> dict[str, Any]:
+    return {
+        "id": str(row.get("id") or ""),
+        "fullName": row.get("full_name") or "",
+        "employeeCode": row.get("employee_code") or "",
+        "position": row.get("position") or "PG",
+        "workLocation": row.get("work_location") or "",
+        "score": int(row.get("score") or 0),
+        "rank": rank,
+        "email": row.get("email"),
+        "phone": row.get("phone"),
+        "dateOfBirth": row.get("date_of_birth"),
+        "cccd": row.get("cccd"),
+        "address": row.get("address"),
+        "status": row.get("status"),
+        "department": row.get("department"),
+        "province": row.get("province"),
+        "area": row.get("area"),
+        "createdDate": row.get("created_date"),
+        "probationDate": row.get("probation_date"),
+        "officialDate": row.get("official_date"),
+        "resignDate": row.get("resign_date"),
+        "resignReason": row.get("resign_reason"),
+        "avatarUrl": row.get("avatar_url"),
+        "storeCode": row.get("store_code"),
+        "rankLevel": row.get("rank_level"),
+    }
+
+
+def _permission_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": int(row.get("id") or 0),
+        "position": row.get("position") or "PG",
+        "description": row.get("description"),
+        "canAttendance": bool(row.get("can_attendance")),
+        "canReport": bool(row.get("can_report")),
+        "canManageAttendance": bool(row.get("can_manage_attendance")),
+        "canEmployees": bool(row.get("can_employees")),
+        "canMore": bool(row.get("can_more")),
+        "canCrud": bool(row.get("can_crud")),
+        "canSwitchStore": bool(row.get("can_switch_store")),
+        "canStoreList": bool(row.get("can_store_list")),
+        "canProductList": bool(row.get("can_product_list")),
+    }
+
+
+def _default_permission_for_position(position: str) -> dict[str, Any]:
+    pos = (position or "").upper()
+    is_manager = pos in {"ADM", "MNG", "CS"}
+    return {
+        "id": 0,
+        "position": pos or "PG",
+        "description": "Default permission",
+        "canAttendance": True,
+        "canReport": True,
+        "canManageAttendance": is_manager,
+        "canEmployees": True,
+        "canMore": True,
+        "canCrud": is_manager,
+        "canSwitchStore": True,
+        "canStoreList": True,
+        "canProductList": True,
+    }
+
+
 def _dashboard_bounds(filter_type: str, now: datetime) -> tuple[str | None, str | None, list[str]]:
     today = now.strftime("%Y-%m-%d")
     if filter_type == "today":
@@ -351,6 +416,188 @@ def api_dashboard():
             "productChart": product_chart,
         }
     )
+
+
+@app.get("/api/permissions")
+@login_required
+def api_get_permissions():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, position, description, can_attendance, can_report, can_manage_attendance, can_employees, can_more, can_crud, can_switch_store, can_store_list, can_product_list "
+            "FROM permissions ORDER BY id ASC"
+        )
+        rows = cur.fetchall()
+    return jsonify([_permission_to_api_json(row) for row in rows])
+
+
+@app.get("/api/permissions/<position>")
+@login_required
+def api_get_permission_by_position(position: str):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, position, description, can_attendance, can_report, can_manage_attendance, can_employees, can_more, can_crud, can_switch_store, can_store_list, can_product_list "
+            "FROM permissions WHERE UPPER(position) = UPPER(%s) LIMIT 1",
+            (position,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return jsonify(_default_permission_for_position(position))
+    return jsonify(_permission_to_api_json(row))
+
+
+@app.get("/api/employees")
+@login_required
+def api_get_employees():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, full_name, employee_code, position, work_location, score, email, phone, date_of_birth, cccd, address, status, department, province, area, created_date, probation_date, official_date, resign_date, resign_reason, avatar_url, store_code, rank_level "
+            "FROM employees ORDER BY score DESC, id ASC"
+        )
+        rows = cur.fetchall()
+    return jsonify([_employee_to_api_json(row, idx + 1) for idx, row in enumerate(rows)])
+
+
+@app.post("/api/employees")
+@login_required
+def api_create_employee():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO employees (full_name, employee_code, position, work_location, email, score) "
+            "VALUES (%s, %s, %s, %s, %s, %s) "
+            "RETURNING id, full_name, employee_code, position, work_location, score, email, phone, date_of_birth, cccd, address, status, department, province, area, created_date, probation_date, official_date, resign_date, resign_reason, avatar_url, store_code, rank_level",
+            (
+                data.get("fullName", ""),
+                data.get("employeeCode", ""),
+                data.get("position", "PG"),
+                data.get("workLocation", ""),
+                data.get("email"),
+                data.get("score", 0),
+            ),
+        )
+        row = cur.fetchone()
+    db.commit()
+    return jsonify(_employee_to_api_json(row, 0)), 201
+
+
+@app.put("/api/employees/<int:employee_id>")
+@login_required
+def api_update_employee(employee_id: int):
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE employees SET full_name = %s, employee_code = %s, position = %s, work_location = %s, score = %s, email = %s, phone = %s, address = %s, status = %s, department = %s, province = %s, area = %s, store_code = %s, rank_level = %s "
+            "WHERE id = %s "
+            "RETURNING id, full_name, employee_code, position, work_location, score, email, phone, date_of_birth, cccd, address, status, department, province, area, created_date, probation_date, official_date, resign_date, resign_reason, avatar_url, store_code, rank_level",
+            (
+                data.get("fullName", ""),
+                data.get("employeeCode", ""),
+                data.get("position", "PG"),
+                data.get("workLocation", ""),
+                data.get("score", 0),
+                data.get("email"),
+                data.get("phone"),
+                data.get("address"),
+                data.get("status"),
+                data.get("department"),
+                data.get("province"),
+                data.get("area"),
+                data.get("storeCode"),
+                data.get("rankLevel"),
+                employee_id,
+            ),
+        )
+        row = cur.fetchone()
+    db.commit()
+    if not row:
+        return jsonify({"error": "Employee not found"}), 404
+    return jsonify(_employee_to_api_json(row, 0))
+
+
+@app.delete("/api/employees/<int:employee_id>")
+@login_required
+def api_delete_employee(employee_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM employees WHERE id = %s", (employee_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/shifts")
+@login_required
+def api_get_shifts():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, shift_code, start_hour, start_minute, end_hour, end_minute, store_name "
+            "FROM work_shifts ORDER BY id ASC"
+        )
+        rows = cur.fetchall()
+    return jsonify([
+        {
+            "id": str(row.get("id") or ""),
+            "name": row.get("name") or "",
+            "shiftCode": row.get("shift_code"),
+            "startHour": int(row.get("start_hour") or 0),
+            "startMinute": int(row.get("start_minute") or 0),
+            "endHour": int(row.get("end_hour") or 0),
+            "endMinute": int(row.get("end_minute") or 0),
+            "storeName": row.get("store_name"),
+        }
+        for row in rows
+    ])
+
+
+@app.post("/api/shifts")
+@login_required
+def api_create_shift():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO work_shifts (name, shift_code, start_hour, start_minute, end_hour, end_minute, store_name) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING id, name, shift_code, start_hour, start_minute, end_hour, end_minute, store_name",
+            (
+                data.get("name", ""),
+                data.get("shiftCode"),
+                data.get("startHour", 0),
+                data.get("startMinute", 0),
+                data.get("endHour", 0),
+                data.get("endMinute", 0),
+                data.get("storeName"),
+            ),
+        )
+        row = cur.fetchone()
+    db.commit()
+    return jsonify(
+        {
+            "id": str(row.get("id") or ""),
+            "name": row.get("name") or "",
+            "shiftCode": row.get("shift_code"),
+            "startHour": int(row.get("start_hour") or 0),
+            "startMinute": int(row.get("start_minute") or 0),
+            "endHour": int(row.get("end_hour") or 0),
+            "endMinute": int(row.get("end_minute") or 0),
+            "storeName": row.get("store_name"),
+        }
+    ), 201
+
+
+@app.delete("/api/shifts/<int:shift_id>")
+@login_required
+def api_delete_shift(shift_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM work_shifts WHERE id = %s", (shift_id,))
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @app.get("/api/products")
