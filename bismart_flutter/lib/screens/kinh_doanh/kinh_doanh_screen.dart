@@ -128,6 +128,24 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
                 child: _buildScreenHeader(provider, false),
               ),
+            if (isCompactMobile)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () =>
+                        Navigator.pushNamed(context, AppRoutes.createReport),
+                    icon: const Icon(Icons.add_rounded, size: 16),
+                    label: const Text(AppStrings.taoPhieuBaoCao),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      textStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ),
             Container(
               margin: EdgeInsets.fromLTRB(16, isCompactMobile ? 10 : 0, 16, 0),
               padding: const EdgeInsets.all(4),

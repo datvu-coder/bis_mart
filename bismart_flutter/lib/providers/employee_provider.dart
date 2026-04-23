@@ -169,6 +169,15 @@ class EmployeeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> assignEmployeeToStore(String employeeId, String? storeCode) async {
+    await _api.updateEmployee(int.parse(employeeId), {'storeCode': storeCode});
+    final index = _employees.indexWhere((e) => e.id == employeeId);
+    if (index != -1) {
+      _employees[index] = _employees[index].copyWith(storeCode: storeCode);
+      notifyListeners();
+    }
+  }
+
   Employee? getEmployeeById(String id) {
     try {
       return _employees.firstWhere((e) => e.id == id);
