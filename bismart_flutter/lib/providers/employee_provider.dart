@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/employee.dart';
 import '../models/attendance.dart';
 import '../models/work_shift.dart';
+import '../models/work_schedule.dart';
 import '../services/api_service.dart';
 
 class EmployeeProvider extends ChangeNotifier {
@@ -11,6 +12,8 @@ class EmployeeProvider extends ChangeNotifier {
   List<Attendance> _attendances = [];
   List<Attendance> _historyAttendances = [];
   List<WorkShift> _shifts = [];
+  List<WorkSchedule> _schedules = [];
+  DateTime _scheduleWeekStart = _getMonday(DateTime.now());
   bool _isLoading = false;
   String? _error;
 
@@ -21,10 +24,17 @@ class EmployeeProvider extends ChangeNotifier {
   List<Attendance> get attendances => _attendances;
   List<Attendance> get historyAttendances => _historyAttendances;
   List<WorkShift> get shifts => _shifts;
+  List<WorkSchedule> get schedules => _schedules;
+  DateTime get scheduleWeekStart => _scheduleWeekStart;
   bool get isLoading => _isLoading;
   String? get error => _error;
   Map<String, dynamic> get monthlySummary => _monthlySummary;
   void clearError() { _error = null; notifyListeners(); }
+
+  static DateTime _getMonday(DateTime d) {
+    final diff = d.weekday - 1;
+    return DateTime(d.year, d.month, d.day - diff);
+  }
 
   List<Employee> get rankedEmployees {
     final sorted = List<Employee>.from(_employees);
@@ -162,6 +172,51 @@ class EmployeeProvider extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  Future<void> loadSchedules({DateTime? weekStart}) async {
+    final monday = weekStart ?? _scheduleWeekStart;
+    _scheduleWeekStart = monday;
+    final weekStr =
+        '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
+    try {
+      final data = await _api.getEmployeeSchedules(week: weekStr);
+      _schedules = data
+          .map((s) => WorkSchedule.fromJson(s as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      _schedules = [];
+    }
+    notifyListeners();
+  }
+
+  Future<void> addSchedule({
+    required String employeeId,
+    required String shiftId,
+    required DateTime workDate,
+    String? note,
+  }) async {
+    final dateStr =
+        '${workDate.year}-${workDate.month.toString().padLeft(2, '0')}-${workDate.day.toString().padLeft(2, '0')}';
+    try {
+      await _api.createEmployeeSchedule({
+        'employeeId': employeeId,
+        'shiftId': shiftId,
+        'workDate': dateStr,
+        'note': note,
+      });
+      await loadSchedules();
+    } catch (_) {
+      notifyListeners();
+    }
+  }
+
+  Future<void> removeSchedule(String id) async {
+    try {
+      await _api.deleteEmployeeSchedule(int.parse(id));
+    } catch (_) {}
+    _schedules.removeWhere((s) => s.id == id);
+    notifyListeners();
   }
 
   void _recalcRanks() {

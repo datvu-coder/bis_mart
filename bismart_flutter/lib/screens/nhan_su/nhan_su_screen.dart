@@ -10,6 +10,7 @@ import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/lms_provider.dart';
 import '../../models/attendance.dart';
+import '../../models/work_schedule.dart';
 import '../../models/work_shift.dart';
 import '../../models/permission.dart';
 import '../../services/location_service.dart';
@@ -33,7 +34,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<EmployeeProvider>();
       final currentUser = context.read<AuthProvider>().currentUser;
@@ -41,6 +42,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
       provider.loadAttendances();
       // Load monthly summary for current user only
       provider.loadMonthlySummary(employeeId: currentUser?.id);
+      provider.loadSchedules();
       context.read<StoreProvider>().loadStores();
       // Load permissions for current user's position
       if (currentUser != null) {
@@ -87,14 +89,20 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                     _buildScreenHeader(provider, canManage, isDesktop),
                     const SizedBox(height: 20),
                     if (isDesktop)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Column(
                         children: [
-                          Expanded(flex: 5, child: _buildAttendancePanel(provider, canManage)),
-                          const SizedBox(width: 18),
-                          Expanded(flex: 4, child: _buildShiftPanel(provider)),
-                          const SizedBox(width: 18),
-                          Expanded(flex: 4, child: _buildRankPanel(provider)),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(flex: 5, child: _buildAttendancePanel(provider, canManage)),
+                              const SizedBox(width: 18),
+                              Expanded(flex: 4, child: _buildShiftPanel(provider)),
+                              const SizedBox(width: 18),
+                              Expanded(flex: 4, child: _buildRankPanel(provider)),
+                            ],
+                          ),
+                          const SizedBox(height: 18),
+                          _buildSchedulePanel(provider, canManage),
                         ],
                       )
                     else
@@ -109,6 +117,8 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                             ],
                           ),
                           _buildRankPanel(provider),
+                          const SizedBox(height: 16),
+                          _buildSchedulePanel(provider, canManage),
                         ],
                       ),
                   ],
@@ -148,6 +158,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                   Tab(text: 'Chấm công'),
                   Tab(text: 'Ca làm'),
                   Tab(text: 'Xếp hạng'),
+                  Tab(text: 'Lịch'),
                 ],
               ),
             ),
@@ -166,6 +177,10 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                   SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                     child: _buildRankPanel(provider),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    child: _buildSchedulePanel(provider, canManage),
                   ),
                 ],
               ),
@@ -1324,6 +1339,271 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                 }
               },
               child: const Text('Thêm'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---- WORK SCHEDULE WIDGETS (extension) ----
+extension _NhanSuScheduleWidgets on _NhanSuScreenState {
+  String _weekLabel(DateTime weekStart) {
+    final end = weekStart.add(const Duration(days: 6));
+    return '${weekStart.day}/${weekStart.month} - ${end.day}/${end.month}/${end.year}';
+  }
+
+  Widget _buildSchedulePanel(EmployeeProvider provider, bool canManage) {
+    return DataPanel(
+      title: 'Lịch làm việc',
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded, size: 20),
+            tooltip: 'Tuần trước',
+            onPressed: () {
+              final prev = provider.scheduleWeekStart.subtract(const Duration(days: 7));
+              provider.loadSchedules(weekStart: prev);
+            },
+          ),
+          Text(
+            _weekLabel(provider.scheduleWeekStart),
+            style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700),
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded, size: 20),
+            tooltip: 'Tuần sau',
+            onPressed: () {
+              final next = provider.scheduleWeekStart.add(const Duration(days: 7));
+              provider.loadSchedules(weekStart: next);
+            },
+          ),
+        ],
+      ),
+      child: _buildWeekGrid(provider, canManage),
+    );
+  }
+
+  Widget _buildWeekGrid(EmployeeProvider provider, bool canManage) {
+    final weekStart = provider.scheduleWeekStart;
+    final days = List.generate(7, (i) => weekStart.add(Duration(days: i)));
+    const dayLabels = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    final now = DateTime.now();
+
+    return Column(
+      children: List.generate(7, (i) {
+        final day = days[i];
+        final isToday =
+            day.year == now.year && day.month == now.month && day.day == now.day;
+        final daySchedules = provider.schedules
+            .where((s) =>
+                s.workDate.year == day.year &&
+                s.workDate.month == day.month &&
+                s.workDate.day == day.day)
+            .toList();
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: isToday ? AppColors.primaryLight : AppColors.surfaceVariant,
+            borderRadius: BorderRadius.circular(12),
+            border: isToday
+                ? Border.all(color: AppColors.primary.withValues(alpha: 0.35))
+                : null,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 40,
+                child: Column(
+                  children: [
+                    Text(
+                      dayLabels[i],
+                      style: AppTextStyles.caption.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: isToday ? AppColors.primary : AppColors.textSecondary,
+                      ),
+                    ),
+                    Text(
+                      '${day.day}/${day.month}',
+                      style: AppTextStyles.caption.copyWith(
+                        fontSize: 10,
+                        color: AppColors.textHint,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 1,
+                height: 32,
+                color: AppColors.border,
+                margin: const EdgeInsets.symmetric(horizontal: 10),
+              ),
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    ...daySchedules.map(
+                        (s) => _buildScheduleChip(s, canManage, provider)),
+                    if (canManage)
+                      InkWell(
+                        onTap: () => _showAssignShiftDialog(provider, day),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: AppColors.borderLight),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add_rounded,
+                                  size: 13, color: AppColors.textHint),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Thêm',
+                                style: AppTextStyles.caption.copyWith(
+                                    color: AppColors.textHint, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    if (daySchedules.isEmpty && !canManage)
+                      Text(
+                        'Chưa có lịch',
+                        style: AppTextStyles.caption
+                            .copyWith(color: AppColors.textHint),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+  }
+
+  Widget _buildScheduleChip(
+      WorkSchedule schedule, bool canManage, EmployeeProvider provider) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.infoLight,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${schedule.employeeName ?? '?'} · ${schedule.shiftName ?? ''}',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.info,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+            ),
+          ),
+          if (schedule.startHour != null) ...[
+            const SizedBox(width: 4),
+            Text(
+              schedule.timeRange,
+              style:
+                  AppTextStyles.caption.copyWith(color: AppColors.info, fontSize: 10),
+            ),
+          ],
+          if (canManage) ...[
+            const SizedBox(width: 4),
+            InkWell(
+              onTap: () => provider.removeSchedule(schedule.id),
+              child: const Icon(Icons.close_rounded, size: 13, color: AppColors.info),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showAssignShiftDialog(EmployeeProvider provider, DateTime day) {
+    String? selectedEmployeeId;
+    String? selectedShiftId;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('Phân ca ${day.day}/${day.month}/${day.year}'),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  decoration:
+                      const InputDecoration(labelText: 'Nhân viên'),
+                  value: selectedEmployeeId,
+                  isExpanded: true,
+                  items: provider.employees
+                      .map((e) =>
+                          DropdownMenuItem(value: e.id, child: Text(e.fullName)))
+                      .toList(),
+                  onChanged: (v) =>
+                      setDialogState(() => selectedEmployeeId = v),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  decoration:
+                      const InputDecoration(labelText: 'Ca làm việc'),
+                  value: selectedShiftId,
+                  isExpanded: true,
+                  items: provider.shifts
+                      .map((s) => DropdownMenuItem(
+                            value: s.id,
+                            child: Text('${s.name} (${s.timeRange})'),
+                          ))
+                      .toList(),
+                  onChanged: (v) =>
+                      setDialogState(() => selectedShiftId = v),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: (selectedEmployeeId != null && selectedShiftId != null)
+                  ? () async {
+                      await provider.addSchedule(
+                        employeeId: selectedEmployeeId!,
+                        shiftId: selectedShiftId!,
+                        workDate: day,
+                      );
+                      if (!ctx.mounted) return;
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Đã phân ca thành công!'),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: AppColors.success,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    }
+                  : null,
+              child: const Text('Lưu'),
             ),
           ],
         ),

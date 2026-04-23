@@ -152,6 +152,24 @@ class ApiService {
     await _dio.delete('/api/shifts/$id');
   }
 
+  // ---- EMPLOYEE SCHEDULES ----
+  Future<List<dynamic>> getEmployeeSchedules({String? week}) async {
+    final response = await _dio.get(
+      '/api/employee-schedules',
+      queryParameters: week != null ? {'week': week} : null,
+    );
+    return response.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createEmployeeSchedule(Map<String, dynamic> data) async {
+    final response = await _dio.post('/api/employee-schedules', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteEmployeeSchedule(int id) async {
+    await _dio.delete('/api/employee-schedules/$id');
+  }
+
   // ---- STORES ----
   Future<List<dynamic>> getStores() async {
     final response = await _dio.get('/api/stores');
