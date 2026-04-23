@@ -7,6 +7,7 @@ class WorkShift {
   final TimeOfDay endTime;
   final String? shiftCode;
   final String? storeName;
+  final String? storeId;
 
   WorkShift({
     required this.id,
@@ -15,6 +16,7 @@ class WorkShift {
     required this.endTime,
     this.shiftCode,
     this.storeName,
+    this.storeId,
   });
 
   String get timeRange =>
@@ -37,6 +39,7 @@ class WorkShift {
       ),
       shiftCode: json['shiftCode'] as String?,
       storeName: json['storeName'] as String?,
+      storeId: json['storeId'] as String?,
     );
   }
 
@@ -47,6 +50,7 @@ class WorkShift {
         'startMinute': startTime.minute,
         'endHour': endTime.hour,
         'endMinute': endTime.minute,
+        if (storeId != null) 'storeId': storeId,
       };
 
   static List<WorkShift> defaultShifts() {

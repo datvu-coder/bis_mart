@@ -138,8 +138,9 @@ class ApiService {
   }
 
   // ---- SHIFTS ----
-  Future<List<dynamic>> getShifts() async {
-    final response = await _dio.get('/api/shifts');
+  Future<List<dynamic>> getShifts({String? storeId}) async {
+    final response = await _dio.get('/api/shifts',
+        queryParameters: storeId != null ? {'storeId': storeId} : null);
     return response.data as List<dynamic>;
   }
 

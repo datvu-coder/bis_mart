@@ -64,6 +64,15 @@ class StoreProvider extends ChangeNotifier {
     }
   }
 
+  Store? getStoreByCode(String code) {
+    try {
+      return _stores.firstWhere(
+          (s) => s.storeCode.toLowerCase() == code.toLowerCase());
+    } catch (_) {
+      return null;
+    }
+  }
+
   void addStore(Store store) async {
     try {
       final result = await _api.createStore(store.toJson());

@@ -42,7 +42,21 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
       // Load monthly summary for current user only
       provider.loadMonthlySummary(employeeId: currentUser?.id);
       provider.loadSchedules();
-      context.read<StoreProvider>().loadStores();
+      context.read<StoreProvider>().loadStores().then((_) {
+        // Auto-filter shifts to current user's store
+        if (currentUser?.storeCode != null && mounted) {
+          final store = context
+              .read<StoreProvider>()
+              .getStoreByCode(currentUser!.storeCode!);
+          if (store != null) {
+            provider.loadShifts(storeId: store.id);
+          } else {
+            provider.loadShifts();
+          }
+        } else {
+          provider.loadShifts();
+        }
+      });
       // Load permissions for current user's position
       if (currentUser != null) {
         context.read<PermissionProvider>().resolveForUser(currentUser);
@@ -911,49 +925,124 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
   }
 
   Widget _buildShiftPanel(EmployeeProvider provider) {
+    final stores = context.read<StoreProvider>().stores;
+    final selectedStoreId = provider.selectedShiftStoreId;
+    final canManage = context.read<PermissionProvider>().canManageAttendance;
+
     return DataPanel(
       title: AppStrings.caLamViec,
-      trailing: TextButton.icon(
+      trailing: TextButton(
         onPressed: () => _showAddShiftDialog(provider),
-        icon: const Icon(Icons.add_rounded, size: 18),
-        label: const Text(AppStrings.themCa),
         style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+        child: const Text(AppStrings.themCa),
       ),
       child: Column(
-        children: provider.shifts.map((shift) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.schedule_rounded, size: 18, color: AppColors.primary),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(shift.name, style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 2),
-                      Text(shift.timeRange, style: AppTextStyles.caption),
-                    ],
-                  ),
-                ),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Store selector (visible to managers)
+          if (canManage && stores.isNotEmpty) ...[  
+            DropdownButtonFormField<String?>(
+              value: selectedStoreId,
+              decoration: InputDecoration(
+                labelText: 'Cửa hàng',
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              items: [
+                const DropdownMenuItem(
+                    value: null, child: Text('Tất cả cửa hàng')),
+                ...stores.map((s) => DropdownMenuItem(
+                      value: s.id,
+                      child: Text(s.name),
+                    )),
               ],
+              onChanged: (v) => provider.loadShifts(storeId: v),
             ),
-          );
-        }).toList(),
+            const SizedBox(height: 12),
+          ],
+          ...provider.shifts.map((shift) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.schedule_rounded,
+                        size: 18, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(shift.name,
+                            style: AppTextStyles.bodyText
+                                .copyWith(fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Text(shift.timeRange,
+                                style: AppTextStyles.caption),
+                            if (shift.storeName != null &&
+                                selectedStoreId == null) ...[  
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.infoLight,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  shift.storeName!,
+                                  style: AppTextStyles.caption.copyWith(
+                                      color: AppColors.info,
+                                      fontSize: 10),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (canManage)
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          size: 18, color: AppColors.error),
+                      tooltip: 'Xóa ca',
+                      onPressed: () => provider.removeShift(shift.id),
+                    ),
+                ],
+              ),
+            );
+          }).toList(),
+          if (provider.shifts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text(
+                  selectedStoreId != null
+                      ? 'Chưa có ca nào cho cửa hàng này'
+                      : 'Chưa có ca làm việc nào',
+                  style: AppTextStyles.caption,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1253,6 +1342,8 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
     final nameCtrl = TextEditingController();
     TimeOfDay startTime = const TimeOfDay(hour: 8, minute: 0);
     TimeOfDay endTime = const TimeOfDay(hour: 17, minute: 0);
+    final stores = context.read<StoreProvider>().stores;
+    String? selectedStoreId = provider.selectedShiftStoreId;
 
     showDialog(
       context: context,
@@ -1269,7 +1360,23 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                   hintText: 'VD: Ca tối',
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              if (stores.isNotEmpty)
+                DropdownButtonFormField<String?>(
+                  decoration: const InputDecoration(labelText: 'Cửa hàng'),
+                  value: selectedStoreId,
+                  items: [
+                    const DropdownMenuItem(
+                        value: null, child: Text('Không chọn')),
+                    ...stores.map((s) => DropdownMenuItem(
+                          value: s.id,
+                          child: Text(s.name),
+                        )),
+                  ],
+                  onChanged: (v) =>
+                      setDialogState(() => selectedStoreId = v),
+                ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
@@ -1324,6 +1431,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                     name: nameCtrl.text,
                     startTime: startTime,
                     endTime: endTime,
+                    storeId: selectedStoreId,
                   ));
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(this.context).showSnackBar(
@@ -1331,7 +1439,8 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                       content: Text('Đã thêm ca "${nameCtrl.text}"'),
                       behavior: SnackBarBehavior.floating,
                       backgroundColor: AppColors.success,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
                     ),
                   );
                 }

@@ -14,6 +14,7 @@ class EmployeeProvider extends ChangeNotifier {
   List<WorkShift> _shifts = [];
   List<WorkSchedule> _schedules = [];
   DateTime _scheduleWeekStart = _getMonday(DateTime.now());
+  String? _selectedShiftStoreId;
   bool _isLoading = false;
   String? _error;
 
@@ -26,6 +27,7 @@ class EmployeeProvider extends ChangeNotifier {
   List<WorkShift> get shifts => _shifts;
   List<WorkSchedule> get schedules => _schedules;
   DateTime get scheduleWeekStart => _scheduleWeekStart;
+  String? get selectedShiftStoreId => _selectedShiftStoreId;
   bool get isLoading => _isLoading;
   String? get error => _error;
   Map<String, dynamic> get monthlySummary => _monthlySummary;
@@ -52,7 +54,7 @@ class EmployeeProvider extends ChangeNotifier {
       for (var i = 0; i < _employees.length; i++) {
         _employees[i] = _employees[i].copyWith(rank: i + 1);
       }
-      final shiftData = await _api.getShifts();
+      final shiftData = await _api.getShifts(storeId: _selectedShiftStoreId);
       _shifts = shiftData.map((s) => WorkShift.fromJson(s as Map<String, dynamic>)).toList();
     } catch (e) {
       _error = 'Không thể tải dữ liệu nhân viên';
@@ -123,11 +125,20 @@ class EmployeeProvider extends ChangeNotifier {
   Future<void> addShift(WorkShift shift) async {
     try {
       await _api.createShift(shift.toJson());
-      final shiftData = await _api.getShifts();
+      final shiftData = await _api.getShifts(storeId: _selectedShiftStoreId);
       _shifts = shiftData.map((s) => WorkShift.fromJson(s as Map<String, dynamic>)).toList();
     } catch (_) {
       _shifts.add(shift);
     }
+    notifyListeners();
+  }
+
+  Future<void> loadShifts({String? storeId}) async {
+    _selectedShiftStoreId = storeId;
+    try {
+      final shiftData = await _api.getShifts(storeId: storeId);
+      _shifts = shiftData.map((s) => WorkShift.fromJson(s as Map<String, dynamic>)).toList();
+    } catch (_) {}
     notifyListeners();
   }
 
