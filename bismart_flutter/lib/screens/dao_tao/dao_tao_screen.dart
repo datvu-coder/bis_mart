@@ -210,7 +210,9 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 20 : 14),
+      padding: isCompactMobile
+          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+          : EdgeInsets.all(emphasize ? 20 : 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFEFF6FF), Color(0xFFFFFFFF)],
@@ -223,38 +225,38 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: isCompactMobile ? 38 : 44,
-                height: isCompactMobile ? 38 : 44,
-                decoration: BoxDecoration(
-                  color: AppColors.infoLight,
-                  borderRadius: BorderRadius.circular(12),
+          if (!isCompactMobile) ...[
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.infoLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.school_rounded,
+                    color: AppColors.info,
+                    size: 24,
+                  ),
                 ),
-                child: Icon(
-                  Icons.school_rounded,
-                  color: AppColors.info,
-                  size: isCompactMobile ? 20 : 24,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
-                    if (!isCompactMobile) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
                       const SizedBox(height: 2),
                       Text('Cộng đồng, bài học & lịch đào tạo',
                           style: AppTextStyles.caption),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
           if (isCompactMobile)
             Row(
               children: [

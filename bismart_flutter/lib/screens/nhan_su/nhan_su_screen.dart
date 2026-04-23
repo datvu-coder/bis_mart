@@ -224,7 +224,9 @@ class _NhanSuScreenState extends State<NhanSuScreen>
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 20 : 14),
+      padding: isCompactMobile
+          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+          : EdgeInsets.all(emphasize ? 20 : 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFFF2EB), Color(0xFFFFFFFF)],
@@ -237,52 +239,52 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: isCompactMobile ? 38 : 44,
-                height: isCompactMobile ? 38 : 44,
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(12),
+          if (!isCompactMobile) ...[
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.groups_2_rounded,
+                      color: AppColors.primary, size: 24),
                 ),
-                child: Icon(Icons.groups_2_rounded,
-                    color: AppColors.primary, size: isCompactMobile ? 20 : 24),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
-                    if (!isCompactMobile) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
                       const SizedBox(height: 2),
                       Text(
                         'Điều phối chấm công, ca làm và hiệu suất đội ngũ',
                         style: AppTextStyles.caption,
                       ),
                     ],
-                  ],
-                ),
-              ),
-              if (canManage && !isCompactMobile)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.infoLight,
-                    borderRadius: BorderRadius.circular(30),
                   ),
-                  child: Text(
-                    'Quản lý',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.info,
-                      fontWeight: FontWeight.w700,
+                ),
+                if (canManage)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.infoLight,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: Text(
+                      'Quản lý',
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.info,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
           if (isCompactMobile)
             Row(
               children: [

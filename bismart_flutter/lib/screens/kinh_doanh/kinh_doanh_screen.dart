@@ -202,7 +202,9 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 20 : 14),
+      padding: isCompactMobile
+          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+          : EdgeInsets.all(emphasize ? 20 : 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFEBF8F0), Color(0xFFFFFFFF)],
@@ -215,46 +217,31 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: isCompactMobile ? 38 : 44,
-                height: isCompactMobile ? 38 : 44,
-                decoration: BoxDecoration(
-                  color: AppColors.successLight,
-                  borderRadius: BorderRadius.circular(12),
+          if (!isCompactMobile) ...[
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.successLight,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.bar_chart_rounded,
+                      color: AppColors.success, size: 24),
                 ),
-                child: Icon(Icons.bar_chart_rounded,
-                    color: AppColors.success, size: isCompactMobile ? 20 : 24),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
-                    if (!isCompactMobile) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
                       const SizedBox(height: 2),
                       Text('Báo cáo bán hàng & thống kê doanh thu',
                           style: AppTextStyles.caption),
                     ],
-                  ],
-                ),
-              ),
-              if (isCompactMobile)
-                IconButton(
-                  onPressed: () =>
-                      Navigator.pushNamed(context, AppRoutes.createReport),
-                  icon: const Icon(Icons.add_rounded),
-                  tooltip: AppStrings.taoPhieuBaoCao,
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.white,
-                    padding: const EdgeInsets.all(6),
-                    minimumSize: const Size(36, 36),
                   ),
-                )
-              else
+                ),
                 ElevatedButton.icon(
                   onPressed: () =>
                       Navigator.pushNamed(context, AppRoutes.createReport),
@@ -267,9 +254,10 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                         const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
           if (isCompactMobile)
             Row(
               children: [
@@ -300,6 +288,22 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     value: '$pgCount',
                     color: AppColors.primary,
                     compact: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: IconButton.filled(
+                    onPressed: () =>
+                        Navigator.pushNamed(context, AppRoutes.createReport),
+                    icon: const Icon(Icons.add_rounded, size: 18),
+                    tooltip: AppStrings.taoPhieuBaoCao,
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.white,
+                      padding: EdgeInsets.zero,
+                    ),
                   ),
                 ),
               ],
