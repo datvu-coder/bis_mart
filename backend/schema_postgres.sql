@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS store_managers (
     id SERIAL PRIMARY KEY,
     store_id INTEGER NOT NULL,
     employee_id INTEGER NOT NULL,
+    store_role TEXT NOT NULL DEFAULT 'PG',
     FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
     UNIQUE(store_id, employee_id)
@@ -352,6 +353,14 @@ CREATE INDEX IF NOT EXISTS idx_store_managers_store ON store_managers(store_id);
 CREATE INDEX IF NOT EXISTS idx_course_contents_title ON course_contents(title_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_questions_content ON quiz_questions(content_id);
 CREATE INDEX IF NOT EXISTS idx_class_attendances_schedule ON class_attendances(schedule_id);
+
+-- Migration: add store_role to existing store_managers if missing
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='store_managers' AND column_name='store_role') THEN
+        ALTER TABLE store_managers ADD COLUMN store_role TEXT NOT NULL DEFAULT 'PG';
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS employee_schedules (
     id SERIAL PRIMARY KEY,

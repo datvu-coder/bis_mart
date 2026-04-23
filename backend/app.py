@@ -447,6 +447,257 @@ def api_get_permission_by_position(position: str):
     return jsonify(_permission_to_api_json(row))
 
 
+@app.post("/api/permissions")
+@login_required
+def api_create_permission():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                "INSERT INTO permissions (position, description, can_attendance, can_report, "
+                "can_manage_attendance, can_employees, can_more, can_crud, can_switch_store, "
+                "can_store_list, can_product_list) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+                "RETURNING id, position, description, can_attendance, can_report, "
+                "can_manage_attendance, can_employees, can_more, can_crud, can_switch_store, "
+                "can_store_list, can_product_list",
+                (
+                    (data.get("position") or "").upper(),
+                    data.get("description"),
+                    int(bool(data.get("canAttendance", False))),
+                    int(bool(data.get("canReport", False))),
+                    int(bool(data.get("canManageAttendance", False))),
+                    int(bool(data.get("canEmployees", False))),
+                    int(bool(data.get("canMore", False))),
+                    int(bool(data.get("canCrud", False))),
+                    int(bool(data.get("canSwitchStore", False))),
+                    int(bool(data.get("canStoreList", False))),
+                    int(bool(data.get("canProductList", False))),
+                ),
+            )
+            row = cur.fetchone()
+        db.commit()
+        return jsonify(_permission_to_api_json(row)), 201
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 400
+
+
+@app.put("/api/permissions/<position>")
+@login_required
+def api_update_permission(position: str):
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE permissions SET description = %s, can_attendance = %s, can_report = %s, "
+            "can_manage_attendance = %s, can_employees = %s, can_more = %s, can_crud = %s, "
+            "can_switch_store = %s, can_store_list = %s, can_product_list = %s "
+            "WHERE UPPER(position) = UPPER(%s) "
+            "RETURNING id, position, description, can_attendance, can_report, "
+            "can_manage_attendance, can_employees, can_more, can_crud, can_switch_store, "
+            "can_store_list, can_product_list",
+            (
+                data.get("description"),
+                int(bool(data.get("canAttendance", False))),
+                int(bool(data.get("canReport", False))),
+                int(bool(data.get("canManageAttendance", False))),
+                int(bool(data.get("canEmployees", False))),
+                int(bool(data.get("canMore", False))),
+                int(bool(data.get("canCrud", False))),
+                int(bool(data.get("canSwitchStore", False))),
+                int(bool(data.get("canStoreList", False))),
+                int(bool(data.get("canProductList", False))),
+                position,
+            ),
+        )
+        row = cur.fetchone()
+    db.commit()
+    if not row:
+        return jsonify({"error": "Position not found"}), 404
+    return jsonify(_permission_to_api_json(row))
+
+
+@app.delete("/api/permissions/<position>")
+@login_required
+def api_delete_permission(position: str):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM permissions WHERE UPPER(position) = UPPER(%s)", (position,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+# ---- STORE MANAGERS (with store role) ----
+
+@app.get("/api/store-managers")
+@login_required
+def api_get_store_managers():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT sm.id, sm.store_id, sm.employee_id, sm.store_role, "
+            "s.name AS store_name, s.store_code, "
+            "e.full_name AS employee_name, e.employee_code "
+            "FROM store_managers sm "
+            "JOIN stores s ON s.id = sm.store_id "
+            "JOIN employees e ON e.id = sm.employee_id "
+            "ORDER BY s.name, e.full_name"
+        )
+        rows = cur.fetchall()
+    return jsonify([
+        {
+            "id": int(row["id"]),
+            "storeId": str(row["store_id"]),
+            "employeeId": str(row["employee_id"]),
+            "storeRole": row.get("store_role") or "PG",
+            "storeName": row.get("store_name") or "",
+            "storeCode": row.get("store_code") or "",
+            "employeeName": row.get("employee_name") or "",
+            "employeeCode": row.get("employee_code") or "",
+        }
+        for row in rows
+    ])
+
+
+@app.post("/api/store-managers")
+@login_required
+def api_create_store_manager():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                "INSERT INTO store_managers (store_id, employee_id, store_role) "
+                "VALUES (%s, %s, %s) "
+                "ON CONFLICT (store_id, employee_id) DO UPDATE SET store_role = EXCLUDED.store_role "
+                "RETURNING id, store_id, employee_id, store_role",
+                (
+                    int(data.get("storeId", 0)),
+                    int(data.get("employeeId", 0)),
+                    (data.get("storeRole") or "PG").upper(),
+                ),
+            )
+            row = cur.fetchone()
+        db.commit()
+        return jsonify({
+            "id": int(row["id"]),
+            "storeId": str(row["store_id"]),
+            "employeeId": str(row["employee_id"]),
+            "storeRole": row.get("store_role") or "PG",
+        }), 201
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 400
+
+
+@app.put("/api/store-managers/<int:sm_id>")
+@login_required
+def api_update_store_manager(sm_id: int):
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE store_managers SET store_role = %s WHERE id = %s "
+            "RETURNING id, store_id, employee_id, store_role",
+            ((data.get("storeRole") or "PG").upper(), sm_id),
+        )
+        row = cur.fetchone()
+    db.commit()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify({
+        "id": int(row["id"]),
+        "storeId": str(row["store_id"]),
+        "employeeId": str(row["employee_id"]),
+        "storeRole": row.get("store_role") or "PG",
+    })
+
+
+@app.delete("/api/store-managers/<int:sm_id>")
+@login_required
+def api_delete_store_manager(sm_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM store_managers WHERE id = %s", (sm_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/me/permissions")
+@login_required
+def api_me_permissions():
+    """Resolve effective permissions for the current user (system role + store role)."""
+    user = g.current_user
+    employee_id = int(user.get("employee_id") or 0)
+    db = get_db()
+    with db.cursor() as cur:
+        # Get employee record for system role + store_code
+        cur.execute(
+            "SELECT position, store_code FROM employees WHERE id = %s LIMIT 1",
+            (employee_id,),
+        )
+        emp = cur.fetchone()
+    system_role = (emp.get("position") if emp else None) or "PG"
+    store_code = emp.get("store_code") if emp else None
+
+    with db.cursor() as cur:
+        # Get system role permissions
+        cur.execute(
+            "SELECT id, position, description, can_attendance, can_report, can_manage_attendance, "
+            "can_employees, can_more, can_crud, can_switch_store, can_store_list, can_product_list "
+            "FROM permissions WHERE UPPER(position) = UPPER(%s) LIMIT 1",
+            (system_role,),
+        )
+        sys_row = cur.fetchone()
+
+        # Get store role (from store_managers for this employee + their store)
+        store_role = None
+        store_row = None
+        if store_code:
+            cur.execute(
+                "SELECT sm.store_role, sm.id AS sm_id "
+                "FROM store_managers sm JOIN stores s ON s.id = sm.store_id "
+                "WHERE sm.employee_id = %s AND s.store_code = %s LIMIT 1",
+                (employee_id, store_code),
+            )
+            sm = cur.fetchone()
+            if sm:
+                store_role = sm.get("store_role") or "PG"
+
+        if store_role:
+            cur.execute(
+                "SELECT id, position, description, can_attendance, can_report, "
+                "can_manage_attendance, can_employees, can_more, can_crud, "
+                "can_switch_store, can_store_list, can_product_list "
+                "FROM permissions WHERE UPPER(position) = UPPER(%s) LIMIT 1",
+                (store_role,),
+            )
+            store_row = cur.fetchone()
+
+    sys_perm = _permission_to_api_json(sys_row) if sys_row else _default_permission_for_position(system_role)
+    store_perm = (_permission_to_api_json(store_row) if store_row else
+                  _default_permission_for_position(store_role) if store_role else None)
+
+    # Merge: effective = OR of system + store perms
+    bool_keys = ["canAttendance", "canReport", "canManageAttendance", "canEmployees",
+                 "canMore", "canCrud", "canSwitchStore", "canStoreList", "canProductList"]
+    effective = dict(sys_perm)
+    effective["position"] = system_role
+    if store_perm:
+        for k in bool_keys:
+            effective[k] = sys_perm.get(k, False) or store_perm.get(k, False)
+
+    return jsonify({
+        "systemRole": system_role,
+        "storeRole": store_role,
+        "systemPerm": sys_perm,
+        "storePerm": store_perm,
+        "effective": effective,
+    })
+
+
 @app.get("/api/employees")
 @login_required
 def api_get_employees():
@@ -779,6 +1030,7 @@ def api_get_stores():
         if store_ids:
             cur.execute(
                 "SELECT sm.store_id, e.id AS employee_id, e.full_name, e.employee_code, e.email "
+                "SELECT sm.store_id, sm.store_role, e.id AS employee_id, e.full_name, e.employee_code, e.email "
                 "FROM store_managers sm JOIN employees e ON e.id = sm.employee_id "
                 "WHERE sm.store_id = ANY(%s::int[]) ORDER BY sm.id ASC",
                 (store_ids,),
@@ -790,6 +1042,7 @@ def api_get_stores():
                         "name": m.get("full_name") or "",
                         "employeeCode": m.get("employee_code") or "",
                         "email": m.get("email"),
+                        "storeRole": m.get("store_role") or "PG",
                     }
                 )
 
