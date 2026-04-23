@@ -362,36 +362,97 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   // ── Panels ────────────────────────────────────────────────────────────────
 
   Widget _buildCommunityPanel(TrainingProvider provider) {
-    return DataPanel(
-      title: 'Cộng đồng',
-      trailing: TextButton.icon(
-        onPressed: () => _showCreatePostDialog(provider),
-        icon: const Icon(Icons.edit_rounded, size: 16),
-        label: const Text('Viết bài'),
-      ),
-      child: provider.posts.isEmpty
-          ? Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.forum_rounded,
-                        size: 40, color: AppColors.textHint),
-                    const SizedBox(height: 8),
-                    Text('Chưa có bài viết', style: AppTextStyles.caption),
-                  ],
-                ),
+    final authProvider = context.read<AuthProvider>();
+    final userName = authProvider.currentUser?.fullName ?? 'Bạn';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Inline composer (Facebook-style) ─────────────────────────────
+        Container(
+          margin: const EdgeInsets.only(bottom: 1),
+          color: AppColors.white,
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  _CommunityAvatar(name: userName, size: 40),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _showCreatePostDialog(provider),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Text(
+                          'Bạn đang nghĩ gì?',
+                          style: AppTextStyles.bodyText
+                              .copyWith(color: AppColors.textHint),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            )
-          : Column(
-              children: provider.posts
-                  .map<Widget>((post) => SocialPostCard(
-                        post: post,
-                        onLike: () => provider.toggleLike(post.id),
-                        onComment: () => _showCommentDialog(post.id, provider),
-                      ))
-                  .toList(),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Divider(height: 1, color: AppColors.border),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _ComposerAction(
+                    icon: Icons.image_rounded,
+                    label: 'Ảnh',
+                    color: AppColors.success,
+                    onTap: () => _showCreatePostDialog(provider),
+                  ),
+                  _ComposerAction(
+                    icon: Icons.videocam_rounded,
+                    label: 'Video',
+                    color: AppColors.error,
+                    onTap: () => _showCreatePostDialog(provider),
+                  ),
+                  _ComposerAction(
+                    icon: Icons.edit_rounded,
+                    label: 'Viết bài',
+                    color: AppColors.primary,
+                    onTap: () => _showCreatePostDialog(provider),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        // ── Feed ─────────────────────────────────────────────────────────
+        if (provider.posts.isEmpty)
+          Container(
+            color: AppColors.white,
+            padding: const EdgeInsets.all(32),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.forum_rounded,
+                      size: 48, color: AppColors.textHint),
+                  const SizedBox(height: 8),
+                  Text('Chưa có bài viết nào',
+                      style: AppTextStyles.caption),
+                ],
+              ),
             ),
+          )
+        else
+          ...provider.posts.map<Widget>((post) => SocialPostCard(
+                post: post,
+                onLike: () => provider.toggleLike(post.id),
+                onComment: () => _showCommentDialog(post.id, provider),
+              )),
+      ],
     );
   }
 
@@ -765,4 +826,77 @@ class _AiAssistantItem {
     required this.description,
     required this.url,
   });
+}
+
+class _CommunityAvatar extends StatelessWidget {
+  final String name;
+  final double size;
+
+  const _CommunityAvatar({required this.name, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.gradientStart, AppColors.gradientEnd],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Text(
+          name.isNotEmpty ? name[0].toUpperCase() : 'B',
+          style: TextStyle(
+            color: AppColors.white,
+            fontWeight: FontWeight.w700,
+            fontSize: size * 0.4,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ComposerAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _ComposerAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
