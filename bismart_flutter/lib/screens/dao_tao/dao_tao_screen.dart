@@ -131,12 +131,13 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         // Mobile: pill-style tabs
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-              child: _buildScreenHeader(provider, false),
-            ),
+            if (!isCompactMobile)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: _buildScreenHeader(provider, false),
+              ),
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
+              margin: EdgeInsets.fromLTRB(16, isCompactMobile ? 10 : 0, 16, 0),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
@@ -156,19 +157,11 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 unselectedLabelStyle:
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                tabs: [
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.groups_rounded, size: 18))
-                      : const Tab(text: 'Cộng đồng'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.play_lesson_rounded, size: 18))
-                      : const Tab(text: 'Bài giảng'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.calendar_month_rounded, size: 18))
-                      : const Tab(text: 'Lịch học'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.auto_awesome_rounded, size: 18))
-                      : const Tab(text: 'Trợ lý AI'),
+                tabs: const [
+                  Tab(text: 'Cộng đồng'),
+                  Tab(text: 'Bài giảng'),
+                  Tab(text: 'Lịch học'),
+                  Tab(text: 'Trợ lý AI'),
                 ],
               ),
             ),

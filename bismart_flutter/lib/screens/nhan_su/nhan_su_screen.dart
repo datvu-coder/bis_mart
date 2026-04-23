@@ -148,12 +148,13 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         // Mobile: focused layout with top summary + sticky-like tab section
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-              child: _buildScreenHeader(provider, canManage, false),
-            ),
+            if (!isCompactMobile)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: _buildScreenHeader(provider, canManage, false),
+              ),
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
+              margin: EdgeInsets.fromLTRB(16, isCompactMobile ? 10 : 0, 16, 0),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
@@ -171,19 +172,11 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 dividerColor: Colors.transparent,
                 labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                tabs: [
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.how_to_reg_rounded, size: 18))
-                      : const Tab(text: 'Chấm công'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.work_history_rounded, size: 18))
-                      : const Tab(text: 'Ca làm'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.leaderboard_rounded, size: 18))
-                      : const Tab(text: 'Xếp hạng'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.calendar_today_rounded, size: 18))
-                      : const Tab(text: 'Lịch'),
+                tabs: const [
+                  Tab(text: 'Chấm công'),
+                  Tab(text: 'Ca làm'),
+                  Tab(text: 'Xếp hạng'),
+                  Tab(text: 'Lịch'),
                 ],
               ),
             ),

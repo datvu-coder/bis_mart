@@ -123,12 +123,13 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         // Mobile: pill-style tabs
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-              child: _buildScreenHeader(provider, false),
-            ),
+            if (!isCompactMobile)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: _buildScreenHeader(provider, false),
+              ),
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
+              margin: EdgeInsets.fromLTRB(16, isCompactMobile ? 10 : 0, 16, 0),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
@@ -148,16 +149,10 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 unselectedLabelStyle:
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                tabs: [
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.receipt_long_rounded, size: 18))
-                      : const Tab(text: 'Báo cáo'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.analytics_rounded, size: 18))
-                      : const Tab(text: 'Thống kê'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.tune_rounded, size: 18))
-                      : const Tab(text: 'Bộ lọc'),
+                tabs: const [
+                  Tab(text: 'Báo cáo'),
+                  Tab(text: 'Thống kê'),
+                  Tab(text: 'Bộ lọc'),
                 ],
               ),
             ),
