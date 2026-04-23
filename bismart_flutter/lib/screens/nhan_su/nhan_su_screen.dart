@@ -57,7 +57,10 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width > 800;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 1280;
+    final isTablet = screenWidth >= 900 && screenWidth < 1280;
+    final isWide = isDesktop || isTablet;
     final perm = context.watch<LmsProvider>().currentPermission;
     final canManage = perm?.canManageAttendance ?? false;
 
@@ -71,45 +74,79 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
 
         if (isWide) {
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
-                const SizedBox(height: 4),
-                Text('Quản lý nhân viên, chấm công & xếp hạng', style: AppTextStyles.caption),
-                const SizedBox(height: 20),
-                Row(
+            padding: EdgeInsets.symmetric(
+              horizontal: isDesktop ? 32 : 24,
+              vertical: isDesktop ? 24 : 20,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1420),
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: _buildAttendancePanel(provider, canManage)),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildShiftPanel(provider)),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildRankPanel(provider)),
+                    _buildScreenHeader(provider, canManage, isDesktop),
+                    const SizedBox(height: 20),
+                    if (isDesktop)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(flex: 5, child: _buildAttendancePanel(provider, canManage)),
+                          const SizedBox(width: 18),
+                          Expanded(flex: 4, child: _buildShiftPanel(provider)),
+                          const SizedBox(width: 18),
+                          Expanded(flex: 4, child: _buildRankPanel(provider)),
+                        ],
+                      )
+                    else
+                      Column(
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(flex: 6, child: _buildAttendancePanel(provider, canManage)),
+                              const SizedBox(width: 16),
+                              Expanded(flex: 5, child: _buildShiftPanel(provider)),
+                            ],
+                          ),
+                          _buildRankPanel(provider),
+                        ],
+                      ),
                   ],
                 ),
-              ],
+              ),
             ),
           );
         }
 
-        // Mobile: horizontal sub-tabs
+        // Mobile: focused layout with top summary + sticky-like tab section
         return Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+              child: _buildScreenHeader(provider, canManage, false),
+            ),
             Container(
-              color: AppColors.white,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(14),
+              ),
               child: TabBar(
                 controller: _tabController,
                 labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textHint,
-                indicatorColor: AppColors.primary,
-                indicatorWeight: 3,
-                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+                unselectedLabelColor: AppColors.textGrey,
+                indicator: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                 tabs: const [
                   Tab(text: 'Chấm công'),
-                  Tab(text: 'Ca làm việc'),
+                  Tab(text: 'Ca làm'),
                   Tab(text: 'Xếp hạng'),
                 ],
               ),
@@ -119,15 +156,15 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                 controller: _tabController,
                 children: [
                   SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                     child: _buildAttendancePanel(provider, canManage),
                   ),
                   SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                     child: _buildShiftPanel(provider),
                   ),
                   SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                     child: _buildRankPanel(provider),
                   ),
                 ],
@@ -136,6 +173,135 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
           ],
         );
       },
+    );
+  }
+
+  Widget _buildScreenHeader(EmployeeProvider provider, bool canManage, bool emphasize) {
+    final checkedInCount = provider.attendances.where((a) => a.isCheckedIn).length;
+    final activeShiftCount = provider.shifts.length;
+    final memberCount = provider.employees.length;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(emphasize ? 20 : 16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFFF2EB), Color(0xFFFFFFFF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.groups_2_rounded, color: AppColors.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Điều phối chấm công, ca làm và hiệu suất đội ngũ',
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
+                ),
+              ),
+              if (canManage)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.infoLight,
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                  child: Text(
+                    'Quản lý',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.info,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _buildHeaderKpiChip(
+                icon: Icons.badge_rounded,
+                label: 'Nhân viên',
+                value: '$memberCount',
+                color: AppColors.primary,
+              ),
+              _buildHeaderKpiChip(
+                icon: Icons.login_rounded,
+                label: 'Đã vào ca',
+                value: '$checkedInCount',
+                color: AppColors.success,
+              ),
+              _buildHeaderKpiChip(
+                icon: Icons.schedule_rounded,
+                label: 'Ca làm',
+                value: '$activeShiftCount',
+                color: AppColors.info,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderKpiChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            value,
+            style: AppTextStyles.caption.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
