@@ -600,6 +600,99 @@ def api_delete_shift(shift_id: int):
     return jsonify({"ok": True})
 
 
+# ---- EMPLOYEE SCHEDULES ----
+
+@app.get("/api/employee-schedules")
+@login_required
+def api_get_schedules():
+    week = request.args.get("week")  # e.g. "2026-04-21" (Monday of the week)
+    db = get_db()
+    with db.cursor() as cur:
+        if week:
+            cur.execute(
+                "SELECT es.id, es.employee_id, es.shift_id, es.work_date::text, es.note, "
+                "e.full_name as employee_name, ws.name as shift_name, "
+                "ws.start_hour, ws.start_minute, ws.end_hour, ws.end_minute "
+                "FROM employee_schedules es "
+                "JOIN employees e ON e.id = es.employee_id "
+                "JOIN work_shifts ws ON ws.id = es.shift_id "
+                "WHERE es.work_date >= %s::date AND es.work_date < (%s::date + INTERVAL '7 days') "
+                "ORDER BY es.work_date, es.employee_id",
+                (week, week),
+            )
+        else:
+            cur.execute(
+                "SELECT es.id, es.employee_id, es.shift_id, es.work_date::text, es.note, "
+                "e.full_name as employee_name, ws.name as shift_name, "
+                "ws.start_hour, ws.start_minute, ws.end_hour, ws.end_minute "
+                "FROM employee_schedules es "
+                "JOIN employees e ON e.id = es.employee_id "
+                "JOIN work_shifts ws ON ws.id = es.shift_id "
+                "ORDER BY es.work_date DESC LIMIT 100"
+            )
+        rows = cur.fetchall()
+    return jsonify([
+        {
+            "id": str(row["id"]),
+            "employeeId": str(row["employee_id"]),
+            "shiftId": str(row["shift_id"]),
+            "workDate": row["work_date"],
+            "note": row.get("note"),
+            "employeeName": row["employee_name"],
+            "shiftName": row["shift_name"],
+            "startHour": int(row["start_hour"] or 0),
+            "startMinute": int(row["start_minute"] or 0),
+            "endHour": int(row["end_hour"] or 0),
+            "endMinute": int(row["end_minute"] or 0),
+        }
+        for row in rows
+    ])
+
+
+@app.post("/api/employee-schedules")
+@login_required
+def api_create_schedule():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                "INSERT INTO employee_schedules (employee_id, shift_id, work_date, note) "
+                "VALUES (%s, %s, %s::date, %s) "
+                "ON CONFLICT (employee_id, work_date) DO UPDATE "
+                "SET shift_id = EXCLUDED.shift_id, note = EXCLUDED.note "
+                "RETURNING id, employee_id, shift_id, work_date::text, note",
+                (
+                    int(data.get("employeeId", 0)),
+                    int(data.get("shiftId", 0)),
+                    data.get("workDate"),
+                    data.get("note"),
+                ),
+            )
+            row = cur.fetchone()
+        db.commit()
+        return jsonify({
+            "id": str(row["id"]),
+            "employeeId": str(row["employee_id"]),
+            "shiftId": str(row["shift_id"]),
+            "workDate": row["work_date"],
+            "note": row.get("note"),
+        }), 201
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 400
+
+
+@app.delete("/api/employee-schedules/<int:schedule_id>")
+@login_required
+def api_delete_schedule(schedule_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM employee_schedules WHERE id = %s", (schedule_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
 @app.get("/api/products")
 @login_required
 def api_get_products():

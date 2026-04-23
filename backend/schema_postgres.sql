@@ -352,3 +352,15 @@ CREATE INDEX IF NOT EXISTS idx_store_managers_store ON store_managers(store_id);
 CREATE INDEX IF NOT EXISTS idx_course_contents_title ON course_contents(title_id);
 CREATE INDEX IF NOT EXISTS idx_quiz_questions_content ON quiz_questions(content_id);
 CREATE INDEX IF NOT EXISTS idx_class_attendances_schedule ON class_attendances(schedule_id);
+
+CREATE TABLE IF NOT EXISTS employee_schedules (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    shift_id INTEGER NOT NULL REFERENCES work_shifts(id) ON DELETE CASCADE,
+    work_date DATE NOT NULL,
+    note TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(employee_id, work_date)
+);
+CREATE INDEX IF NOT EXISTS idx_employee_schedules_date ON employee_schedules(work_date);
+CREATE INDEX IF NOT EXISTS idx_employee_schedules_employee ON employee_schedules(employee_id);
