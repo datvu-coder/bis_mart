@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -10,6 +13,7 @@ import '../../providers/training_provider.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/cards/lesson_card.dart';
 import '../../widgets/cards/social_post_card.dart';
+import 'package:bismart_flutter/models/community_post.dart';
 
 class DaoTaoScreen extends StatefulWidget {
   const DaoTaoScreen({super.key});
@@ -410,19 +414,19 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                     icon: Icons.image_rounded,
                     label: 'Ảnh',
                     color: AppColors.success,
-                    onTap: () => _showCreatePostDialog(provider),
+                    onTap: () => _showCreatePostDialog(provider, initialTab: 'photo'),
                   ),
                   _ComposerAction(
                     icon: Icons.videocam_rounded,
                     label: 'Video',
                     color: AppColors.error,
-                    onTap: () => _showCreatePostDialog(provider),
+                    onTap: () => _showCreatePostDialog(provider, initialTab: 'video'),
                   ),
                   _ComposerAction(
                     icon: Icons.edit_rounded,
                     label: 'Viết bài',
                     color: AppColors.primary,
-                    onTap: () => _showCreatePostDialog(provider),
+                    onTap: () => _showCreatePostDialog(provider, initialTab: 'text'),
                   ),
                 ],
               ),
@@ -451,6 +455,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 post: post,
                 onLike: () => provider.toggleLike(post.id),
                 onComment: () => _showCommentDialog(post.id, provider),
+                onShare: () => _sharePost(post),
               )),
       ],
     );
@@ -592,56 +597,571 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
 
   // ── Dialogs ───────────────────────────────────────────────────────────────
 
-  void _showCreatePostDialog(TrainingProvider provider) {
-    final controller = TextEditingController();
+  void _showCreatePostDialog(TrainingProvider provider, {String initialTab = 'text'}) {
+    final textController = TextEditingController();
     final authProvider = context.read<AuthProvider>();
+    final userName = authProvider.currentUser?.fullName ?? 'Bạn';
+    // For web: store picked image bytes and name
+    final List<Map<String, dynamic>> pickedFiles = []; // {name, bytes, isVideo}
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Viết bài'),
-        content: TextField(
-          controller: controller,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            hintText: 'Chia sẻ điều gì đó với cộng đồng...',
-            border: OutlineInputBorder(),
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          Future<void> pickImages() async {
+            try {
+              final uploadInput = html.FileUploadInputElement()
+                ..accept = 'image/*,video/*'
+                ..multiple = true;
+              uploadInput.onChange.listen((event) {
+                final files = uploadInput.files;
+                if (files == null) return;
+                for (final file in files) {
+                  final reader = html.FileReader();
+                  reader.onLoadEnd.listen((_) {
+                    final dataUrl = reader.result as String?;
+                    if (dataUrl != null) {
+                      setDialogState(() {
+                        pickedFiles.add({
+                          'name': file.name,
+                          'dataUrl': dataUrl,
+                          'isVideo': file.type.startsWith('video/'),
+                        });
+                      });
+                    }
+                  });
+                  reader.readAsDataUrl(file);
+                }
+              });
+              uploadInput.click();
+            } catch (_) {
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text('Không thể mở cửa sổ chọn file.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            }
+          }
+
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560, maxHeight: 680),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Header ─────────────────────────────────────────────
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
+                    decoration: const BoxDecoration(
+                      border: Border(bottom: BorderSide(color: AppColors.border)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Expanded(
+                          child: Text('Tạo bài viết',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  fontSize: 17, fontWeight: FontWeight.w700)),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close_rounded),
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppColors.surfaceVariant,
+                            padding: const EdgeInsets.all(6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Author row ─────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+                    child: Row(
+                      children: [
+                        _CommunityAvatar(name: userName, size: 44),
+                        const SizedBox(width: 10),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(userName,
+                                style: AppTextStyles.bodyTextMedium),
+                            Container(
+                              margin: const EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceVariant,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Row(
+                                children: const [
+                                  Icon(Icons.public_rounded,
+                                      size: 13, color: AppColors.textSecondary),
+                                  SizedBox(width: 4),
+                                  Text('Mọi người',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textSecondary)),
+                                  Icon(Icons.arrow_drop_down_rounded,
+                                      size: 16, color: AppColors.textSecondary),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Text input ────────────────────────────────────────
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: textController,
+                            maxLines: null,
+                            minLines: 4,
+                            autofocus: initialTab != 'photo',
+                            style: const TextStyle(fontSize: 18),
+                            decoration: InputDecoration(
+                              hintText: '$userName ơi, bạn đang nghĩ gì thế?',
+                              hintStyle: const TextStyle(
+                                  color: AppColors.textHint, fontSize: 18),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                          // ── Image previews ──────────────────────────
+                          if (pickedFiles.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            _buildImagePreviews(pickedFiles, setDialogState),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // ── Add to post bar ────────────────────────────────────
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: AppColors.border),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Text('Thêm vào bài viết',
+                            style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textSecondary)),
+                        const Spacer(),
+                        _iconBtn(Icons.image_rounded, AppColors.success,
+                            'Ảnh', () async {
+                          await pickImages();
+                        }),
+                        _iconBtn(Icons.videocam_rounded, AppColors.error,
+                            'Video', () async {
+                          await pickImages();
+                        }),
+                        _iconBtn(Icons.emoji_emotions_rounded,
+                            AppColors.warning, 'Cảm xúc', () {}),
+                        _iconBtn(Icons.location_on_rounded,
+                            AppColors.primary, 'Check-in', () {}),
+                      ],
+                    ),
+                  ),
+
+                  // ── Submit button ──────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final text = textController.text.trim();
+                          if (text.isEmpty && pickedFiles.isEmpty) return;
+                          await provider.createPost(
+                            text,
+                            authorName: userName,
+                            imageDataUrls: pickedFiles
+                                .map((f) => f['dataUrl'] as String)
+                                .toList(),
+                          );
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text('Đăng',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w700)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildImagePreviews(
+      List<Map<String, dynamic>> files, StateSetter setDialogState) {
+    if (files.length == 1) {
+      return Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.network(
+              files[0]['dataUrl'] as String,
+              width: double.infinity,
+              height: 200,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _imagePlaceholder(files[0]['name'] as String),
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-          ElevatedButton(
-            onPressed: () async {
-              if (controller.text.trim().isEmpty) return;
-              await provider.createPost(controller.text.trim(),
-                  authorName: authProvider.currentUser?.fullName);
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Đăng'),
+          Positioned(
+            top: 6,
+            right: 6,
+            child: _removeImageBtn(() => setDialogState(() => files.removeAt(0))),
+          ),
+        ],
+      );
+    }
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3, crossAxisSpacing: 4, mainAxisSpacing: 4),
+      itemCount: files.length,
+      itemBuilder: (_, i) => Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              files[i]['dataUrl'] as String,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _imagePlaceholder(files[i]['name'] as String),
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: _removeImageBtn(() => setDialogState(() => files.removeAt(i))),
           ),
         ],
       ),
     );
   }
 
-  void _showCommentDialog(String postId, TrainingProvider provider) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Bình luận'),
-        content: const Text('Tính năng đang phát triển.'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              provider.addComment(postId);
-              Navigator.pop(ctx);
-            },
-            child: const Text('Thích'),
+  Widget _imagePlaceholder(String name) => Container(
+        color: AppColors.surfaceVariant,
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Icon(Icons.image_rounded, size: 32, color: AppColors.textHint),
+          const SizedBox(height: 4),
+          Text(name,
+              style: AppTextStyles.caption,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+        ]),
+      );
+
+  Widget _removeImageBtn(VoidCallback onTap) => GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.6),
+              shape: BoxShape.circle),
+          child: const Icon(Icons.close_rounded, color: Colors.white, size: 14),
+        ),
+      );
+
+  Widget _iconBtn(IconData icon, Color color, String tooltip, VoidCallback onTap) =>
+      Tooltip(
+        message: tooltip,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(50),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Icon(icon, size: 22, color: color),
           ),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
-        ],
+        ),
+      );
+
+  void _showCommentDialog(String postId, TrainingProvider provider) {
+    final commentController = TextEditingController();
+    final authProvider = context.read<AuthProvider>();
+    final userName = authProvider.currentUser?.fullName ?? 'Bạn';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final post = provider.posts.firstWhere(
+            (p) => p.id == postId,
+            orElse: () => throw StateError('Post not found'),
+          );
+
+          return Padding(
+            padding: EdgeInsets.only(
+                bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: DraggableScrollableSheet(
+              initialChildSize: 0.6,
+              minChildSize: 0.4,
+              maxChildSize: 0.92,
+              expand: false,
+              builder: (context, scrollController) => Column(
+                children: [
+                  // Handle bar
+                  Container(
+                    margin: const EdgeInsets.only(top: 10, bottom: 6),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${post.commentCount} bình luận',
+                          style: AppTextStyles.sectionHeader,
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          icon: const Icon(Icons.close_rounded),
+                          padding: EdgeInsets.zero,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  // Comment list
+                  Expanded(
+                    child: post.comments.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.chat_bubble_outline_rounded,
+                                    size: 48, color: AppColors.textHint),
+                                const SizedBox(height: 8),
+                                Text('Chưa có bình luận nào',
+                                    style: AppTextStyles.caption),
+                                const SizedBox(height: 4),
+                                Text('Hãy là người đầu tiên bình luận!',
+                                    style: AppTextStyles.caption.copyWith(
+                                        color: AppColors.textHint)),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            controller: scrollController,
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                            itemCount: post.comments.length,
+                            itemBuilder: (_, i) {
+                              final c = post.comments[i];
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.only(bottom: 14),
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    _CommunityAvatar(
+                                        name: c.authorName, size: 36),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            padding:
+                                                const EdgeInsets.fromLTRB(
+                                                    12, 8, 12, 8),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  AppColors.surfaceVariant,
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                      14),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(c.authorName,
+                                                    style: AppTextStyles
+                                                        .bodyText
+                                                        .copyWith(
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w700)),
+                                                const SizedBox(height: 2),
+                                                Text(c.text,
+                                                    style: AppTextStyles
+                                                        .bodyText),
+                                              ],
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.only(
+                                                left: 8, top: 4),
+                                            child: Text(
+                                              _relativeTime(c.createdAt),
+                                              style: AppTextStyles.caption
+                                                  .copyWith(
+                                                      color: AppColors
+                                                          .textHint),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                  // Input row
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+                    decoration: const BoxDecoration(
+                      border: Border(
+                          top: BorderSide(color: AppColors.border)),
+                    ),
+                    child: Row(
+                      children: [
+                        _CommunityAvatar(name: userName, size: 36),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: commentController,
+                            autofocus: true,
+                            style: const TextStyle(fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: 'Viết bình luận...',
+                              hintStyle: const TextStyle(
+                                  color: AppColors.textHint, fontSize: 14),
+                              filled: true,
+                              fillColor: AppColors.surfaceVariant,
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(24),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            onSubmitted: (val) {
+                              final text = val.trim();
+                              if (text.isEmpty) return;
+                              provider.addCommentText(postId, text,
+                                  authorName: userName);
+                              commentController.clear();
+                              setSheetState(() {});
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          onTap: () {
+                            final text = commentController.text.trim();
+                            if (text.isEmpty) return;
+                            provider.addCommentText(postId, text,
+                                authorName: userName);
+                            commentController.clear();
+                            setSheetState(() {});
+                          },
+                          borderRadius: BorderRadius.circular(50),
+                          child: Container(
+                            width: 38,
+                            height: 38,
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.gradientStart,
+                                  AppColors.gradientEnd
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.send_rounded,
+                                color: Colors.white, size: 18),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _relativeTime(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inSeconds < 60) return 'Vừa xong';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
+    if (diff.inHours < 24) return '${diff.inHours} giờ trước';
+    return '${diff.inDays} ngày trước';
+  }
+
+  void _sharePost(CommunityPost post) {
+    final shareText = post.content ?? '${post.authorName} đã đăng một bài viết';
+    Clipboard.setData(ClipboardData(text: shareText));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+            SizedBox(width: 8),
+            Text('Đã sao chép nội dung bài viết'),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.success,
+        duration: Duration(seconds: 2),
       ),
     );
   }

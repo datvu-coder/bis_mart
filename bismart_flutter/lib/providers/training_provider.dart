@@ -58,10 +58,23 @@ class TrainingProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> createPost(String content, {String? authorName}) async {
+  Future<void> createPost(String content, {String? authorName, List<String>? imageDataUrls}) async {
+    final images = imageDataUrls ?? [];
     try {
       final result = await _api.createPost({'content': content, 'authorName': authorName ?? 'Bạn'});
-      _posts.insert(0, CommunityPost.fromJson(result));
+      final post = CommunityPost.fromJson(result);
+      // Attach local preview images if API doesn't return them
+      if (images.isNotEmpty && post.imageUrls.isEmpty) {
+        _posts.insert(0, CommunityPost(
+          id: post.id,
+          authorName: post.authorName,
+          createdAt: post.createdAt,
+          content: post.content,
+          imageUrls: images,
+        ));
+      } else {
+        _posts.insert(0, post);
+      }
     } catch (_) {
       _posts.insert(
         0,
@@ -70,6 +83,7 @@ class TrainingProvider extends ChangeNotifier {
           authorName: authorName ?? 'Bạn',
           createdAt: DateTime.now(),
           content: content,
+          imageUrls: images,
           likeCount: 0,
           commentCount: 0,
         ),
@@ -84,6 +98,23 @@ class TrainingProvider extends ChangeNotifier {
       _posts[index].commentCount++;
       notifyListeners();
       try { await _api.addComment(int.parse(postId)); } catch (_) {}
+    }
+  }
+
+  void addCommentText(String postId, String text, {String authorName = 'Bạn'}) {
+    final index = _posts.indexWhere((p) => p.id == postId);
+    if (index != -1) {
+      _posts[index].comments.add(
+        PostComment(
+          id: DateTime.now().millisecondsSinceEpoch.toString(),
+          authorName: authorName,
+          text: text,
+          createdAt: DateTime.now(),
+        ),
+      );
+      _posts[index].commentCount++;
+      notifyListeners();
+      try { _api.addComment(int.parse(postId)); } catch (_) {}
     }
   }
 

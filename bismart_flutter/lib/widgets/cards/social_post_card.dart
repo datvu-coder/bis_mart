@@ -9,12 +9,14 @@ class SocialPostCard extends StatelessWidget {
   final CommunityPost post;
   final VoidCallback? onLike;
   final VoidCallback? onComment;
+  final VoidCallback? onShare;
 
   const SocialPostCard({
     super.key,
     required this.post,
     this.onLike,
     this.onComment,
+    this.onShare,
   });
 
   @override
@@ -161,7 +163,7 @@ class SocialPostCard extends StatelessWidget {
                     icon: Icons.share_outlined,
                     label: 'Chia sẻ',
                     color: AppColors.textGrey,
-                    onTap: null,
+                    onTap: onShare,
                   ),
                 ),
               ],
