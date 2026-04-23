@@ -56,6 +56,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
+    final isCompactMobile = screenWidth < 430;
     final isWide = isDesktop || isTablet;
     final authProvider = context.watch<AuthProvider>();
     final canManageAi = _isTmkAccount(authProvider.currentUser?.position);
@@ -152,11 +153,19 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 unselectedLabelStyle:
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                tabs: const [
-                  Tab(text: 'Cộng đồng'),
-                  Tab(text: 'Bài giảng'),
-                  Tab(text: 'Lịch học'),
-                  Tab(text: 'Trợ lý AI'),
+                tabs: [
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.groups_rounded, size: 18))
+                      : const Tab(text: 'Cộng đồng'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.play_lesson_rounded, size: 18))
+                      : const Tab(text: 'Bài giảng'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.calendar_month_rounded, size: 18))
+                      : const Tab(text: 'Lịch học'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.auto_awesome_rounded, size: 18))
+                      : const Tab(text: 'Trợ lý AI'),
                 ],
               ),
             ),
@@ -601,18 +610,18 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final textController = TextEditingController();
     final authProvider = context.read<AuthProvider>();
     final userName = authProvider.currentUser?.fullName ?? 'Bạn';
-    // For web: store picked image bytes and name
-    final List<Map<String, dynamic>> pickedFiles = []; // {name, bytes, isVideo}
+    final List<Map<String, dynamic>> pickedFiles = [];
+    bool autoPickConsumed = false;
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
-          Future<void> pickImages() async {
+          Future<void> pickMedia({bool videoOnly = false}) async {
             try {
               final uploadInput = html.FileUploadInputElement()
-                ..accept = 'image/*,video/*'
+                ..accept = videoOnly ? 'video/*' : 'image/*,video/*'
                 ..multiple = true;
               uploadInput.onChange.listen((event) {
                 final files = uploadInput.files;
@@ -645,6 +654,78 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 );
               }
             }
+          }
+
+          Future<void> pickFeeling() async {
+            final feeling = await showModalBottomSheet<String>(
+              context: ctx,
+              backgroundColor: AppColors.white,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              builder: (sheetCtx) {
+                const feelings = [
+                  ('😀', 'vui vẻ'),
+                  ('😍', 'rất thích'),
+                  ('😢', 'buồn'),
+                  ('😡', 'bức xúc'),
+                  ('🤩', 'phấn khích'),
+                  ('🙏', 'biết ơn'),
+                ];
+                return SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: AppColors.border,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text('Thêm cảm xúc', style: AppTextStyles.sectionHeader),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: feelings
+                              .map(
+                                (item) => ActionChip(
+                                  label: Text('${item.$1} ${item.$2}'),
+                                  onPressed: () => Navigator.pop(sheetCtx, '${item.$1} đang ${item.$2}'),
+                                  backgroundColor: AppColors.surfaceVariant,
+                                  side: const BorderSide(color: AppColors.border),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            );
+
+            if (feeling == null) return;
+            final current = textController.text.trim();
+            textController.text = current.isEmpty ? feeling : '$current - $feeling';
+            textController.selection = TextSelection.fromPosition(
+              TextPosition(offset: textController.text.length),
+            );
+            setDialogState(() {});
+          }
+
+          if (!autoPickConsumed && (initialTab == 'photo' || initialTab == 'video')) {
+            autoPickConsumed = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (ctx.mounted) {
+                pickMedia(videoOnly: initialTab == 'video');
+              }
+            });
           }
 
           return Dialog(
@@ -733,7 +814,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                             controller: textController,
                             maxLines: null,
                             minLines: 4,
-                            autofocus: initialTab != 'photo',
+                            autofocus: initialTab == 'text',
                             style: const TextStyle(fontSize: 18),
                             decoration: InputDecoration(
                               hintText: '$userName ơi, bạn đang nghĩ gì thế?',
@@ -761,27 +842,52 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                       border: Border.all(color: AppColors.border),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Row(
-                      children: [
-                        const Text('Thêm vào bài viết',
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary)),
-                        const Spacer(),
-                        _iconBtn(Icons.image_rounded, AppColors.success,
-                            'Ảnh', () async {
-                          await pickImages();
-                        }),
-                        _iconBtn(Icons.videocam_rounded, AppColors.error,
-                            'Video', () async {
-                          await pickImages();
-                        }),
-                        _iconBtn(Icons.emoji_emotions_rounded,
-                            AppColors.warning, 'Cảm xúc', () {}),
-                        _iconBtn(Icons.location_on_rounded,
-                            AppColors.primary, 'Check-in', () {}),
-                      ],
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 360;
+                        return Row(
+                          children: [
+                            if (!compact)
+                              const Text('Thêm vào bài viết',
+                                  style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary)),
+                            if (!compact) const Spacer(),
+                            Expanded(
+                              child: Row(
+                                mainAxisAlignment: compact
+                                    ? MainAxisAlignment.spaceBetween
+                                    : MainAxisAlignment.end,
+                                children: [
+                                  _iconBtn(Icons.image_rounded, AppColors.success,
+                                      'Ảnh', () async {
+                                    await pickMedia();
+                                  }),
+                                  _iconBtn(Icons.videocam_rounded, AppColors.error,
+                                      'Video', () async {
+                                    await pickMedia(videoOnly: true);
+                                  }),
+                                  _iconBtn(Icons.emoji_emotions_rounded,
+                                      AppColors.warning, 'Cảm xúc', () async {
+                                    await pickFeeling();
+                                  }),
+                                  _iconBtn(Icons.location_on_rounded,
+                                      AppColors.primary, 'Check-in', () {
+                                    final current = textController.text.trim();
+                                    const checkIn = '📍 đang check-in';
+                                    textController.text =
+                                        current.isEmpty ? checkIn : '$current - $checkIn';
+                                    textController.selection = TextSelection.fromPosition(
+                                      TextPosition(offset: textController.text.length),
+                                    );
+                                  }),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ),
 
@@ -832,13 +938,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
-            child: Image.network(
-              files[0]['dataUrl'] as String,
-              width: double.infinity,
-              height: 200,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _imagePlaceholder(files[0]['name'] as String),
-            ),
+            child: _mediaPreview(files[0], height: 200),
           ),
           Positioned(
             top: 6,
@@ -859,11 +959,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              files[i]['dataUrl'] as String,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _imagePlaceholder(files[i]['name'] as String),
-            ),
+            child: _mediaPreview(files[i]),
           ),
           Positioned(
             top: 4,
@@ -872,6 +968,40 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _mediaPreview(Map<String, dynamic> file, {double? height}) {
+    final isVideo = file['isVideo'] as bool? ?? false;
+    if (isVideo) {
+      return Container(
+        width: double.infinity,
+        height: height,
+        color: AppColors.surfaceVariant,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.videocam_rounded,
+                size: 34, color: AppColors.error),
+            const SizedBox(height: 6),
+            Text(
+              file['name'] as String? ?? 'Video',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.caption,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Image.network(
+      file['dataUrl'] as String,
+      width: double.infinity,
+      height: height,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _imagePlaceholder(file['name'] as String),
     );
   }
 
@@ -905,9 +1035,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(50),
-          child: Padding(
-            padding: const EdgeInsets.all(6),
-            child: Icon(icon, size: 22, color: color),
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(icon, size: 20, color: color),
           ),
         ),
       );
@@ -1396,6 +1531,7 @@ class _ComposerAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompactMobile = MediaQuery.of(context).size.width < 390;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -1405,15 +1541,17 @@ class _ComposerAction extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 20, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+            if (!isCompactMobile) ...[
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
               ),
-            ),
+            ],
           ],
         ),
       ),

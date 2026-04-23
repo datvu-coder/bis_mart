@@ -73,6 +73,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isCompactMobile = MediaQuery.of(context).size.width < 430;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Phân quyền hệ thống'),
@@ -83,9 +84,13 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
           labelColor: AppColors.white,
           unselectedLabelColor: AppColors.white.withValues(alpha: 0.65),
           indicatorColor: AppColors.white,
-          tabs: const [
-            Tab(text: 'Quyền theo chức vụ'),
-            Tab(text: 'Phân công cửa hàng'),
+          tabs: [
+            isCompactMobile
+                ? const Tab(icon: Icon(Icons.admin_panel_settings_rounded, size: 18))
+                : const Tab(text: 'Quyền theo chức vụ'),
+            isCompactMobile
+                ? const Tab(icon: Icon(Icons.store_mall_directory_rounded, size: 18))
+                : const Tab(text: 'Phân công cửa hàng'),
           ],
         ),
       ),

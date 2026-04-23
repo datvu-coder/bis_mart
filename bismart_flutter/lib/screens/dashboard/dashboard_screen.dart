@@ -38,7 +38,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width > 800;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWide = screenWidth > 800;
+    final isCompactMobile = screenWidth < 390;
 
     return Consumer<DashboardProvider>(
       builder: (context, provider, _) {
@@ -117,10 +119,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 indicatorWeight: 3,
                 labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
-                tabs: const [
-                  Tab(text: 'Tổng quan'),
-                  Tab(text: 'Biểu đồ'),
-                  Tab(text: 'Xếp hạng'),
+                tabs: [
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.dashboard_rounded, size: 18))
+                      : const Tab(text: 'Tổng quan'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.bar_chart_rounded, size: 18))
+                      : const Tab(text: 'Biểu đồ'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.emoji_events_rounded, size: 18))
+                      : const Tab(text: 'Xếp hạng'),
                 ],
               ),
             ),

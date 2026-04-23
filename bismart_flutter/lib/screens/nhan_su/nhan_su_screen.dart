@@ -75,6 +75,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
+    final isCompactMobile = screenWidth < 430;
     final isWide = isDesktop || isTablet;
     final canManage = context.watch<PermissionProvider>().canManageAttendance;
 
@@ -166,11 +167,19 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                 dividerColor: Colors.transparent,
                 labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                tabs: const [
-                  Tab(text: 'Chấm công'),
-                  Tab(text: 'Ca làm'),
-                  Tab(text: 'Xếp hạng'),
-                  Tab(text: 'Lịch'),
+                tabs: [
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.how_to_reg_rounded, size: 18))
+                      : const Tab(text: 'Chấm công'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.work_history_rounded, size: 18))
+                      : const Tab(text: 'Ca làm'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.leaderboard_rounded, size: 18))
+                      : const Tab(text: 'Xếp hạng'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.calendar_today_rounded, size: 18))
+                      : const Tab(text: 'Lịch'),
                 ],
               ),
             ),

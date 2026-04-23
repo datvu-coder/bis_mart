@@ -43,6 +43,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
+    final isCompactMobile = screenWidth < 430;
     final isWide = isDesktop || isTablet;
 
     return Consumer<SalesProvider>(
@@ -144,10 +145,16 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 unselectedLabelStyle:
                     const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                tabs: const [
-                  Tab(text: 'Báo cáo'),
-                  Tab(text: 'Thống kê'),
-                  Tab(text: 'Bộ lọc'),
+                tabs: [
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.receipt_long_rounded, size: 18))
+                      : const Tab(text: 'Báo cáo'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.analytics_rounded, size: 18))
+                      : const Tab(text: 'Thống kê'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.tune_rounded, size: 18))
+                      : const Tab(text: 'Bộ lọc'),
                 ],
               ),
             ),
