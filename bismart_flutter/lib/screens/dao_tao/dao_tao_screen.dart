@@ -24,11 +24,18 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   late TabController _tabController;
+  final List<_AiAssistantItem> _aiAssistants = [
+    const _AiAssistantItem(
+      name: 'AI Trợ lý Momcare',
+      description: 'Khám phá AI hỗ trợ chăm sóc mẹ & bé',
+      url: 'https://momcare.ai',
+    ),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TrainingProvider>().loadTrainingData();
     });
@@ -46,6 +53,8 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
     final isWide = isDesktop || isTablet;
+    final authProvider = context.watch<AuthProvider>();
+    final canManageAi = _isTmkAccount(authProvider.currentUser?.position);
 
     return Consumer<TrainingProvider>(
       builder: (context, provider, _) {
@@ -69,8 +78,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   children: [
                     _buildScreenHeader(provider, isDesktop),
                     const SizedBox(height: 20),
-                    _buildAiBanner(),
-                    const SizedBox(height: 20),
                     if (isDesktop)
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,6 +87,8 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                           Expanded(child: _buildLessonPanel(provider)),
                           const SizedBox(width: 18),
                           Expanded(child: _buildSchedulePanel(provider)),
+                          const SizedBox(width: 18),
+                          Expanded(child: _buildAiAssistantPanel(canManageAi)),
                         ],
                       )
                     else
@@ -94,7 +103,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                             ],
                           ),
                           const SizedBox(height: 16),
-                          _buildSchedulePanel(provider),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(child: _buildSchedulePanel(provider)),
+                              const SizedBox(width: 16),
+                              Expanded(child: _buildAiAssistantPanel(canManageAi)),
+                            ],
+                          ),
                         ],
                       ),
                   ],
@@ -136,6 +152,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   Tab(text: 'Cộng đồng'),
                   Tab(text: 'Bài giảng'),
                   Tab(text: 'Lịch học'),
+                  Tab(text: 'Trợ lý AI'),
                 ],
               ),
             ),
@@ -145,13 +162,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 children: [
                   SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    child: Column(
-                      children: [
-                        _buildAiBanner(),
-                        const SizedBox(height: 12),
-                        _buildCommunityPanel(provider),
-                      ],
-                    ),
+                    child: _buildCommunityPanel(provider),
                   ),
                   SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
@@ -160,6 +171,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   SingleChildScrollView(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                     child: _buildSchedulePanel(provider),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    child: _buildAiAssistantPanel(canManageAi),
                   ),
                 ],
               ),
@@ -275,57 +290,71 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     );
   }
 
-  // ── AI Banner ─────────────────────────────────────────────────────────────
-
-  Widget _buildAiBanner() {
-    return GestureDetector(
-      onTap: () async {
-        final url = Uri.parse('https://momcare.ai');
-        if (await canLaunchUrl(url)) {
-          await launchUrl(url, mode: LaunchMode.externalApplication);
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(12),
+  Widget _buildAiAssistantPanel(bool canManageAi) {
+    return DataPanel(
+      title: 'Trợ lý AI',
+      trailing: canManageAi
+          ? TextButton.icon(
+              onPressed: _showAddAiAssistantDialog,
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Thêm AI'),
+            )
+          : null,
+      child: Column(
+        children: _aiAssistants.map((item) {
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
               ),
-              child: const Icon(Icons.auto_awesome_rounded,
-                  color: Colors.white, size: 22),
+              borderRadius: BorderRadius.circular(14),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('AI Trợ lý Momcare',
-                      style: AppTextStyles.sectionHeader
-                          .copyWith(color: Colors.white)),
-                  const SizedBox(height: 2),
-                  Text('Khám phá AI hỗ trợ chăm sóc mẹ & bé',
-                      style:
-                          AppTextStyles.caption.copyWith(color: Colors.white70)),
-                ],
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => _openAiTool(item.url),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.auto_awesome_rounded,
+                            color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item.name,
+                                style: AppTextStyles.bodyTextMedium
+                                    .copyWith(color: Colors.white)),
+                            const SizedBox(height: 2),
+                            Text(item.description,
+                                style: AppTextStyles.caption
+                                    .copyWith(color: Colors.white70)),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.open_in_new_rounded,
+                          color: Colors.white70, size: 18),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const Icon(Icons.arrow_forward_ios_rounded,
-                color: Colors.white70, size: 16),
-          ],
-        ),
+          );
+        }).toList(),
       ),
     );
   }
@@ -621,4 +650,119 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       ),
     );
   }
+
+  bool _isTmkAccount(String? position) {
+    return (position ?? '').toUpperCase() == 'TMK';
+  }
+
+  Future<void> _openAiTool(String urlText) async {
+    final uri = Uri.tryParse(urlText.trim());
+    if (uri == null) {
+      return;
+    }
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  void _showAddAiAssistantDialog() {
+    final currentPos =
+        (context.read<AuthProvider>().currentUser?.position ?? '').toUpperCase();
+    if (currentPos != 'TMK') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Chỉ tài khoản TMK mới được thêm AI mới.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final nameController = TextEditingController();
+    final descController = TextEditingController();
+    final urlController = TextEditingController(text: 'https://');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Thêm trợ lý AI mới'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(
+                labelText: 'Tên AI',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: descController,
+              decoration: const InputDecoration(
+                labelText: 'Mô tả ngắn',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: urlController,
+              decoration: const InputDecoration(
+                labelText: 'Đường dẫn',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final name = nameController.text.trim();
+              final desc = descController.text.trim();
+              final url = urlController.text.trim();
+              final parsed = Uri.tryParse(url);
+
+              if (name.isEmpty ||
+                  desc.isEmpty ||
+                  parsed == null ||
+                  parsed.scheme.isEmpty ||
+                  parsed.host.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Vui lòng nhập đầy đủ và URL hợp lệ.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+                return;
+              }
+
+              setState(() {
+                _aiAssistants.add(
+                  _AiAssistantItem(name: name, description: desc, url: url),
+                );
+              });
+              Navigator.pop(ctx);
+            },
+            child: const Text('Thêm'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AiAssistantItem {
+  final String name;
+  final String description;
+  final String url;
+
+  const _AiAssistantItem({
+    required this.name,
+    required this.description,
+    required this.url,
+  });
 }
