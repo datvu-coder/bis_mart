@@ -1090,7 +1090,19 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                       icon: const Icon(Icons.delete_outline_rounded,
                           size: 18, color: AppColors.error),
                       tooltip: 'Xóa ca',
-                      onPressed: () => provider.removeShift(shift.id),
+                      onPressed: () async {
+                        try {
+                          await provider.removeShift(shift.id);
+                        } catch (e) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text('Xóa ca thất bại: $e'),
+                              backgroundColor: Colors.red,
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        }
+                      },
                     ),
                 ],
               ),
@@ -1490,25 +1502,38 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               child: const Text('Hủy'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 if (nameCtrl.text.isNotEmpty) {
-                  provider.addShift(WorkShift(
-                    id: DateTime.now().millisecondsSinceEpoch.toString(),
-                    name: nameCtrl.text,
-                    startTime: startTime,
-                    endTime: endTime,
-                    storeId: selectedStoreId,
-                  ));
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    SnackBar(
-                      content: Text('Đã thêm ca "${nameCtrl.text}"'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.success,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                  );
+                  try {
+                    await provider.addShift(WorkShift(
+                      id: DateTime.now().millisecondsSinceEpoch.toString(),
+                      name: nameCtrl.text,
+                      startTime: startTime,
+                      endTime: endTime,
+                      storeId: selectedStoreId,
+                    ));
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: Text('Đã thêm ca "${nameCtrl.text}"'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: AppColors.success,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  } catch (e) {
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: Text('Thêm ca thất bại: $e'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: Colors.red,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  }
                 }
               },
               child: const Text('Thêm'),
@@ -1697,7 +1722,19 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
           if (canManage) ...[
             const SizedBox(width: 4),
             InkWell(
-              onTap: () => provider.removeSchedule(schedule.id),
+              onTap: () async {
+                try {
+                  await provider.removeSchedule(schedule.id);
+                } catch (e) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(
+                      content: Text('Xóa lịch thất bại: $e'),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              },
               child: const Icon(Icons.close_rounded, size: 13, color: AppColors.info),
             ),
           ],
@@ -1758,22 +1795,36 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
             ElevatedButton(
               onPressed: (selectedEmployeeId != null && selectedShiftId != null)
                   ? () async {
-                      await provider.addSchedule(
-                        employeeId: selectedEmployeeId!,
-                        shiftId: selectedShiftId!,
-                        workDate: day,
-                      );
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(this.context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Đã phân ca thành công!'),
-                          behavior: SnackBarBehavior.floating,
-                          backgroundColor: AppColors.success,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                      );
+                      try {
+                        await provider.addSchedule(
+                          employeeId: selectedEmployeeId!,
+                          shiftId: selectedShiftId!,
+                          workDate: day,
+                        );
+                        if (!ctx.mounted) return;
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Đã phân ca thành công!'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppColors.success,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      } catch (e) {
+                        if (!ctx.mounted) return;
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(
+                            content: Text('Phân ca thất bại: $e'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: Colors.red,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      }
                     }
                   : null,
               child: const Text('Lưu'),

@@ -1003,17 +1003,29 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                         onPressed: () async {
                           final text = textController.text.trim();
                           if (text.isEmpty && pickedFiles.isEmpty) return;
-                          await provider.createPost(
-                            text,
-                            authorName: userName,
-                            authorId: currentUser?.id,
-                            visibility: selectedVisibility,
-                            storeCode: currentUser?.storeCode,
-                            imageDataUrls: pickedFiles
-                                .map((f) => f['dataUrl'] as String)
-                                .toList(),
-                          );
-                          if (ctx.mounted) Navigator.pop(ctx);
+                          try {
+                            await provider.createPost(
+                              text,
+                              authorName: userName,
+                              authorId: currentUser?.id,
+                              visibility: selectedVisibility,
+                              storeCode: currentUser?.storeCode,
+                              imageDataUrls: pickedFiles
+                                  .map((f) => f['dataUrl'] as String)
+                                  .toList(),
+                            );
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          } catch (e) {
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(
+                                  content: Text('Đăng bài thất bại: $e'),
+                                  backgroundColor: Colors.red,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
@@ -1463,12 +1475,24 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               onPressed: () async {
                 final text = controller.text.trim();
                 if (text.isEmpty) return;
-                await provider.updatePost(
-                  post.id,
-                  content: text,
-                  visibility: visibility,
-                );
-                if (ctx.mounted) Navigator.pop(ctx);
+                try {
+                  await provider.updatePost(
+                    post.id,
+                    content: text,
+                    visibility: visibility,
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(
+                        content: Text('Lưu thất bại: $e'),
+                        backgroundColor: Colors.red,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                }
               },
               child: const Text('Lưu'),
             ),
@@ -1489,11 +1513,24 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Hủy'),
           ),
-          ElevatedButton(
+            ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () {
-              provider.deletePost(post.id);
-              Navigator.pop(ctx);
+            onPressed: () async {
+              try {
+                await provider.deletePost(post.id);
+                if (ctx.mounted) Navigator.pop(ctx);
+              } catch (e) {
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Xóa thất bại: $e'),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Xóa'),
           ),

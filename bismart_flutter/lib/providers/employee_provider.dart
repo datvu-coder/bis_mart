@@ -123,13 +123,9 @@ class EmployeeProvider extends ChangeNotifier {
   }
 
   Future<void> addShift(WorkShift shift) async {
-    try {
-      await _api.createShift(shift.toJson());
-      final shiftData = await _api.getShifts(storeId: _selectedShiftStoreId);
-      _shifts = shiftData.map((s) => WorkShift.fromJson(s as Map<String, dynamic>)).toList();
-    } catch (_) {
-      _shifts.add(shift);
-    }
+    await _api.createShift(shift.toJson());
+    final shiftData = await _api.getShifts(storeId: _selectedShiftStoreId);
+    _shifts = shiftData.map((s) => WorkShift.fromJson(s as Map<String, dynamic>)).toList();
     notifyListeners();
   }
 
@@ -142,25 +138,21 @@ class EmployeeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void removeShift(String shiftId) async {
-    try { await _api.deleteShift(int.parse(shiftId)); } catch (_) {}
+  Future<void> removeShift(String shiftId) async {
+    await _api.deleteShift(int.parse(shiftId));
     _shifts.removeWhere((s) => s.id == shiftId);
     notifyListeners();
   }
 
   Future<void> addEmployee(Employee employee) async {
-    try {
-      final result = await _api.createEmployee(employee.toJson());
-      _employees.add(Employee.fromJson(result));
-    } catch (_) {
-      _employees.add(employee);
-    }
+    final result = await _api.createEmployee(employee.toJson());
+    _employees.add(Employee.fromJson(result));
     _recalcRanks();
     notifyListeners();
   }
 
   Future<void> updateEmployee(Employee updated) async {
-    try { await _api.updateEmployee(int.parse(updated.id), updated.toJson()); } catch (_) {}
+    await _api.updateEmployee(int.parse(updated.id), updated.toJson());
     final index = _employees.indexWhere((e) => e.id == updated.id);
     if (index != -1) {
       _employees[index] = updated;
@@ -170,7 +162,7 @@ class EmployeeProvider extends ChangeNotifier {
   }
 
   Future<void> deleteEmployee(String id) async {
-    try { await _api.deleteEmployee(int.parse(id)); } catch (_) {}
+    await _api.deleteEmployee(int.parse(id));
     _employees.removeWhere((e) => e.id == id);
     _attendances.removeWhere((a) => a.employeeId == id);
     _recalcRanks();
@@ -209,23 +201,17 @@ class EmployeeProvider extends ChangeNotifier {
   }) async {
     final dateStr =
         '${workDate.year}-${workDate.month.toString().padLeft(2, '0')}-${workDate.day.toString().padLeft(2, '0')}';
-    try {
-      await _api.createEmployeeSchedule({
-        'employeeId': employeeId,
-        'shiftId': shiftId,
-        'workDate': dateStr,
-        'note': note,
-      });
-      await loadSchedules();
-    } catch (_) {
-      notifyListeners();
-    }
+    await _api.createEmployeeSchedule({
+      'employeeId': employeeId,
+      'shiftId': shiftId,
+      'workDate': dateStr,
+      'note': note,
+    });
+    await loadSchedules();
   }
 
   Future<void> removeSchedule(String id) async {
-    try {
-      await _api.deleteEmployeeSchedule(int.parse(id));
-    } catch (_) {}
+    await _api.deleteEmployeeSchedule(int.parse(id));
     _schedules.removeWhere((s) => s.id == id);
     notifyListeners();
   }

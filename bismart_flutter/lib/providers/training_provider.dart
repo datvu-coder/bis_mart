@@ -67,46 +67,27 @@ class TrainingProvider extends ChangeNotifier {
     List<String>? imageDataUrls,
   }) async {
     final images = imageDataUrls ?? [];
-    try {
-      final result = await _api.createPost({
-        'content': content,
-        'authorName': authorName ?? 'Bạn',
-        'authorId': authorId,
-        'visibility': visibility,
-        'storeCode': storeCode,
-      });
-      final post = CommunityPost.fromJson(result);
-      // Attach local preview images if API doesn't return them
-      if (images.isNotEmpty && post.imageUrls.isEmpty) {
-        _posts.insert(0, CommunityPost(
-          id: post.id,
-          authorId: post.authorId,
-          authorName: post.authorName,
-          createdAt: post.createdAt,
-          content: post.content,
-          imageUrls: images,
-          visibility: post.visibility,
-          storeCode: post.storeCode,
-        ));
-      } else {
-        _posts.insert(0, post);
-      }
-    } catch (_) {
-      _posts.insert(
-        0,
-        CommunityPost(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          authorId: authorId,
-          authorName: authorName ?? 'Bạn',
-          createdAt: DateTime.now(),
-          content: content,
-          imageUrls: images,
-          visibility: visibility,
-          storeCode: storeCode,
-          likeCount: 0,
-          commentCount: 0,
-        ),
-      );
+    final result = await _api.createPost({
+      'content': content,
+      'authorName': authorName ?? 'Bạn',
+      'authorId': authorId,
+      'visibility': visibility,
+      'storeCode': storeCode,
+    });
+    final post = CommunityPost.fromJson(result);
+    if (images.isNotEmpty && post.imageUrls.isEmpty) {
+      _posts.insert(0, CommunityPost(
+        id: post.id,
+        authorId: post.authorId,
+        authorName: post.authorName,
+        createdAt: post.createdAt,
+        content: post.content,
+        imageUrls: images,
+        visibility: post.visibility,
+        storeCode: post.storeCode,
+      ));
+    } else {
+      _posts.insert(0, post);
     }
     notifyListeners();
   }
@@ -137,8 +118,8 @@ class TrainingProvider extends ChangeNotifier {
     }
   }
 
-  void deletePost(String postId) async {
-    try { await _api.deletePost(int.parse(postId)); } catch (_) {}
+  Future<void> deletePost(String postId) async {
+    await _api.deletePost(int.parse(postId));
     _posts.removeWhere((p) => p.id == postId);
     notifyListeners();
   }
@@ -170,19 +151,15 @@ class TrainingProvider extends ChangeNotifier {
     _posts[index] = updated;
     notifyListeners();
 
-    try {
-      await _api.updatePost(int.parse(postId), {
-        'content': content,
-        'visibility': visibility,
-      });
-    } catch (_) {}
+    await _api.updatePost(int.parse(postId), {
+      'content': content,
+      'visibility': visibility,
+    });
   }
 
-  void addEvent(DateTime date, String title) async {
+  Future<void> addEvent(DateTime date, String title) async {
     final key = DateTime.utc(date.year, date.month, date.day);
-    try {
-      await _api.createEvent({'title': title, 'date': key.toIso8601String()});
-    } catch (_) {}
+    await _api.createEvent({'title': title, 'date': key.toIso8601String()});
     if (_events.containsKey(key)) {
       _events[key]!.add(title);
     } else {
@@ -191,11 +168,9 @@ class TrainingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void removeEvent(DateTime date, String title) async {
+  Future<void> removeEvent(DateTime date, String title) async {
     final key = DateTime.utc(date.year, date.month, date.day);
-    try {
-      await _api.deleteEvent({'title': title, 'date': key.toIso8601String()});
-    } catch (_) {}
+    await _api.deleteEvent({'title': title, 'date': key.toIso8601String()});
     _events[key]?.remove(title);
     if (_events[key]?.isEmpty ?? false) {
       _events.remove(key);
