@@ -203,10 +203,11 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   Widget _buildScreenHeader(TrainingProvider provider, bool emphasize) {
     final lessonCount = provider.lessons.length;
     final todayEvents = provider.getEventsForDay(DateTime.now()).length;
+    final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 20 : 16),
+      padding: EdgeInsets.all(emphasize ? 20 : 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFEFF6FF), Color(0xFFFFFFFF)],
@@ -222,53 +223,94 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: isCompactMobile ? 38 : 44,
+                height: isCompactMobile ? 38 : 44,
                 decoration: BoxDecoration(
                   color: AppColors.infoLight,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.school_rounded, color: AppColors.info),
+                child: Icon(
+                  Icons.school_rounded,
+                  color: AppColors.info,
+                  size: isCompactMobile ? 20 : 24,
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
-                    const SizedBox(height: 2),
-                    Text('Cộng đồng, bài học & lịch đào tạo',
-                        style: AppTextStyles.caption),
+                    if (!isCompactMobile) ...[
+                      const SizedBox(height: 2),
+                      Text('Cộng đồng, bài học & lịch đào tạo',
+                          style: AppTextStyles.caption),
+                    ],
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _buildKpiChip(
-                icon: Icons.play_lesson_rounded,
-                label: 'Bài giảng',
-                value: '$lessonCount',
-                color: AppColors.info,
-              ),
-              _buildKpiChip(
-                icon: Icons.event_rounded,
-                label: 'Hôm nay',
-                value: '$todayEvents sự kiện',
-                color: AppColors.warning,
-              ),
-              _buildKpiChip(
-                icon: Icons.people_rounded,
-                label: 'Bài viết',
-                value: '${provider.posts.length}',
-                color: AppColors.primary,
-              ),
-            ],
-          ),
+          const SizedBox(height: 12),
+          if (isCompactMobile)
+            Row(
+              children: [
+                Expanded(
+                  child: _buildKpiChip(
+                    icon: Icons.play_lesson_rounded,
+                    label: 'Bài giảng',
+                    value: '$lessonCount',
+                    color: AppColors.info,
+                    compact: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildKpiChip(
+                    icon: Icons.event_rounded,
+                    label: 'Hôm nay',
+                    value: '$todayEvents',
+                    color: AppColors.warning,
+                    compact: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildKpiChip(
+                    icon: Icons.people_rounded,
+                    label: 'Bài viết',
+                    value: '${provider.posts.length}',
+                    color: AppColors.primary,
+                    compact: true,
+                  ),
+                ),
+              ],
+            )
+          else
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _buildKpiChip(
+                  icon: Icons.play_lesson_rounded,
+                  label: 'Bài giảng',
+                  value: '$lessonCount',
+                  color: AppColors.info,
+                ),
+                _buildKpiChip(
+                  icon: Icons.event_rounded,
+                  label: 'Hôm nay',
+                  value: '$todayEvents sự kiện',
+                  color: AppColors.warning,
+                ),
+                _buildKpiChip(
+                  icon: Icons.people_rounded,
+                  label: 'Bài viết',
+                  value: '${provider.posts.length}',
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -279,27 +321,46 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     required String label,
     required String value,
     required Color color,
+    bool compact = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 12,
+        vertical: compact ? 8 : 10,
+      ),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderLight),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Text('$label: ',
-              style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-          Text(value,
-              style: AppTextStyles.caption
-                  .copyWith(color: color, fontWeight: FontWeight.w800)),
-        ],
-      ),
+      child: compact
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption
+                      .copyWith(color: color, fontWeight: FontWeight.w800),
+                ),
+              ],
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 8),
+                Text('$label: ',
+                    style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                Text(value,
+                    style: AppTextStyles.caption
+                        .copyWith(color: color, fontWeight: FontWeight.w800)),
+              ],
+            ),
     );
   }
 
@@ -376,7 +437,15 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
 
   Widget _buildCommunityPanel(TrainingProvider provider) {
     final authProvider = context.read<AuthProvider>();
+    final currentUser = authProvider.currentUser;
     final userName = authProvider.currentUser?.fullName ?? 'Bạn';
+    final currentStore = currentUser?.storeCode;
+    final visiblePosts = provider.posts.where((post) {
+      if (post.visibility != 'store') return true;
+      if (post.authorId != null && post.authorId == currentUser?.id) return true;
+      if (post.storeCode == null || post.storeCode!.isEmpty) return true;
+      return post.storeCode == currentStore;
+    }).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -443,7 +512,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           ),
         ),
         // ── Feed ─────────────────────────────────────────────────────────
-        if (provider.posts.isEmpty)
+        if (visiblePosts.isEmpty)
           Container(
             color: AppColors.white,
             padding: const EdgeInsets.all(32),
@@ -460,11 +529,17 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             ),
           )
         else
-          ...provider.posts.map<Widget>((post) => SocialPostCard(
+          ...visiblePosts.map<Widget>((post) => SocialPostCard(
                 post: post,
                 onLike: () => provider.toggleLike(post.id),
                 onComment: () => _showCommentDialog(post.id, provider),
                 onShare: () => _sharePost(post),
+                onEdit: _canManagePost(post, currentUser)
+                    ? () => _showEditPostDialog(provider, post)
+                    : null,
+                onDelete: _canManagePost(post, currentUser)
+                    ? () => _confirmDeletePost(provider, post)
+                    : null,
               )),
       ],
     );
@@ -609,8 +684,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   void _showCreatePostDialog(TrainingProvider provider, {String initialTab = 'text'}) {
     final textController = TextEditingController();
     final authProvider = context.read<AuthProvider>();
+    final currentUser = authProvider.currentUser;
     final userName = authProvider.currentUser?.fullName ?? 'Bạn';
     final List<Map<String, dynamic>> pickedFiles = [];
+    String selectedVisibility = 'public';
     bool autoPickConsumed = false;
 
     showDialog(
@@ -782,19 +859,47 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                                 borderRadius: BorderRadius.circular(6),
                                 border: Border.all(color: AppColors.border),
                               ),
-                              child: Row(
-                                children: const [
-                                  Icon(Icons.public_rounded,
-                                      size: 13, color: AppColors.textSecondary),
-                                  SizedBox(width: 4),
-                                  Text('Mọi người',
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textSecondary)),
-                                  Icon(Icons.arrow_drop_down_rounded,
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: selectedVisibility,
+                                  icon: const Icon(Icons.arrow_drop_down_rounded,
                                       size: 16, color: AppColors.textSecondary),
-                                ],
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem<String>(
+                                      value: 'public',
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.public_rounded,
+                                              size: 13, color: AppColors.textSecondary),
+                                          SizedBox(width: 4),
+                                          Text('Mọi người'),
+                                        ],
+                                      ),
+                                    ),
+                                    DropdownMenuItem<String>(
+                                      value: 'store',
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.storefront_rounded,
+                                              size: 13, color: AppColors.textSecondary),
+                                          SizedBox(width: 4),
+                                          Text('Cửa hàng'),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value == null) return;
+                                    setDialogState(() => selectedVisibility = value);
+                                  },
+                                ),
                               ),
                             ),
                           ],
@@ -903,6 +1008,9 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                           await provider.createPost(
                             text,
                             authorName: userName,
+                            authorId: currentUser?.id,
+                            visibility: selectedVisibility,
+                            storeCode: currentUser?.storeCode,
                             imageDataUrls: pickedFiles
                                 .map((f) => f['dataUrl'] as String)
                                 .toList(),
@@ -1297,6 +1405,101 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.success,
         duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  bool _canManagePost(CommunityPost post, dynamic currentUser) {
+    if (currentUser == null) return false;
+    final isOwnerById = post.authorId != null && post.authorId == currentUser.id;
+    final isOwnerByName = post.authorName == currentUser.fullName;
+    final role = (currentUser.position ?? '').toString().toUpperCase();
+    final isPrivileged = role == 'ADM' || role == 'TMK';
+    return isOwnerById || isOwnerByName || isPrivileged;
+  }
+
+  void _showEditPostDialog(TrainingProvider provider, CommunityPost post) {
+    final controller = TextEditingController(text: post.content ?? '');
+    var visibility = post.visibility;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Sửa bài viết'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  hintText: 'Nội dung bài viết...',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                value: visibility,
+                decoration: const InputDecoration(
+                  labelText: 'Quyền xem',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'public', child: Text('Mọi người')),
+                  DropdownMenuItem(value: 'store', child: Text('Cửa hàng')),
+                ],
+                onChanged: (val) {
+                  if (val == null) return;
+                  setDialogState(() => visibility = val);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final text = controller.text.trim();
+                if (text.isEmpty) return;
+                await provider.updatePost(
+                  post.id,
+                  content: text,
+                  visibility: visibility,
+                );
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('Lưu'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeletePost(TrainingProvider provider, CommunityPost post) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xóa bài viết'),
+        content: const Text('Bạn có chắc muốn xóa bài viết này không?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            onPressed: () {
+              provider.deletePost(post.id);
+              Navigator.pop(ctx);
+            },
+            child: const Text('Xóa'),
+          ),
+        ],
       ),
     );
   }

@@ -58,19 +58,35 @@ class TrainingProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> createPost(String content, {String? authorName, List<String>? imageDataUrls}) async {
+  Future<void> createPost(
+    String content, {
+    String? authorName,
+    String? authorId,
+    String visibility = 'public',
+    String? storeCode,
+    List<String>? imageDataUrls,
+  }) async {
     final images = imageDataUrls ?? [];
     try {
-      final result = await _api.createPost({'content': content, 'authorName': authorName ?? 'Bạn'});
+      final result = await _api.createPost({
+        'content': content,
+        'authorName': authorName ?? 'Bạn',
+        'authorId': authorId,
+        'visibility': visibility,
+        'storeCode': storeCode,
+      });
       final post = CommunityPost.fromJson(result);
       // Attach local preview images if API doesn't return them
       if (images.isNotEmpty && post.imageUrls.isEmpty) {
         _posts.insert(0, CommunityPost(
           id: post.id,
+          authorId: post.authorId,
           authorName: post.authorName,
           createdAt: post.createdAt,
           content: post.content,
           imageUrls: images,
+          visibility: post.visibility,
+          storeCode: post.storeCode,
         ));
       } else {
         _posts.insert(0, post);
@@ -80,10 +96,13 @@ class TrainingProvider extends ChangeNotifier {
         0,
         CommunityPost(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
+          authorId: authorId,
           authorName: authorName ?? 'Bạn',
           createdAt: DateTime.now(),
           content: content,
           imageUrls: images,
+          visibility: visibility,
+          storeCode: storeCode,
           likeCount: 0,
           commentCount: 0,
         ),
@@ -122,6 +141,41 @@ class TrainingProvider extends ChangeNotifier {
     try { await _api.deletePost(int.parse(postId)); } catch (_) {}
     _posts.removeWhere((p) => p.id == postId);
     notifyListeners();
+  }
+
+  Future<void> updatePost(
+    String postId, {
+    required String content,
+    required String visibility,
+  }) async {
+    final index = _posts.indexWhere((p) => p.id == postId);
+    if (index == -1) return;
+
+    final old = _posts[index];
+    final updated = CommunityPost(
+      id: old.id,
+      authorId: old.authorId,
+      authorName: old.authorName,
+      createdAt: old.createdAt,
+      content: content,
+      imageUrls: old.imageUrls,
+      visibility: visibility,
+      storeCode: old.storeCode,
+      likeCount: old.likeCount,
+      commentCount: old.commentCount,
+      isLiked: old.isLiked,
+      comments: old.comments,
+    );
+
+    _posts[index] = updated;
+    notifyListeners();
+
+    try {
+      await _api.updatePost(int.parse(postId), {
+        'content': content,
+        'visibility': visibility,
+      });
+    } catch (_) {}
   }
 
   void addEvent(DateTime date, String title) async {

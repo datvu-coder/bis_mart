@@ -10,6 +10,8 @@ class SocialPostCard extends StatelessWidget {
   final VoidCallback? onLike;
   final VoidCallback? onComment;
   final VoidCallback? onShare;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const SocialPostCard({
     super.key,
@@ -17,6 +19,8 @@ class SocialPostCard extends StatelessWidget {
     this.onLike,
     this.onComment,
     this.onShare,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -55,15 +59,79 @@ class SocialPostCard extends StatelessWidget {
                                 .copyWith(color: AppColors.textGrey),
                           ),
                           const SizedBox(width: 4),
-                          const Icon(Icons.public_rounded,
-                              size: 12, color: AppColors.textHint),
+                          Icon(
+                            post.visibility == 'store'
+                                ? Icons.storefront_rounded
+                                : Icons.public_rounded,
+                            size: 12,
+                            color: AppColors.textHint,
+                          ),
+                          if (post.visibility == 'store') ...[
+                            const SizedBox(width: 4),
+                            Text(
+                              'Cửa hàng',
+                              style: AppTextStyles.caption
+                                  .copyWith(color: AppColors.textHint),
+                            ),
+                          ],
                         ],
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.more_horiz_rounded,
-                    color: AppColors.textGrey, size: 22),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_horiz_rounded,
+                      color: AppColors.textGrey, size: 22),
+                  onSelected: (value) {
+                    if (value == 'edit') {
+                      onEdit?.call();
+                    }
+                    if (value == 'delete') {
+                      onDelete?.call();
+                    }
+                  },
+                  itemBuilder: (context) {
+                    final items = <PopupMenuEntry<String>>[];
+                    if (onEdit != null) {
+                      items.add(
+                        const PopupMenuItem<String>(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit_rounded, size: 18),
+                              SizedBox(width: 8),
+                              Text('Sửa bài viết'),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    if (onDelete != null) {
+                      items.add(
+                        const PopupMenuItem<String>(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_rounded, size: 18, color: AppColors.error),
+                              SizedBox(width: 8),
+                              Text('Xóa bài viết', style: TextStyle(color: AppColors.error)),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    if (items.isEmpty) {
+                      return const [
+                        PopupMenuItem<String>(
+                          enabled: false,
+                          value: 'none',
+                          child: Text('Không có thao tác'),
+                        ),
+                      ];
+                    }
+                    return items;
+                  },
+                ),
               ],
             ),
           ),

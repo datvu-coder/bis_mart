@@ -257,6 +257,11 @@ class ApiService {
     await _dio.delete('/api/posts/$postId');
   }
 
+  Future<Map<String, dynamic>> updatePost(int postId, Map<String, dynamic> data) async {
+    final response = await _dio.put('/api/posts/$postId', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
   // ---- LESSONS ----
   Future<List<dynamic>> getLessons() async {
     final response = await _dio.get('/api/lessons');

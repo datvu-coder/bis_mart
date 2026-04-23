@@ -195,10 +195,11 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     final totalRev = provider.totalRevenue;
     final reportCount = provider.salesReportCount;
     final pgCount = provider.filteredReports.map((r) => r.pgName).toSet().length;
+    final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 20 : 16),
+      padding: EdgeInsets.all(emphasize ? 20 : 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFEBF8F0), Color(0xFFFFFFFF)],
@@ -214,65 +215,117 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: isCompactMobile ? 38 : 44,
+                height: isCompactMobile ? 38 : 44,
                 decoration: BoxDecoration(
                   color: AppColors.successLight,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.bar_chart_rounded, color: AppColors.success),
+                child: Icon(Icons.bar_chart_rounded,
+                    color: AppColors.success, size: isCompactMobile ? 20 : 24),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
-                    const SizedBox(height: 2),
-                    Text('Báo cáo bán hàng & thống kê doanh thu',
-                        style: AppTextStyles.caption),
+                    if (!isCompactMobile) ...[
+                      const SizedBox(height: 2),
+                      Text('Báo cáo bán hàng & thống kê doanh thu',
+                          style: AppTextStyles.caption),
+                    ],
                   ],
                 ),
               ),
-              ElevatedButton.icon(
-                onPressed: () =>
-                    Navigator.pushNamed(context, AppRoutes.createReport),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text(AppStrings.taoPhieuBaoCao),
-                style: ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  textStyle:
-                      const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              if (isCompactMobile)
+                IconButton(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, AppRoutes.createReport),
+                  icon: const Icon(Icons.add_rounded),
+                  tooltip: AppStrings.taoPhieuBaoCao,
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
+                    padding: const EdgeInsets.all(6),
+                    minimumSize: const Size(36, 36),
+                  ),
+                )
+              else
+                ElevatedButton.icon(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, AppRoutes.createReport),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text(AppStrings.taoPhieuBaoCao),
+                  style: ElevatedButton.styleFrom(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    textStyle:
+                        const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                 ),
-              ),
             ],
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _buildKpiChip(
-                icon: Icons.description_rounded,
-                label: 'Báo cáo',
-                value: '$reportCount',
-                color: AppColors.info,
-              ),
-              _buildKpiChip(
-                icon: Icons.account_balance_wallet_rounded,
-                label: 'Doanh thu',
-                value: CurrencyFormatter.formatVND(totalRev),
-                color: AppColors.success,
-              ),
-              _buildKpiChip(
-                icon: Icons.person_rounded,
-                label: 'PG',
-                value: '$pgCount',
-                color: AppColors.primary,
-              ),
-            ],
-          ),
+          const SizedBox(height: 12),
+          if (isCompactMobile)
+            Row(
+              children: [
+                Expanded(
+                  child: _buildKpiChip(
+                    icon: Icons.description_rounded,
+                    label: 'Báo cáo',
+                    value: '$reportCount',
+                    color: AppColors.info,
+                    compact: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildKpiChip(
+                    icon: Icons.account_balance_wallet_rounded,
+                    label: 'Doanh thu',
+                    value: CurrencyFormatter.formatVND(totalRev),
+                    color: AppColors.success,
+                    compact: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildKpiChip(
+                    icon: Icons.person_rounded,
+                    label: 'PG',
+                    value: '$pgCount',
+                    color: AppColors.primary,
+                    compact: true,
+                  ),
+                ),
+              ],
+            )
+          else
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _buildKpiChip(
+                  icon: Icons.description_rounded,
+                  label: 'Báo cáo',
+                  value: '$reportCount',
+                  color: AppColors.info,
+                ),
+                _buildKpiChip(
+                  icon: Icons.account_balance_wallet_rounded,
+                  label: 'Doanh thu',
+                  value: CurrencyFormatter.formatVND(totalRev),
+                  color: AppColors.success,
+                ),
+                _buildKpiChip(
+                  icon: Icons.person_rounded,
+                  label: 'PG',
+                  value: '$pgCount',
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -283,27 +336,46 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     required String label,
     required String value,
     required Color color,
+    bool compact = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 12,
+        vertical: compact ? 8 : 10,
+      ),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderLight),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Text('$label: ',
-              style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-          Text(value,
-              style: AppTextStyles.caption
-                  .copyWith(color: color, fontWeight: FontWeight.w800)),
-        ],
-      ),
+      child: compact
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption
+                      .copyWith(color: color, fontWeight: FontWeight.w800),
+                ),
+              ],
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 8),
+                Text('$label: ',
+                    style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                Text(value,
+                    style: AppTextStyles.caption
+                        .copyWith(color: color, fontWeight: FontWeight.w800)),
+              ],
+            ),
     );
   }
 

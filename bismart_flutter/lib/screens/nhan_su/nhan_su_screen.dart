@@ -216,10 +216,11 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
     final checkedInCount = provider.attendances.where((a) => a.isCheckedIn).length;
     final activeShiftCount = provider.shifts.length;
     final memberCount = provider.employees.length;
+    final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 20 : 16),
+      padding: EdgeInsets.all(emphasize ? 20 : 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFFF2EB), Color(0xFFFFFFFF)],
@@ -235,29 +236,32 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
           Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: isCompactMobile ? 38 : 44,
+                height: isCompactMobile ? 38 : 44,
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.groups_2_rounded, color: AppColors.primary),
+                child: Icon(Icons.groups_2_rounded,
+                    color: AppColors.primary, size: isCompactMobile ? 20 : 24),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Điều phối chấm công, ca làm và hiệu suất đội ngũ',
-                      style: AppTextStyles.caption,
-                    ),
+                    if (!isCompactMobile) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Điều phối chấm công, ca làm và hiệu suất đội ngũ',
+                        style: AppTextStyles.caption,
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (canManage)
+              if (canManage && !isCompactMobile)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
@@ -274,31 +278,66 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
                 ),
             ],
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _buildHeaderKpiChip(
-                icon: Icons.badge_rounded,
-                label: 'Nhân viên',
-                value: '$memberCount',
-                color: AppColors.primary,
-              ),
-              _buildHeaderKpiChip(
-                icon: Icons.login_rounded,
-                label: 'Đã vào ca',
-                value: '$checkedInCount',
-                color: AppColors.success,
-              ),
-              _buildHeaderKpiChip(
-                icon: Icons.schedule_rounded,
-                label: 'Ca làm',
-                value: '$activeShiftCount',
-                color: AppColors.info,
-              ),
-            ],
-          ),
+          const SizedBox(height: 12),
+          if (isCompactMobile)
+            Row(
+              children: [
+                Expanded(
+                  child: _buildHeaderKpiChip(
+                    icon: Icons.badge_rounded,
+                    label: 'Nhân viên',
+                    value: '$memberCount',
+                    color: AppColors.primary,
+                    compact: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildHeaderKpiChip(
+                    icon: Icons.login_rounded,
+                    label: 'Đã vào ca',
+                    value: '$checkedInCount',
+                    color: AppColors.success,
+                    compact: true,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildHeaderKpiChip(
+                    icon: Icons.schedule_rounded,
+                    label: 'Ca làm',
+                    value: '$activeShiftCount',
+                    color: AppColors.info,
+                    compact: true,
+                  ),
+                ),
+              ],
+            )
+          else
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _buildHeaderKpiChip(
+                  icon: Icons.badge_rounded,
+                  label: 'Nhân viên',
+                  value: '$memberCount',
+                  color: AppColors.primary,
+                ),
+                _buildHeaderKpiChip(
+                  icon: Icons.login_rounded,
+                  label: 'Đã vào ca',
+                  value: '$checkedInCount',
+                  color: AppColors.success,
+                ),
+                _buildHeaderKpiChip(
+                  icon: Icons.schedule_rounded,
+                  label: 'Ca làm',
+                  value: '$activeShiftCount',
+                  color: AppColors.info,
+                ),
+              ],
+            ),
         ],
       ),
     );
@@ -309,35 +348,54 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
     required String label,
     required String value,
     required Color color,
+    bool compact = false,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 12,
+        vertical: compact ? 8 : 10,
+      ),
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderLight),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
-          Text(
-            '$label: ',
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.textSecondary,
-              fontWeight: FontWeight.w600,
+      child: compact
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption
+                      .copyWith(color: color, fontWeight: FontWeight.w800),
+                ),
+              ],
+            )
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 8),
+                Text(
+                  '$label: ',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: AppTextStyles.caption.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
-          ),
-          Text(
-            value,
-            style: AppTextStyles.caption.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
