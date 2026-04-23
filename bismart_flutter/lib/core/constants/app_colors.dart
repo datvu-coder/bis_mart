@@ -55,4 +55,8 @@ class AppColors {
   // Shadows
   static const shadow = Color(0x0A000000);
   static const shadowMedium = Color(0x14000000);
+
+  // Purple — dùng cho Phân quyền (admin)
+  static const purpleAccent = Color(0xFF7C3AED);
+  static const purpleLight  = Color(0xFFF5F3FF);
 }

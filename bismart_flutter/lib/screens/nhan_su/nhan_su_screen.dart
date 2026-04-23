@@ -8,11 +8,10 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/employee_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/lms_provider.dart';
 import '../../models/attendance.dart';
 import '../../models/work_schedule.dart';
 import '../../models/work_shift.dart';
-import '../../models/permission.dart';
+import '../../providers/permission_provider.dart';
 import '../../services/location_service.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/primary_button.dart';
@@ -46,7 +45,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
       context.read<StoreProvider>().loadStores();
       // Load permissions for current user's position
       if (currentUser != null) {
-        context.read<LmsProvider>().loadPermissionForPosition(currentUser.position);
+        context.read<PermissionProvider>().resolveForUser(currentUser);
       }
     });
   }
@@ -63,8 +62,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
     final isWide = isDesktop || isTablet;
-    final perm = context.watch<LmsProvider>().currentPermission;
-    final canManage = perm?.canManageAttendance ?? false;
+    final canManage = context.watch<PermissionProvider>().canManageAttendance;
 
     return Consumer<EmployeeProvider>(
       builder: (context, provider, _) {

@@ -348,4 +348,44 @@ class ApiService {
     final response = await _dio.get('/api/posts/$postId/comments');
     return response.data as List<dynamic>;
   }
+
+  Future<Map<String, dynamic>> createPermission(Map<String, dynamic> data) async {
+    final response = await _dio.post('/api/permissions', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updatePermission(String position, Map<String, dynamic> data) async {
+    final response = await _dio.put('/api/permissions/$position', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> deletePermission(String position) async {
+    await _dio.delete('/api/permissions/$position');
+  }
+
+  // ---- STORE MANAGERS (phân công cửa hàng) ----
+  Future<List<dynamic>> getStoreManagers() async {
+    final response = await _dio.get('/api/store-managers');
+    return response.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createStoreManager(Map<String, dynamic> data) async {
+    final response = await _dio.post('/api/store-managers', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateStoreManager(int id, Map<String, dynamic> data) async {
+    final response = await _dio.put('/api/store-managers/$id', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteStoreManager(int id) async {
+    await _dio.delete('/api/store-managers/$id');
+  }
+
+  // ---- EFFECTIVE PERMISSIONS ----
+  Future<Map<String, dynamic>> getMyEffectivePermissions() async {
+    final response = await _dio.get('/api/me/permissions');
+    return response.data as Map<String, dynamic>;
+  }
 }

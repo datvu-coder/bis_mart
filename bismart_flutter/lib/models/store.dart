@@ -84,12 +84,14 @@ class StoreManager {
   final String name;
   final String employeeCode;
   final String? email;
+  final String storeRole;
 
   StoreManager({
     required this.employeeId,
     required this.name,
     required this.employeeCode,
     this.email,
+    this.storeRole = 'PG',
   });
 
   factory StoreManager.fromJson(Map<String, dynamic> json) {
@@ -98,6 +100,7 @@ class StoreManager {
       name: json['name'] as String,
       employeeCode: json['employeeCode'] as String,
       email: json['email'] as String?,
+      storeRole: json['storeRole'] as String? ?? 'PG',
     );
   }
 
@@ -106,5 +109,6 @@ class StoreManager {
         'name': name,
         'employeeCode': employeeCode,
         'email': email,
+        'storeRole': storeRole,
       };
 }

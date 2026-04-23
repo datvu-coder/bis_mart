@@ -6,7 +6,7 @@ import '../../core/constants/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/employee_provider.dart';
-import '../../providers/lms_provider.dart';
+import '../../providers/permission_provider.dart';
 import '../../models/employee.dart';
 
 class CaNhanScreen extends StatefulWidget {
@@ -23,7 +23,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final currentUser = context.read<AuthProvider>().currentUser;
       if (currentUser != null) {
-        context.read<LmsProvider>().loadPermissionForPosition(currentUser.position);
+        context.read<PermissionProvider>().resolveForUser(currentUser);
       }
     });
   }
@@ -242,18 +242,20 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
   }
 
   Widget _buildMenuSection(BuildContext context) {
-    final perm = context.watch<LmsProvider>().currentPermission;
+    final permProv = context.watch<PermissionProvider>();
     final menuItems = <_MenuItem>[
-      if (perm?.canEmployees ?? true)
+      if (permProv.canEmployees)
         _MenuItem(Icons.people_rounded, AppStrings.danhSachNhanVien, 'Xem danh sách & thông tin nhân viên', AppRoutes.employeeList, AppColors.info, AppColors.infoLight),
-      if (perm?.canAttendance ?? true)
+      if (permProv.canAttendance)
         _MenuItem(Icons.fingerprint_rounded, AppStrings.quanLyChamCong, 'Chấm công, ca làm & xếp hạng', AppRoutes.nhanSu, AppColors.success, AppColors.successLight),
-      if (perm?.canReport ?? true)
+      if (permProv.canReport)
         _MenuItem(Icons.bar_chart_rounded, AppStrings.quanLyBaoCao, 'Báo cáo doanh thu & thống kê', AppRoutes.kinhDoanh, AppColors.warning, AppColors.warningLight),
-      if (perm?.canStoreList ?? true)
+      if (permProv.canStoreList)
         _MenuItem(Icons.store_rounded, AppStrings.danhSachCuaHang, 'Danh sách cửa hàng trong hệ thống', AppRoutes.storeList, AppColors.primary, AppColors.primaryLight),
-      if (perm?.canProductList ?? true)
+      if (permProv.canProductList)
         _MenuItem(Icons.inventory_2_rounded, AppStrings.danhSachSanPham, 'Quản lý sản phẩm & tồn kho', AppRoutes.productList, AppColors.error, AppColors.errorLight),
+      if (permProv.isAdmin || permProv.canCrud)
+        _MenuItem(Icons.admin_panel_settings_rounded, 'Phân quyền hệ thống', 'Cấu hình quyền & phân công cửa hàng', AppRoutes.phanQuyen, AppColors.purpleAccent, AppColors.purpleLight),
     ];
 
     return Container(
