@@ -104,8 +104,15 @@ CREATE TABLE IF NOT EXISTS work_shifts (
     start_minute INTEGER NOT NULL DEFAULT 0,
     end_hour INTEGER NOT NULL,
     end_minute INTEGER NOT NULL DEFAULT 0,
-    store_name TEXT
+    store_name TEXT,
+    store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL
 );
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_name='work_shifts' AND column_name='store_id') THEN
+    ALTER TABLE work_shifts ADD COLUMN store_id INTEGER REFERENCES stores(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS attendances (
     id SERIAL PRIMARY KEY,

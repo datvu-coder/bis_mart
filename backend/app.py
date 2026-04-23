@@ -783,12 +783,24 @@ def api_delete_employee(employee_id: int):
 @app.get("/api/shifts")
 @login_required
 def api_get_shifts():
+    store_id = request.args.get("storeId")
     db = get_db()
     with db.cursor() as cur:
-        cur.execute(
-            "SELECT id, name, shift_code, start_hour, start_minute, end_hour, end_minute, store_name "
-            "FROM work_shifts ORDER BY id ASC"
-        )
+        if store_id:
+            cur.execute(
+                "SELECT ws.id, ws.name, ws.shift_code, ws.start_hour, ws.start_minute, "
+                "ws.end_hour, ws.end_minute, ws.store_name, ws.store_id, s.name AS store_display_name "
+                "FROM work_shifts ws LEFT JOIN stores s ON s.id = ws.store_id "
+                "WHERE ws.store_id = %s ORDER BY ws.id ASC",
+                (int(store_id),)
+            )
+        else:
+            cur.execute(
+                "SELECT ws.id, ws.name, ws.shift_code, ws.start_hour, ws.start_minute, "
+                "ws.end_hour, ws.end_minute, ws.store_name, ws.store_id, s.name AS store_display_name "
+                "FROM work_shifts ws LEFT JOIN stores s ON s.id = ws.store_id "
+                "ORDER BY ws.id ASC"
+            )
         rows = cur.fetchall()
     return jsonify([
         {
@@ -799,7 +811,8 @@ def api_get_shifts():
             "startMinute": int(row.get("start_minute") or 0),
             "endHour": int(row.get("end_hour") or 0),
             "endMinute": int(row.get("end_minute") or 0),
-            "storeName": row.get("store_name"),
+            "storeName": row.get("store_display_name") or row.get("store_name"),
+            "storeId": str(row["store_id"]) if row.get("store_id") else None,
         }
         for row in rows
     ])
@@ -809,12 +822,13 @@ def api_get_shifts():
 @login_required
 def api_create_shift():
     data = request.get_json(silent=True) or {}
+    store_id = int(data["storeId"]) if data.get("storeId") else None
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "INSERT INTO work_shifts (name, shift_code, start_hour, start_minute, end_hour, end_minute, store_name) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) "
-            "RETURNING id, name, shift_code, start_hour, start_minute, end_hour, end_minute, store_name",
+            "INSERT INTO work_shifts (name, shift_code, start_hour, start_minute, end_hour, end_minute, store_name, store_id) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING id, name, shift_code, start_hour, start_minute, end_hour, end_minute, store_name, store_id",
             (
                 data.get("name", ""),
                 data.get("shiftCode"),
@@ -823,6 +837,7 @@ def api_create_shift():
                 data.get("endHour", 0),
                 data.get("endMinute", 0),
                 data.get("storeName"),
+                store_id,
             ),
         )
         row = cur.fetchone()
@@ -837,6 +852,7 @@ def api_create_shift():
             "endHour": int(row.get("end_hour") or 0),
             "endMinute": int(row.get("end_minute") or 0),
             "storeName": row.get("store_name"),
+            "storeId": str(row["store_id"]) if row.get("store_id") else None,
         }
     ), 201
 
