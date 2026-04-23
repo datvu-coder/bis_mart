@@ -20,7 +20,9 @@ class KinhDoanhScreen extends StatefulWidget {
 }
 
 class _KinhDoanhScreenState extends State<KinhDoanhScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   late TabController _tabController;
 
   @override
@@ -40,6 +42,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;

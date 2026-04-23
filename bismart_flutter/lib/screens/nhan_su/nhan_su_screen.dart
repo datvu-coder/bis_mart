@@ -24,7 +24,10 @@ class NhanSuScreen extends StatefulWidget {
   State<NhanSuScreen> createState() => _NhanSuScreenState();
 }
 
-class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderStateMixin {
+class _NhanSuScreenState extends State<NhanSuScreen>
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   bool _isCheckingIn = false;
   String? _locationError;
   double? _lastDistance;
@@ -72,6 +75,7 @@ class _NhanSuScreenState extends State<NhanSuScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
