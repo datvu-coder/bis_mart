@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:html' show InputElement, FileReader;
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/permission.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/permission_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/employee_provider.dart';
@@ -26,6 +28,8 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
   // State for tab 2 (store assignments)
   List<Map<String, dynamic>> _assignments = [];
   bool _loadingAssign = false;
+  String _assignmentSearch = '';
+  bool _importingAssign = false;
 
   final _api = ApiService();
 
@@ -74,6 +78,10 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
   @override
   Widget build(BuildContext context) {
     final isCompactMobile = MediaQuery.of(context).size.width < 430;
+    final perm = context.watch<PermissionProvider>();
+    final canEditPermissions = perm.isAdmin || perm.canCrud;
+    final canManageAssignments = canEditPermissions || perm.canSwitchStore;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Phân quyền hệ thống'),
@@ -97,8 +105,8 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildPermissionsTab(),
-          _buildAssignmentsTab(),
+          _buildPermissionsTab(canEditPermissions),
+          _buildAssignmentsTab(canManageAssignments),
         ],
       ),
     );
@@ -106,7 +114,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
 
   // ── TAB 1: Quyền theo chức vụ ─────────────────────────────────────────────
 
-  Widget _buildPermissionsTab() {
+  Widget _buildPermissionsTab(bool canEditPermissions) {
     if (_loadingPerms) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
@@ -122,8 +130,19 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                   style: AppTextStyles.caption,
                 ),
               ),
+              if (!canEditPermissions)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Text(
+                    'Chỉ xem',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.warning,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
               TextButton.icon(
-                onPressed: () => _showEditPermissionDialog(null),
+                onPressed: canEditPermissions ? () => _showEditPermissionDialog(null) : null,
                 icon: const Icon(Icons.add_rounded, size: 18),
                 label: const Text('Thêm'),
                 style: TextButton.styleFrom(foregroundColor: AppColors.primary),
@@ -141,7 +160,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
                   itemCount: _permissions.length,
-                  itemBuilder: (ctx, i) => _buildPermissionCard(_permissions[i]),
+                  itemBuilder: (ctx, i) => _buildPermissionCard(_permissions[i], canEditPermissions),
                 ),
         ),
       ],
@@ -196,7 +215,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
     );
   }
 
-  Widget _buildPermissionCard(Permission perm) {
+  Widget _buildPermissionCard(Permission perm, bool canEditPermissions) {
     final flags = [
       ('Chấm công', perm.canAttendance),
       ('Báo cáo', perm.canReport),
@@ -242,12 +261,12 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
               IconButton(
                 icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.primary),
                 tooltip: 'Chỉnh sửa',
-                onPressed: () => _showEditPermissionDialog(perm),
+                onPressed: canEditPermissions ? () => _showEditPermissionDialog(perm) : null,
               ),
               IconButton(
                 icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
                 tooltip: 'Xóa',
-                onPressed: () => _deletePermission(perm.position),
+                onPressed: canEditPermissions ? () => _deletePermission(perm.position) : null,
               ),
             ],
           ),
@@ -304,15 +323,27 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
       ),
     );
     if (confirmed == true) {
-      await _api.deletePermission(position);
-      await _loadPermissions();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Đã xóa quyền cho "$position"'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.success,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ));
+      try {
+        await _api.deletePermission(position);
+        await _loadPermissions();
+        await _refreshCurrentUserPermissions();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Đã xóa quyền cho "$position"'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.success,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Xóa quyền thất bại: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ));
+        }
       }
     }
   }
@@ -388,22 +419,40 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
             ElevatedButton(
               onPressed: () async {
-                final payload = {
-                  'position': existing?.position ?? posCtrl.text.trim().toUpperCase(),
-                  'description': descCtrl.text.trim(),
-                  ...flags,
-                };
-                if (existing == null) {
-                  await _api.createPermission(payload);
-                } else {
-                  await _api.updatePermission(existing.position, payload);
-                }
-                if (!ctx.mounted) return;
-                Navigator.pop(ctx);
-                await _loadPermissions();
-                // Refresh effective permissions
-                if (mounted) {
-                  context.read<PermissionProvider>().clear();
+                try {
+                  final payload = {
+                    'position': existing?.position ?? posCtrl.text.trim().toUpperCase(),
+                    'description': descCtrl.text.trim(),
+                    ...flags,
+                  };
+                  if (existing == null) {
+                    await _api.createPermission(payload);
+                  } else {
+                    await _api.updatePermission(existing.position, payload);
+                  }
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  await _loadPermissions();
+                  await _refreshCurrentUserPermissions();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(existing == null
+                          ? 'Đã thêm chức vụ mới'
+                          : 'Đã cập nhật quyền cho ${existing.position}'),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: AppColors.success,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ));
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                      content: Text('Lưu quyền thất bại: $e'),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: AppColors.error,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ));
+                  }
                 }
               },
               child: Text(existing == null ? 'Thêm' : 'Lưu'),
@@ -416,17 +465,45 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
 
   // ── TAB 2: Phân công cửa hàng ────────────────────────────────────────────
 
-  Widget _buildAssignmentsTab() {
+  Widget _buildAssignmentsTab(bool canManageAssignments) {
     if (_loadingAssign) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primary));
     }
     final stores = context.watch<StoreProvider>().stores;
     final employees = context.watch<EmployeeProvider>().employees;
+    final query = _assignmentSearch.trim().toLowerCase();
+    final filtered = _assignments.where((a) {
+      if (query.isEmpty) return true;
+      final employeeName = (a['employeeName'] ?? '').toString().toLowerCase();
+      final employeeCode = (a['employeeCode'] ?? '').toString().toLowerCase();
+      final storeName = (a['storeName'] ?? '').toString().toLowerCase();
+      final storeCode = (a['storeCode'] ?? '').toString().toLowerCase();
+      final storeRole = (a['storeRole'] ?? '').toString().toLowerCase();
+      return employeeName.contains(query) ||
+          employeeCode.contains(query) ||
+          storeName.contains(query) ||
+          storeCode.contains(query) ||
+          storeRole.contains(query);
+    }).toList();
 
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+          child: TextField(
+            onChanged: (v) => setState(() => _assignmentSearch = v),
+            decoration: InputDecoration(
+              hintText: 'Tìm theo nhân viên, cửa hàng, mã, chức vụ...',
+              prefixIcon: const Icon(Icons.search_rounded, size: 18),
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
           child: Row(
             children: [
               Expanded(
@@ -436,7 +513,21 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                 ),
               ),
               TextButton.icon(
-                onPressed: stores.isEmpty || employees.isEmpty
+                onPressed: (!canManageAssignments || _importingAssign)
+                    ? null
+                    : () => _importAssignmentsFromCsv(stores, employees),
+                icon: _importingAssign
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.upload_file_rounded, size: 18),
+                label: Text(_importingAssign ? 'Đang import...' : 'Import CSV'),
+                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
+              ),
+              TextButton.icon(
+                onPressed: !canManageAssignments || stores.isEmpty || employees.isEmpty
                     ? null
                     : () => _showAssignDialog(stores, employees),
                 icon: const Icon(Icons.add_rounded, size: 18),
@@ -446,17 +537,33 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
             ],
           ),
         ),
+        if (!canManageAssignments)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Bạn không có quyền phân công/chuyển cửa hàng.',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
         Expanded(
-          child: _assignments.isEmpty
+          child: filtered.isEmpty
               ? Center(
-                  child: Text('Chưa có phân công nào.\nNhấn "Phân công" để thêm.',
+                  child: Text(_assignments.isEmpty
+                      ? 'Chưa có phân công nào.\nNhấn "Phân công" để thêm.'
+                      : 'Không có kết quả phù hợp từ khóa tìm kiếm.',
                     textAlign: TextAlign.center, style: AppTextStyles.caption),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                  itemCount: _assignments.length,
+                  itemCount: filtered.length,
                   itemBuilder: (ctx, i) =>
-                      _buildAssignmentCard(_assignments[i], stores, employees),
+                      _buildAssignmentCard(filtered[i], stores, employees, canManageAssignments),
                 ),
         ),
       ],
@@ -464,7 +571,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
   }
 
   Widget _buildAssignmentCard(Map<String, dynamic> a,
-      List<dynamic> stores, List<dynamic> employees) {
+      List<dynamic> stores, List<dynamic> employees, bool canManageAssignments) {
     final roleLabel = Permission.storeRoleLabels[a['storeRole']] ??
         Permission.systemRoleLabels[a['storeRole']] ??
         (a['storeRole'] ?? '');
@@ -517,21 +624,33 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
             ),
           ),
           const SizedBox(width: 8),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert_rounded, size: 18),
-            onSelected: (v) async {
-              if (v == 'edit') {
-                _showEditRoleDialog(a);
-              } else if (v == 'delete') {
-                await _api.deleteStoreManager(a['id'] as int);
-                await _loadAssignments();
-              }
-            },
-            itemBuilder: (ctx) => const [
-              PopupMenuItem(value: 'edit', child: Text('Đổi chức vụ')),
-              PopupMenuItem(value: 'delete', child: Text('Xóa phân công')),
-            ],
-          ),
+          if (canManageAssignments)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded, size: 18),
+              onSelected: (v) async {
+                if (v == 'edit') {
+                  _showEditRoleDialog(a);
+                } else if (v == 'delete') {
+                  try {
+                    await _api.deleteStoreManager(a['id'] as int);
+                    await _loadAssignments();
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text('Xóa phân công thất bại: $e'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: AppColors.error,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ));
+                    }
+                  }
+                }
+              },
+              itemBuilder: (ctx) => const [
+                PopupMenuItem(value: 'edit', child: Text('Đổi chức vụ')),
+                PopupMenuItem(value: 'delete', child: Text('Xóa phân công')),
+              ],
+            ),
         ],
       ),
     );
@@ -597,14 +716,25 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
             ElevatedButton(
               onPressed: (storeId != null && employeeId != null)
                   ? () async {
-                      await _api.createStoreManager({
-                        'storeId': storeId,
-                        'employeeId': employeeId,
-                        'storeRole': storeRole,
-                      });
-                      if (!ctx.mounted) return;
-                      Navigator.pop(ctx);
-                      await _loadAssignments();
+                      try {
+                        await _api.createStoreManager({
+                          'storeId': storeId,
+                          'employeeId': employeeId,
+                          'storeRole': storeRole,
+                        });
+                        if (!ctx.mounted) return;
+                        Navigator.pop(ctx);
+                        await _loadAssignments();
+                      } catch (e) {
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                            content: Text('Phân công thất bại: $e'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppColors.error,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ));
+                        }
+                      }
                     }
                   : null,
               child: const Text('Phân công'),
@@ -649,11 +779,22 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
             ElevatedButton(
               onPressed: () async {
-                await _api.updateStoreManager(
-                    assignment['id'] as int, {'storeRole': storeRole});
-                if (!ctx.mounted) return;
-                Navigator.pop(ctx);
-                await _loadAssignments();
+                try {
+                  await _api.updateStoreManager(
+                      assignment['id'] as int, {'storeRole': storeRole});
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  await _loadAssignments();
+                } catch (e) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                      content: Text('Cập nhật chức vụ thất bại: $e'),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: AppColors.error,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ));
+                  }
+                }
               },
               child: const Text('Lưu'),
             ),
@@ -661,5 +802,113 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _refreshCurrentUserPermissions() async {
+    final user = context.read<AuthProvider>().currentUser;
+    if (user == null) return;
+    await context.read<PermissionProvider>().resolveForUser(user);
+  }
+
+  Future<void> _importAssignmentsFromCsv(
+      List<dynamic> stores, List<dynamic> employees) async {
+    final input = InputElement()
+      ..type = 'file'
+      ..accept = '.csv';
+    input.click();
+
+    input.onChange.listen((_) {
+      final file = input.files?.isNotEmpty == true ? input.files!.first : null;
+      if (file == null) return;
+
+      final reader = FileReader();
+      reader.readAsText(file);
+      reader.onLoadEnd.listen((_) async {
+        final raw = (reader.result ?? '').toString();
+        if (raw.trim().isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text('File CSV trống.'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ));
+          }
+          return;
+        }
+
+        final lines = raw
+            .split(RegExp(r'\r?\n'))
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+        if (lines.isEmpty) return;
+
+        final start = lines.first.toLowerCase().contains('employeecode') ? 1 : 0;
+        if (start >= lines.length) return;
+
+        setState(() => _importingAssign = true);
+        int success = 0;
+        int failed = 0;
+
+        final storeIdByCode = <String, String>{
+          for (final s in stores)
+            if ((s.storeCode ?? '').toString().isNotEmpty)
+              (s.storeCode as String).toUpperCase(): s.id as String,
+        };
+        final employeeIdByCode = <String, String>{
+          for (final e in employees)
+            if ((e.employeeCode ?? '').toString().isNotEmpty)
+              (e.employeeCode as String).toUpperCase(): e.id as String,
+        };
+
+        for (var i = start; i < lines.length; i++) {
+          final cols = lines[i].split(',').map((e) => e.trim()).toList();
+          if (cols.length < 2) {
+            failed++;
+            continue;
+          }
+
+          final employeeCode = cols[0].toUpperCase();
+          final storeCode = cols[1].toUpperCase();
+          final role =
+              (cols.length >= 3 && cols[2].isNotEmpty ? cols[2] : Permission.storeRolePG)
+                  .toUpperCase();
+
+          final employeeId = employeeIdByCode[employeeCode];
+          final storeId = storeIdByCode[storeCode];
+          if (employeeId == null || storeId == null) {
+            failed++;
+            continue;
+          }
+          if (!Permission.storeRoleLabels.containsKey(role)) {
+            failed++;
+            continue;
+          }
+
+          try {
+            await _api.createStoreManager({
+              'storeId': storeId,
+              'employeeId': employeeId,
+              'storeRole': role,
+            });
+            success++;
+          } catch (_) {
+            failed++;
+          }
+        }
+
+        await _loadAssignments();
+        if (mounted) {
+          setState(() => _importingAssign = false);
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Import xong: $success thành công, $failed thất bại.'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: failed == 0 ? AppColors.success : AppColors.warning,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ));
+        }
+      });
+    });
   }
 }
