@@ -665,9 +665,43 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
   }
 
   void _showAssignDialog(List<dynamic> stores, List<dynamic> employees) {
+    final employeeList = employees.cast<Employee>();
+    final storeList = stores.cast<Store>();
     String? storeId;
     String? employeeId;
     String storeRole = Permission.storeRolePG;
+    String employeeQuery = '';
+    String storeQuery = '';
+
+    Employee? findEmployee(String raw) {
+      final query = raw.trim().toLowerCase();
+      if (query.isEmpty) return null;
+      for (final employee in employeeList) {
+        final display =
+            '${employee.fullName} (${employee.employeeCode})'.toLowerCase();
+        if (employee.fullName.toLowerCase() == query ||
+            employee.employeeCode.toLowerCase() == query ||
+            display == query) {
+          return employee;
+        }
+      }
+      return null;
+    }
+
+    Store? findStore(String raw) {
+      final query = raw.trim().toLowerCase();
+      if (query.isEmpty) return null;
+      for (final store in storeList) {
+        final display = '${store.name} (${store.storeCode})'.toLowerCase();
+        if (store.name.toLowerCase() == query ||
+            store.storeCode.toLowerCase() == query ||
+            display == query) {
+          return store;
+        }
+      }
+      return null;
+    }
+
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -683,10 +717,10 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                     displayStringForOption: (e) =>
                         '${e.fullName} (${e.employeeCode})',
                     optionsBuilder: (textEditingValue) {
-                      final list = employees.cast<Employee>();
-                      if (textEditingValue.text.trim().isEmpty) return list;
+                      employeeQuery = textEditingValue.text;
+                      if (textEditingValue.text.trim().isEmpty) return employeeList;
                       final query = textEditingValue.text.toLowerCase();
-                      return list.where((e) =>
+                      return employeeList.where((e) =>
                           e.fullName.toLowerCase().contains(query) ||
                           e.employeeCode.toLowerCase().contains(query));
                     },
@@ -702,6 +736,10 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                           hintText: 'Tìm tên hoặc mã nhân viên...',
                           prefixIcon: Icon(Icons.search_rounded, size: 18),
                         ),
+                        onChanged: (value) => setDialogState(() {
+                          employeeQuery = value;
+                          employeeId = null;
+                        }),
                       );
                     },
                   ),
@@ -710,10 +748,10 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                     displayStringForOption: (s) =>
                         '${s.name} (${s.storeCode})',
                     optionsBuilder: (textEditingValue) {
-                      final list = stores.cast<Store>();
-                      if (textEditingValue.text.trim().isEmpty) return list;
+                      storeQuery = textEditingValue.text;
+                      if (textEditingValue.text.trim().isEmpty) return storeList;
                       final query = textEditingValue.text.toLowerCase();
-                      return list.where((s) =>
+                      return storeList.where((s) =>
                           s.name.toLowerCase().contains(query) ||
                           s.storeCode.toLowerCase().contains(query));
                     },
@@ -729,6 +767,10 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                           hintText: 'Tìm tên hoặc mã cửa hàng...',
                           prefixIcon: Icon(Icons.store_rounded, size: 18),
                         ),
+                        onChanged: (value) => setDialogState(() {
+                          storeQuery = value;
+                          storeId = null;
+                        }),
                       );
                     },
                   ),
@@ -750,29 +792,62 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
             ElevatedButton(
-              onPressed: (storeId != null && employeeId != null)
-                  ? () async {
-                      try {
-                        await _api.createStoreManager({
-                          'storeId': storeId,
-                          'employeeId': employeeId,
-                          'storeRole': storeRole,
-                        });
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx);
-                        await _loadAssignments();
-                      } catch (e) {
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                            content: Text('Phân công thất bại: $e'),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: AppColors.error,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ));
-                        }
-                      }
-                    }
-                  : null,
+              onPressed: () async {
+                final selectedEmployee = employeeId != null
+                    ? employeeList.where((e) => e.id == employeeId).firstOrNull
+                    : findEmployee(employeeQuery);
+                final selectedStore = storeId != null
+                    ? storeList.where((s) => s.id == storeId).firstOrNull
+                    : findStore(storeQuery);
+
+                if (selectedEmployee == null || selectedStore == null) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                    content: const Text(
+                      'Hãy chọn đúng nhân viên và cửa hàng từ danh sách gợi ý hoặc nhập đúng mã.',
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.warning,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ));
+                  return;
+                }
+
+                final duplicated = _assignments.any((item) {
+                  return (item['employeeCode'] ?? '').toString().toUpperCase() ==
+                          selectedEmployee.employeeCode.toUpperCase() &&
+                      (item['storeCode'] ?? '').toString().toUpperCase() ==
+                          selectedStore.storeCode.toUpperCase();
+                });
+                if (duplicated) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                    content: const Text('Nhân viên này đã được phân công vào cửa hàng đã chọn.'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.warning,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ));
+                  return;
+                }
+
+                try {
+                  await _api.createStoreManager({
+                    'storeId': selectedStore.id,
+                    'employeeId': selectedEmployee.id,
+                    'storeRole': storeRole,
+                  });
+                  if (!ctx.mounted) return;
+                  Navigator.pop(ctx);
+                  await _loadAssignments();
+                } catch (e) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                      content: Text('Phân công thất bại: $e'),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: AppColors.error,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ));
+                  }
+                }
+              },
               child: const Text('Phân công'),
             ),
           ],
