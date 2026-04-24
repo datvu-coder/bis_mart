@@ -91,6 +91,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 ),
                 child: TabBar(
                   controller: _tabController,
+                  isScrollable: true,
                   labelColor: AppColors.primary,
                   unselectedLabelColor: AppColors.textGrey,
                   indicator: BoxDecoration(
@@ -99,6 +100,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   ),
                   indicatorSize: TabBarIndicatorSize.tab,
                   dividerColor: Colors.transparent,
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 16),
                   labelStyle:
                       const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                   unselectedLabelStyle:

@@ -110,6 +110,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               ),
               child: TabBar(
                 controller: _tabController,
+                isScrollable: true,
                 labelColor: AppColors.primary,
                 unselectedLabelColor: AppColors.textGrey,
                 indicator: BoxDecoration(
@@ -118,6 +119,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
+                labelPadding: const EdgeInsets.symmetric(horizontal: 16),
                 labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                 tabs: const [
