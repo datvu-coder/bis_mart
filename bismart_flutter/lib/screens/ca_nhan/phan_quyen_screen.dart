@@ -7,6 +7,7 @@ import '../../models/permission.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/permission_provider.dart';
 import '../../providers/store_provider.dart';
+import '../../models/employee.dart';
 import '../../providers/employee_provider.dart';
 import '../../services/api_service.dart';
 
@@ -660,20 +661,10 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
     String? storeId;
     String? employeeId;
     String storeRole = Permission.storeRolePG;
-    String employeeSearch = '';
-
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final filteredEmployees = employees.where((e) {
-            if (employeeSearch.trim().isEmpty) return true;
-            final query = employeeSearch.toLowerCase();
-            final fullName = (e.fullName as String).toLowerCase();
-            final employeeCode = (e.employeeCode as String).toLowerCase();
-            return fullName.contains(query) || employeeCode.contains(query);
-          }).toList();
-
           return AlertDialog(
             title: const Text('Phân công nhân viên vào cửa hàng'),
             content: SizedBox(
@@ -681,36 +672,31 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  TextField(
-                    decoration: const InputDecoration(
-                      labelText: 'Tìm kiếm nhân viên',
-                      hintText: 'Nhập tên hoặc mã nhân viên',
-                      prefixIcon: Icon(Icons.search_rounded, size: 18),
-                    ),
-                    onChanged: (v) => setDialogState(() => employeeSearch = v),
-                  ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Kết quả: ${filteredEmployees.length}/${employees.length}',
-                      style: AppTextStyles.caption,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'Nhân viên'),
-                    value: filteredEmployees.any((e) => e.id == employeeId)
-                        ? employeeId
-                        : null,
-                    isExpanded: true,
-                    items: filteredEmployees
-                        .map((e) => DropdownMenuItem(
-                              value: e.id as String,
-                              child: Text('${e.fullName} (${e.employeeCode})'),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => employeeId = v),
+                  Autocomplete<Employee>(
+                    displayStringForOption: (e) =>
+                        '${e.fullName} (${e.employeeCode})',
+                    optionsBuilder: (textEditingValue) {
+                      final list = employees.cast<Employee>();
+                      if (textEditingValue.text.trim().isEmpty) return list;
+                      final query = textEditingValue.text.toLowerCase();
+                      return list.where((e) =>
+                          e.fullName.toLowerCase().contains(query) ||
+                          e.employeeCode.toLowerCase().contains(query));
+                    },
+                    onSelected: (e) =>
+                        setDialogState(() => employeeId = e.id),
+                    fieldViewBuilder:
+                        (context, controller, focusNode, onFieldSubmitted) {
+                      return TextFormField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        decoration: const InputDecoration(
+                          labelText: 'Nhân viên',
+                          hintText: 'Tìm tên hoặc mã nhân viên...',
+                          prefixIcon: Icon(Icons.search_rounded, size: 18),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
