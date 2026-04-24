@@ -18,18 +18,31 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DashboardProvider>().loadDashboard();
     });
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width > 800;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWide = screenWidth > 800;
+    final isCompactMobile = screenWidth < 390;
+    final hPad = isWide ? 24.0 : 16.0;
 
     return Consumer<DashboardProvider>(
       builder: (context, provider, _) {
@@ -53,78 +66,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
-        return SingleChildScrollView(
-          padding: EdgeInsets.all(isWide ? 24 : 16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              _buildHeader(provider, data),
-              const SizedBox(height: 20),
-
-              // Metric cards
-              _buildMetricCards(data, isWide),
-              const SizedBox(height: 20),
-
-              // System announcement
-              _buildAnnouncementBanner(data),
-              const SizedBox(height: 20),
-
-              // Charts + Featured/Top10
-              if (isWide)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        children: [
-                          _buildChartCard(
-                            AppStrings.bieuDoDoanhSo,
-                            Icons.bar_chart_rounded,
-                            RevenueBarChart(data: data.revenueChart),
-                          ),
-                          const SizedBox(height: 16),
-                          _buildChartCard(
-                            AppStrings.bieuDoSanPham,
-                            Icons.pie_chart_rounded,
-                            ProductHChart(data: data.productChart),
-                          ),
-                        ],
-                      ),
+        // Tab layout for all screen sizes
+        return Column(
+          children: [
+            Container(
+              color: AppColors.white,
+              child: TabBar(
+                controller: _tabController,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textHint,
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+                tabs: [
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.dashboard_rounded, size: 18))
+                      : const Tab(text: 'Tổng quan'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.bar_chart_rounded, size: 18))
+                      : const Tab(text: 'Biểu đồ'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.emoji_events_rounded, size: 18))
+                      : const Tab(text: 'Xếp hạng'),
+                ],
+              ),
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  SingleChildScrollView(
+                    padding: EdgeInsets.all(hPad),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(provider, data),
+                        const SizedBox(height: 16),
+                        _buildMetricCards(data, false),
+                        const SizedBox(height: 16),
+                        _buildAnnouncementBanner(data),
+                      ],
                     ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        children: [
-                          if (data.featuredPrograms.isNotEmpty)
-                            _buildFeaturedPrograms(data),
-                          _buildTopEmployees(data),
-                        ],
-                      ),
+                  ),
+                  SingleChildScrollView(
+                    padding: EdgeInsets.all(hPad),
+                    child: Column(
+                      children: [
+                        _buildChartCard(
+                          AppStrings.bieuDoDoanhSo,
+                          Icons.bar_chart_rounded,
+                          RevenueBarChart(data: data.revenueChart),
+                        ),
+                        const SizedBox(height: 16),
+                        _buildChartCard(
+                          AppStrings.bieuDoSanPham,
+                          Icons.pie_chart_rounded,
+                          ProductHChart(data: data.productChart),
+                        ),
+                      ],
                     ),
-                  ],
-                )
-              else ...[
-                _buildChartCard(
-                  AppStrings.bieuDoDoanhSo,
-                  Icons.bar_chart_rounded,
-                  RevenueBarChart(data: data.revenueChart),
-                ),
-                const SizedBox(height: 16),
-                _buildChartCard(
-                  AppStrings.bieuDoSanPham,
-                  Icons.pie_chart_rounded,
-                  ProductHChart(data: data.productChart),
-                ),
-                const SizedBox(height: 16),
-                if (data.featuredPrograms.isNotEmpty)
-                  _buildFeaturedPrograms(data),
-                _buildTopEmployees(data),
-              ],
-            ],
-          ),
+                  ),
+                  SingleChildScrollView(
+                    padding: EdgeInsets.all(hPad),
+                    child: Column(
+                      children: [
+                        if (data.featuredPrograms.isNotEmpty)
+                          _buildFeaturedPrograms(data),
+                        _buildTopEmployees(data),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         );
       },
     );
