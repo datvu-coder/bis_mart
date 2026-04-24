@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:html' show InputElement, FileReader;
+import 'dart:html' as html show InputElement, FileReader, Blob, Url, AnchorElement;
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/permission.dart';
@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/permission_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../models/employee.dart';
+import '../../models/store.dart';
 import '../../providers/employee_provider.dart';
 import '../../services/api_service.dart';
 
@@ -528,6 +529,12 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                 style: TextButton.styleFrom(foregroundColor: AppColors.primary),
               ),
               TextButton.icon(
+                onPressed: () => _downloadSampleCsv(),
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: const Text('Mẫu CSV'),
+                style: TextButton.styleFrom(foregroundColor: AppColors.textHint),
+              ),
+              TextButton.icon(
                 onPressed: !canManageAssignments || stores.isEmpty || employees.isEmpty
                     ? null
                     : () => _showAssignDialog(stores, employees),
@@ -699,17 +706,31 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                     },
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'Cửa hàng'),
-                    value: storeId,
-                    isExpanded: true,
-                    items: stores
-                        .map((s) => DropdownMenuItem(
-                              value: s.id as String,
-                              child: Text(s.name as String),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => storeId = v),
+                  Autocomplete<Store>(
+                    displayStringForOption: (s) =>
+                        '${s.name} (${s.storeCode})',
+                    optionsBuilder: (textEditingValue) {
+                      final list = stores.cast<Store>();
+                      if (textEditingValue.text.trim().isEmpty) return list;
+                      final query = textEditingValue.text.toLowerCase();
+                      return list.where((s) =>
+                          s.name.toLowerCase().contains(query) ||
+                          s.storeCode.toLowerCase().contains(query));
+                    },
+                    onSelected: (s) =>
+                        setDialogState(() => storeId = s.id),
+                    fieldViewBuilder:
+                        (context, controller, focusNode, onFieldSubmitted) {
+                      return TextFormField(
+                        controller: controller,
+                        focusNode: focusNode,
+                        decoration: const InputDecoration(
+                          labelText: 'Cửa hàng',
+                          hintText: 'Tìm tên hoặc mã cửa hàng...',
+                          prefixIcon: Icon(Icons.store_rounded, size: 18),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -826,9 +847,22 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
     await context.read<PermissionProvider>().resolveForUser(user);
   }
 
+  void _downloadSampleCsv() {
+    const csv = 'employeeCode,storeCode,storeRole\n'
+        'NV001,CH001,PG\n'
+        'NV002,CH002,SM\n'
+        'NV003,CH001,ASM\n';
+    final blob = html.Blob([csv], 'text/csv;charset=utf-8');
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    final anchor = html.AnchorElement(href: url)
+      ..setAttribute('download', 'mau_phan_cong.csv')
+      ..click();
+    html.Url.revokeObjectUrl(url);
+  }
+
   Future<void> _importAssignmentsFromCsv(
       List<dynamic> stores, List<dynamic> employees) async {
-    final input = InputElement()
+    final input = html.InputElement()
       ..type = 'file'
       ..accept = '.csv';
     input.click();
@@ -837,7 +871,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
       final file = input.files?.isNotEmpty == true ? input.files!.first : null;
       if (file == null) return;
 
-      final reader = FileReader();
+      final reader = html.FileReader();
       reader.readAsText(file);
       reader.onLoadEnd.listen((_) async {
         final raw = (reader.result ?? '').toString();
