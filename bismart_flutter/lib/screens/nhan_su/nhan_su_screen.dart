@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:html' show InputElement, FileReader;
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
 import '../../core/constants/app_strings.dart';
@@ -32,13 +31,12 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   bool _isCheckingIn = false;
   String? _locationError;
   double? _lastDistance;
-  String _assignSearch = '';
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<EmployeeProvider>();
       final currentUser = context.read<AuthProvider>().currentUser;
@@ -179,7 +177,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   Tab(text: 'Ca làm'),
                   Tab(text: 'Xếp hạng'),
                   Tab(text: 'Lịch'),
-                  Tab(text: 'Phân công'),
                 ],
               ),
             ),
@@ -203,7 +200,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                     child: _buildSchedulePanel(provider, canManage),
                   ),
-                  _buildAssignPanel(provider, context.watch<PermissionProvider>().canSwitchStore),
                 ],
               ),
             ),
@@ -1141,238 +1137,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         ],
       ),
     );
-  }
-
-  Widget _buildAssignPanel(EmployeeProvider provider, bool canSwitchStore) {
-    final stores = context.read<StoreProvider>().stores;
-    final filtered = provider.employees
-        .where((e) =>
-            _assignSearch.isEmpty ||
-            e.fullName.toLowerCase().contains(_assignSearch.toLowerCase()) ||
-            e.employeeCode.toLowerCase().contains(_assignSearch.toLowerCase()))
-        .toList();
-
-    return Column(
-      children: [
-        // Search + import bar
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Tìm nhân viên...',
-                    prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: AppColors.border)),
-                  ),
-                  onChanged: (v) => setState(() => _assignSearch = v),
-                ),
-              ),
-              if (canSwitchStore) ...[
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () => _importExcelAssignment(provider),
-                  icon: const Icon(Icons.upload_file_rounded, size: 16),
-                  label: const Text('Import Excel'),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    textStyle: const TextStyle(fontSize: 12),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        if (!canSwitchStore)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.textGrey),
-                const SizedBox(width: 6),
-                Text('Bạn không có quyền chuyển cửa hàng',
-                    style: AppTextStyles.caption),
-              ],
-            ),
-          ),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            itemCount: filtered.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 6),
-            itemBuilder: (context, index) {
-              final emp = filtered[index];
-              final storeName = stores
-                  .cast<dynamic>()
-                  .firstWhere(
-                      (s) => s.storeCode == emp.storeCode,
-                      orElse: () => null)
-                  ?.name as String?;
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 18,
-                      backgroundColor: AppColors.primaryLight,
-                      child: Text(
-                        emp.fullName[0].toUpperCase(),
-                        style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(emp.fullName,
-                              style: const TextStyle(
-                                  fontSize: 13, fontWeight: FontWeight.w600)),
-                          Text(
-                            '${emp.employeeCode} · ${storeName ?? emp.storeCode ?? 'Chưa phân công'}',
-                            style: AppTextStyles.caption,
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (canSwitchStore)
-                      IconButton(
-                        icon: const Icon(Icons.store_rounded,
-                            size: 18, color: AppColors.primary),
-                        tooltip: 'Chuyển cửa hàng',
-                        onPressed: () =>
-                            _showTransferStoreDialog(provider, emp),
-                      ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showTransferStoreDialog(EmployeeProvider provider, emp) {
-    final stores = context.read<StoreProvider>().stores;
-    String? selectedStoreCode = emp.storeCode as String?;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Chuyển cửa hàng — ${emp.fullName}'),
-          content: SizedBox(
-            width: 320,
-            child: DropdownButtonFormField<String?>(
-              decoration: const InputDecoration(labelText: 'Cửa hàng mới'),
-              value: selectedStoreCode,
-              isExpanded: true,
-              items: [
-                const DropdownMenuItem(
-                    value: null, child: Text('Không phân công')),
-                ...stores.map((s) => DropdownMenuItem(
-                      value: s.storeCode as String?,
-                      child: Text(s.name as String),
-                    )),
-              ],
-              onChanged: (v) => setDialogState(() => selectedStoreCode = v),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Hủy'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  await provider.assignEmployeeToStore(
-                      emp.id as String, selectedStoreCode);
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    SnackBar(
-                      content: Text('Đã cập nhật cửa hàng cho ${emp.fullName}'),
-                      backgroundColor: AppColors.success,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                } catch (e) {
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    SnackBar(
-                      content: Text('Lỗi: $e'),
-                      backgroundColor: Colors.red,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              },
-              child: const Text('Lưu'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _importExcelAssignment(EmployeeProvider provider) {
-    // Web file input using dart:html
-    final input = InputElement()..type = 'file'..accept = '.csv';
-    input.click();
-    input.onChange.listen((event) {
-      final file = input.files?.first;
-      if (file == null) return;
-      final reader = FileReader();
-      reader.readAsText(file);
-      reader.onLoad.listen((_) {
-        final content = reader.result as String;
-        _processCsvAssignment(provider, content);
-      });
-    });
-  }
-
-  void _processCsvAssignment(EmployeeProvider provider, String csv) {
-    final lines = csv.split('\n').where((l) => l.trim().isNotEmpty).toList();
-    if (lines.isEmpty) return;
-    // Expected columns: employeeCode,storeCode
-    int success = 0, failed = 0;
-    final futures = <Future>[];
-    for (var i = 1; i < lines.length; i++) {
-      final cols = lines[i].split(',');
-      if (cols.length < 2) { failed++; continue; }
-      final code = cols[0].trim();
-      final storeCode = cols[1].trim().isEmpty ? null : cols[1].trim();
-      final emp = provider.employees.cast<dynamic>().firstWhere(
-          (e) => e.employeeCode == code, orElse: () => null);
-      if (emp == null) { failed++; continue; }
-      futures.add(provider.assignEmployeeToStore(emp.id as String, storeCode)
-          .then((_) => success++)
-          .catchError((_) => failed++));
-    }
-    Future.wait(futures).then((_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Import xong: $success thành công, $failed thất bại'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: success > 0 ? AppColors.success : Colors.red,
-          ),
-        );
-      }
-    });
   }
 
   Widget _buildRankPanel(EmployeeProvider provider) {

@@ -660,57 +660,86 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
     String? storeId;
     String? employeeId;
     String storeRole = Permission.storeRolePG;
+    String employeeSearch = '';
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Phân công nhân viên vào cửa hàng'),
-          content: SizedBox(
-            width: 380,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'Nhân viên'),
-                  value: employeeId,
-                  isExpanded: true,
-                  items: employees
-                      .map((e) => DropdownMenuItem(
-                            value: e.id as String,
-                            child: Text('${e.fullName} (${e.employeeCode})'),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setDialogState(() => employeeId = v),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'Cửa hàng'),
-                  value: storeId,
-                  isExpanded: true,
-                  items: stores
-                      .map((s) => DropdownMenuItem(
-                            value: s.id as String,
-                            child: Text(s.name as String),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setDialogState(() => storeId = v),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'Chức vụ tại cửa hàng'),
-                  value: storeRole,
-                  items: Permission.storeRoleLabels.entries
-                      .map((e) => DropdownMenuItem(
-                            value: e.key,
-                            child: Text('${e.key} — ${e.value}'),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setDialogState(() => storeRole = v!),
-                ),
-              ],
+        builder: (context, setDialogState) {
+          final filteredEmployees = employees.where((e) {
+            if (employeeSearch.trim().isEmpty) return true;
+            final query = employeeSearch.toLowerCase();
+            final fullName = (e.fullName as String).toLowerCase();
+            final employeeCode = (e.employeeCode as String).toLowerCase();
+            return fullName.contains(query) || employeeCode.contains(query);
+          }).toList();
+
+          return AlertDialog(
+            title: const Text('Phân công nhân viên vào cửa hàng'),
+            content: SizedBox(
+              width: 380,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: 'Tìm kiếm nhân viên',
+                      hintText: 'Nhập tên hoặc mã nhân viên',
+                      prefixIcon: Icon(Icons.search_rounded, size: 18),
+                    ),
+                    onChanged: (v) => setDialogState(() => employeeSearch = v),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Kết quả: ${filteredEmployees.length}/${employees.length}',
+                      style: AppTextStyles.caption,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: 'Nhân viên'),
+                    value: filteredEmployees.any((e) => e.id == employeeId)
+                        ? employeeId
+                        : null,
+                    isExpanded: true,
+                    items: filteredEmployees
+                        .map((e) => DropdownMenuItem(
+                              value: e.id as String,
+                              child: Text('${e.fullName} (${e.employeeCode})'),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setDialogState(() => employeeId = v),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: 'Cửa hàng'),
+                    value: storeId,
+                    isExpanded: true,
+                    items: stores
+                        .map((s) => DropdownMenuItem(
+                              value: s.id as String,
+                              child: Text(s.name as String),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setDialogState(() => storeId = v),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: 'Chức vụ tại cửa hàng'),
+                    value: storeRole,
+                    items: Permission.storeRoleLabels.entries
+                        .map((e) => DropdownMenuItem(
+                              value: e.key,
+                              child: Text('${e.key} — ${e.value}'),
+                            ))
+                        .toList(),
+                    onChanged: (v) => setDialogState(() => storeRole = v!),
+                  ),
+                ],
+              ),
             ),
-          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
             ElevatedButton(
@@ -740,7 +769,8 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
               child: const Text('Phân công'),
             ),
           ],
-        ),
+          );
+        },
       ),
     );
   }
