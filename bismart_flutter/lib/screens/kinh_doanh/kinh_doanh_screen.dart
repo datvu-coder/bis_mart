@@ -57,76 +57,15 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           );
         }
 
-        if (isWide) {
-          return SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: isDesktop ? 32 : 24,
-              vertical: isDesktop ? 24 : 20,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1420),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildScreenHeader(provider, isDesktop),
-                    const SizedBox(height: 20),
-                    if (isDesktop)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(flex: 5, child: _buildReportList(provider)),
-                          const SizedBox(width: 18),
-                          Expanded(
-                            flex: 4,
-                            child: Column(
-                              children: [
-                                _buildFilterPanel(provider),
-                                const SizedBox(height: 18),
-                                _buildTopPgPanel(provider),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 18),
-                          Expanded(flex: 4, child: _buildStoreRevenuePanel(provider)),
-                        ],
-                      )
-                    else
-                      Column(
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(flex: 6, child: _buildReportList(provider)),
-                              const SizedBox(width: 16),
-                              Expanded(flex: 5, child: _buildFilterPanel(provider)),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: _buildTopPgPanel(provider)),
-                              const SizedBox(width: 16),
-                              Expanded(child: _buildStoreRevenuePanel(provider)),
-                            ],
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
+        final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
 
-        // Mobile: pill-style tabs
+        // Tab layout for all screen sizes
         return Column(
           children: [
             if (!isCompactMobile)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                child: _buildScreenHeader(provider, false),
+                padding: EdgeInsets.fromLTRB(hPad, isWide ? 20 : 14, hPad, 10),
+                child: _buildScreenHeader(provider, isWide),
               ),
             if (isCompactMobile)
               Padding(
@@ -147,7 +86,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 ),
               ),
             Container(
-              margin: EdgeInsets.fromLTRB(16, isCompactMobile ? 10 : 0, 16, 0),
+              margin: EdgeInsets.fromLTRB(hPad, isCompactMobile ? 10 : 0, hPad, 0),
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
@@ -179,11 +118,11 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 controller: _tabController,
                 children: [
                   SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12),
                     child: _buildReportList(provider),
                   ),
                   SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12),
                     child: Column(
                       children: [
                         _buildTopPgPanel(provider),
@@ -193,7 +132,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     ),
                   ),
                   SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12),
                     child: _buildFilterPanel(provider),
                   ),
                 ],

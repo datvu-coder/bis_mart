@@ -64,49 +64,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           );
         }
 
-        if (isWide) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(provider, data),
-                const SizedBox(height: 20),
-                _buildMetricCards(data, true),
-                const SizedBox(height: 20),
-                _buildAnnouncementBanner(data),
-                const SizedBox(height: 20),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Column(
-                        children: [
-                          _buildChartCard(AppStrings.bieuDoDoanhSo, Icons.bar_chart_rounded, RevenueBarChart(data: data.revenueChart)),
-                          const SizedBox(height: 16),
-                          _buildChartCard(AppStrings.bieuDoSanPham, Icons.pie_chart_rounded, ProductHChart(data: data.productChart)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      flex: 2,
-                      child: Column(
-                        children: [
-                          if (data.featuredPrograms.isNotEmpty) _buildFeaturedPrograms(data),
-                          _buildTopEmployees(data),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        }
+        final hPad = isWide ? 24.0 : 16.0;
 
-        // Mobile: horizontal sub-tabs
+        // Tab layout for all screen sizes
         return Column(
           children: [
             Container(
@@ -137,20 +97,20 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 controller: _tabController,
                 children: [
                   SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(hPad),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildHeader(provider, data),
                         const SizedBox(height: 16),
-                        _buildMetricCards(data, false),
+                        _buildMetricCards(data, isWide),
                         const SizedBox(height: 16),
                         _buildAnnouncementBanner(data),
                       ],
                     ),
                   ),
                   SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(hPad),
                     child: Column(
                       children: [
                         _buildChartCard(AppStrings.bieuDoDoanhSo, Icons.bar_chart_rounded, RevenueBarChart(data: data.revenueChart)),
@@ -160,7 +120,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                   ),
                   SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
+                    padding: EdgeInsets.all(hPad),
                     child: Column(
                       children: [
                         if (data.featuredPrograms.isNotEmpty) _buildFeaturedPrograms(data),

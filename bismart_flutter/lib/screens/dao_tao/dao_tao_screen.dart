@@ -72,124 +72,70 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           );
         }
 
-        if (isWide) {
-          return SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: isDesktop ? 32 : 24,
-              vertical: isDesktop ? 24 : 20,
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1420),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildScreenHeader(provider, isDesktop),
-                    const SizedBox(height: 20),
-                    if (isDesktop)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: _buildCommunityPanel(provider)),
-                          const SizedBox(width: 18),
-                          Expanded(child: _buildLessonPanel(provider)),
-                          const SizedBox(width: 18),
-                          Expanded(child: _buildSchedulePanel(provider)),
-                          const SizedBox(width: 18),
-                          Expanded(child: _buildAiAssistantPanel(canManageAi)),
-                        ],
-                      )
-                    else
-                      Column(
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: _buildCommunityPanel(provider)),
-                              const SizedBox(width: 16),
-                              Expanded(child: _buildLessonPanel(provider)),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: _buildSchedulePanel(provider)),
-                              const SizedBox(width: 16),
-                              Expanded(child: _buildAiAssistantPanel(canManageAi)),
-                            ],
-                          ),
-                        ],
-                      ),
+        final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
+
+        // Tab layout for all screen sizes
+        return Column(
+            children: [
+              if (!isCompactMobile)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(hPad, isWide ? 20 : 14, hPad, 10),
+                  child: _buildScreenHeader(provider, isWide),
+                ),
+              Container(
+                margin: EdgeInsets.fromLTRB(hPad, isCompactMobile ? 10 : 0, hPad, 0),
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceVariant,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: AppColors.textGrey,
+                  indicator: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  labelStyle:
+                      const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  unselectedLabelStyle:
+                      const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  tabs: const [
+                    Tab(text: 'Cộng đồng'),
+                    Tab(text: 'Bài giảng'),
+                    Tab(text: 'Lịch học'),
+                    Tab(text: 'Trợ lý AI'),
                   ],
                 ),
               ),
-            ),
-          );
-        }
-
-        // Mobile: pill-style tabs
-        return Column(
-          children: [
-            if (!isCompactMobile)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                child: _buildScreenHeader(provider, false),
-              ),
-            Container(
-              margin: EdgeInsets.fromLTRB(16, isCompactMobile ? 10 : 0, 16, 0),
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: TabBar(
-                controller: _tabController,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textGrey,
-                indicator: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(10),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12),
+                      child: _buildCommunityPanel(provider),
+                    ),
+                    SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12),
+                      child: _buildLessonPanel(provider),
+                    ),
+                    SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12),
+                      child: _buildSchedulePanel(provider),
+                    ),
+                    SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12),
+                      child: _buildAiAssistantPanel(canManageAi),
+                    ),
+                  ],
                 ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                labelStyle:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                unselectedLabelStyle:
-                    const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                tabs: const [
-                  Tab(text: 'Cộng đồng'),
-                  Tab(text: 'Bài giảng'),
-                  Tab(text: 'Lịch học'),
-                  Tab(text: 'Trợ lý AI'),
-                ],
               ),
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    child: _buildCommunityPanel(provider),
-                  ),
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    child: _buildLessonPanel(provider),
-                  ),
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    child: _buildSchedulePanel(provider),
-                  ),
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                    child: _buildAiAssistantPanel(canManageAi),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
+            ],
+          );
       },
     );
   }
