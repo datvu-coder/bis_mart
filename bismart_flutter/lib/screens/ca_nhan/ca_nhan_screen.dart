@@ -7,7 +7,10 @@ import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/employee_provider.dart';
 import '../../providers/permission_provider.dart';
+import '../../providers/store_provider.dart';
 import '../../models/employee.dart';
+import '../../models/store.dart';
+import '../../services/api_service.dart';
 
 class CaNhanScreen extends StatefulWidget {
   const CaNhanScreen({super.key});
@@ -63,7 +66,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     );
   }
 
-  Widget _buildProfileCard(BuildContext context, dynamic user) {
+  Widget _buildProfileCard(BuildContext context, Employee? user) {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -81,105 +84,126 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 68,
-            height: 68,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 2.5,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                user?.fullName?.isNotEmpty == true
-                    ? user!.fullName[0].toUpperCase()
-                    : '?',
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.white,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${AppStrings.xinChao},',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.75),
+          Row(
+            children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    width: 2.5,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  user?.fullName ?? 'Người dùng',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.white,
-                    letterSpacing: -0.3,
+                child: Center(
+                  child: Text(
+                    user?.fullName?.isNotEmpty == true
+                        ? user!.fullName[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.white,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 6),
-                Row(
+              ),
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        user?.positionLabel ?? user?.position ?? '',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.white,
-                        ),
+                    Text(
+                      '${AppStrings.xinChao},',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.75),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
+                    const SizedBox(height: 2),
+                    Text(
+                      user?.fullName ?? 'Người dùng',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.white,
+                        letterSpacing: -0.3,
                       ),
-                      child: Text(
-                        user?.employeeCode ?? '',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.white,
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            user?.positionLabel ?? user?.position ?? '',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.white,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            user?.employeeCode ?? '',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.white,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () => _showEditProfileDialog(context, user),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.edit_rounded, color: AppColors.white, size: 18),
-            ),
+              GestureDetector(
+                onTap: () => _showEditProfileDialog(context, user),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.edit_rounded, color: AppColors.white, size: 18),
+                ),
+              ),
+            ],
           ),
+          if (user != null) ...[            
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              onPressed: () => _showTransferStoreDialog(context, user),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: AppColors.white),
+              label: const Text(
+                'Chuyển cửa hàng',
+                style: TextStyle(color: AppColors.white, fontSize: 13),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -316,6 +340,164 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showTransferStoreDialog(BuildContext context, Employee user) {
+    final storeProvider = context.read<StoreProvider>();
+    if (storeProvider.stores.isEmpty) storeProvider.loadStores();
+
+    String? selectedStoreId;
+    String storeQuery = '';
+    String selectedRole = 'PG';
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx2, setDialogState) {
+          final stores = context.read<StoreProvider>().stores;
+          return AlertDialog(
+            title: const Text('Chuyển cửa hàng'),
+            content: SizedBox(
+              width: 360,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '${user.fullName} (${user.employeeCode})',
+                    style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 16),
+                  Autocomplete<Store>(
+                    displayStringForOption: (s) => '${s.name} (${s.storeCode})',
+                    optionsBuilder: (textEditingValue) {
+                      storeQuery = textEditingValue.text;
+                      if (textEditingValue.text.trim().isEmpty) return stores;
+                      final query = textEditingValue.text.toLowerCase();
+                      return stores.where((s) =>
+                          s.name.toLowerCase().contains(query) ||
+                          s.storeCode.toLowerCase().contains(query));
+                    },
+                    onSelected: (s) => setDialogState(() => selectedStoreId = s.id),
+                    fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) =>
+                        TextFormField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          onChanged: (_) => setDialogState(() => selectedStoreId = null),
+                          decoration: const InputDecoration(
+                            labelText: 'Cửa hàng *',
+                            prefixIcon: Icon(Icons.store_rounded, size: 18),
+                          ),
+                        ),
+                    optionsViewBuilder: (context, onSelected, options) => Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(10),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 200, maxWidth: 360),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            itemBuilder: (context, index) {
+                              final store = options.elementAt(index);
+                              return ListTile(
+                                dense: true,
+                                title: Text(store.name),
+                                subtitle: Text(store.storeCode),
+                                onTap: () => onSelected(store),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedRole,
+                    decoration: const InputDecoration(labelText: 'Vai trò'),
+                    items: ['PG', 'TLD', 'MNG', 'CS', 'ADM']
+                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                        .toList(),
+                    onChanged: (v) => setDialogState(() => selectedRole = v!),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx2),
+                child: const Text('Hủy'),
+              ),
+              ElevatedButton(
+                onPressed: isLoading
+                    ? null
+                    : () async {
+                        Store? store;
+                        if (selectedStoreId != null) {
+                          try {
+                            store = stores.firstWhere((s) => s.id == selectedStoreId);
+                          } catch (_) {}
+                        }
+                        if (store == null && storeQuery.isNotEmpty) {
+                          final q = storeQuery.toLowerCase();
+                          try {
+                            store = stores.firstWhere((s) =>
+                                s.name.toLowerCase().contains(q) ||
+                                s.storeCode.toLowerCase().contains(q));
+                          } catch (_) {}
+                        }
+                        if (store == null) {
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Vui lòng chọn cửa hàng hợp lệ'),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: AppColors.error,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                          return;
+                        }
+                        setDialogState(() => isLoading = true);
+                        try {
+                          await ApiService().createStoreManager({
+                            'storeId': store!.id,
+                            'employeeId': user.id,
+                            'storeRole': selectedRole,
+                          });
+                          if (ctx2.mounted) Navigator.pop(ctx2);
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text('Đã chuyển ${user.fullName} đến ${store.name}!'),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: AppColors.success,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                        } catch (e) {
+                          setDialogState(() => isLoading = false);
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text('Lỗi: $e'),
+                              behavior: SnackBarBehavior.floating,
+                              backgroundColor: AppColors.error,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                        }
+                      },
+                child: isLoading
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('Chuyển'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

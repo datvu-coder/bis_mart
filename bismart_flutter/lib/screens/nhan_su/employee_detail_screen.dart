@@ -120,7 +120,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Info section
+            // Thông tin công tác
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -133,7 +133,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Thông tin',
+                    'Thông tin công tác',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -144,12 +144,103 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                   const SizedBox(height: 16),
                   _infoRow(Icons.badge_outlined, 'Mã nhân viên', _employee.employeeCode),
                   _infoRow(Icons.work_outline_rounded, 'Vị trí', _employee.positionLabel),
+                  if (_employee.department != null && _employee.department!.isNotEmpty)
+                    _infoRow(Icons.business, 'Phòng ban', _employee.department!),
+                  if (_employee.status != null && _employee.status!.isNotEmpty)
+                    _infoRow(Icons.info_outline, 'Trạng thái', _employee.status!),
+                  if (_employee.storeCode != null && _employee.storeCode!.isNotEmpty)
+                    _infoRow(Icons.store_rounded, 'Cửa hàng', _employee.storeCode!),
+                  if (_employee.rankLevel != null && _employee.rankLevel!.isNotEmpty)
+                    _infoRow(Icons.emoji_events, 'Cấp độ', _employee.rankLevel!),
                   _infoRow(Icons.location_on_outlined, 'Nơi làm việc', _employee.workLocation),
-                  if (_employee.email != null)
-                    _infoRow(Icons.email_outlined, 'Email', _employee.email!),
+                  if (_employee.province != null && _employee.province!.isNotEmpty)
+                    _infoRow(Icons.map_outlined, 'Tỉnh/TP', _employee.province!),
+                  if (_employee.area != null && _employee.area!.isNotEmpty)
+                    _infoRow(Icons.place, 'Khu vực', _employee.area!),
                 ],
               ),
             ),
+
+            // Thông tin cá nhân
+            if (_employee.phone != null || _employee.email != null ||
+                _employee.dateOfBirth != null || _employee.cccd != null ||
+                _employee.address != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Thông tin cá nhân',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_employee.phone != null && _employee.phone!.isNotEmpty)
+                      _infoRow(Icons.phone_outlined, 'Số điện thoại', _employee.phone!),
+                    if (_employee.email != null && _employee.email!.isNotEmpty)
+                      _infoRow(Icons.email_outlined, 'Email', _employee.email!),
+                    if (_employee.dateOfBirth != null && _employee.dateOfBirth!.isNotEmpty)
+                      _infoRow(Icons.cake_outlined, 'Ngày sinh', _employee.dateOfBirth!),
+                    if (_employee.cccd != null && _employee.cccd!.isNotEmpty)
+                      _infoRow(Icons.credit_card_outlined, 'CCCD', _employee.cccd!),
+                    if (_employee.address != null && _employee.address!.isNotEmpty)
+                      _infoRow(Icons.home_outlined, 'Địa chỉ', _employee.address!),
+                  ],
+                ),
+              ),
+            ],
+
+            // Lịch sử công tác
+            if (_employee.createdDate != null || _employee.probationDate != null ||
+                _employee.officialDate != null || _employee.resignDate != null) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Lịch sử công tác',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    if (_employee.createdDate != null && _employee.createdDate!.isNotEmpty)
+                      _infoRow(Icons.calendar_today_outlined, 'Ngày vào làm', _employee.createdDate!),
+                    if (_employee.probationDate != null && _employee.probationDate!.isNotEmpty)
+                      _infoRow(Icons.event_note_outlined, 'Thử việc từ', _employee.probationDate!),
+                    if (_employee.officialDate != null && _employee.officialDate!.isNotEmpty)
+                      _infoRow(Icons.verified_outlined, 'Chính thức từ', _employee.officialDate!),
+                    if (_employee.resignDate != null && _employee.resignDate!.isNotEmpty)
+                      _infoRow(Icons.logout, 'Ngày nghỉ việc', _employee.resignDate!),
+                    if (_employee.resignReason != null && _employee.resignReason!.isNotEmpty)
+                      _infoRow(Icons.description_outlined, 'Lý do nghỉ', _employee.resignReason!),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
