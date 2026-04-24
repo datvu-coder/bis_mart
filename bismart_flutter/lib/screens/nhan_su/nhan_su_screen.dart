@@ -108,27 +108,32 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 color: AppColors.surfaceVariant,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: TabBar(
-                controller: _tabController,
-                isScrollable: true,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textGrey,
-                indicator: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                dividerColor: Colors.transparent,
-                labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-                labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                tabs: const [
-                  Tab(text: 'Chấm công'),
-                  Tab(text: 'Ca làm'),
-                  Tab(text: 'Xếp hạng'),
-                  Tab(text: 'Lịch'),
-                ],
-              ),
+              child: isDesktop
+                  ? _buildDesktopTabSelector(
+                      labels: const ['Chấm công', 'Ca làm', 'Xếp hạng', 'Lịch'],
+                      flexes: const [2, 2, 1, 1],
+                    )
+                  : TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: AppColors.textGrey,
+                      indicator: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      dividerColor: Colors.transparent,
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      tabs: const [
+                        Tab(text: 'Chấm công'),
+                        Tab(text: 'Ca làm'),
+                        Tab(text: 'Xếp hạng'),
+                        Tab(text: 'Lịch'),
+                      ],
+                    ),
             ),
             Expanded(
               child: TabBarView(
@@ -154,6 +159,50 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               ),
             ),
           ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDesktopTabSelector({
+    required List<String> labels,
+    required List<int> flexes,
+  }) {
+    return AnimatedBuilder(
+      animation: _tabController,
+      builder: (context, _) {
+        return Row(
+          children: List.generate(labels.length, (index) {
+            final selected = _tabController.index == index;
+            return Expanded(
+              flex: flexes[index],
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => _tabController.animateTo(index),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: selected ? AppColors.white : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(
+                      labels[index],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                        color: selected ? AppColors.primary : AppColors.textGrey,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
         );
       },
     );
