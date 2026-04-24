@@ -644,6 +644,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               final uploadInput = html.FileUploadInputElement()
                 ..accept = videoOnly ? 'video/*' : 'image/*,video/*'
                 ..multiple = true;
+              html.document.body!.append(uploadInput);
               uploadInput.onChange.listen((event) {
                 final files = uploadInput.files;
                 if (files == null) return;
@@ -992,7 +993,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           );
         },
       ),
-    );
+    ).then((_) => textController.dispose());
   }
 
   Widget _buildImagePreviews(
@@ -1335,7 +1336,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           );
         },
       ),
-    );
+    ).then((_) => commentController.dispose());
   }
 
   String _relativeTime(DateTime dt) {
@@ -1445,7 +1446,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           ],
         ),
       ),
-    );
+    ).then((_) => controller.dispose());
   }
 
   void _confirmDeletePost(TrainingProvider provider, CommunityPost post) {

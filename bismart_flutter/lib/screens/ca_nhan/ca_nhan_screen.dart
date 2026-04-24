@@ -464,7 +464,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                         setDialogState(() => isLoading = true);
                         try {
                           await ApiService().createStoreManager({
-                            'storeId': store!.id,
+                            'storeId': store.id,
                             'employeeId': user.id,
                             'storeRole': selectedRole,
                           });

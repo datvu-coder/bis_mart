@@ -78,7 +78,7 @@ class SalesProvider extends ChangeNotifier {
     }
   }
 
-  void deleteReport(String id) async {
+  Future<void> deleteReport(String id) async {
     try { await _api.deleteReport(int.parse(id)); } catch (_) {}
     _reports.removeWhere((r) => r.id == id);
     notifyListeners();

@@ -65,9 +65,9 @@ class BismartApp extends StatelessWidget {
         break;
       case AppRoutes.productList:
         page = const ProductListScreen();
-              case AppRoutes.phanQuyen:
-                page = const PhanQuyenScreen();
-                break;
+        break;
+      case AppRoutes.phanQuyen:
+        page = const PhanQuyenScreen();
         break;
       default:
         page = const MainShell(initialIndex: 0);

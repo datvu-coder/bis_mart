@@ -6,7 +6,6 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../providers/dashboard_provider.dart';
-import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/filter_dropdown.dart';
 import '../../widgets/charts/revenue_bar_chart.dart';
 import '../../widgets/charts/product_h_chart.dart';

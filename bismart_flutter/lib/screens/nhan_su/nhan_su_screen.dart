@@ -9,12 +9,12 @@ import '../../providers/employee_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/attendance.dart';
+import '../../models/employee.dart';
 import '../../models/work_schedule.dart';
 import '../../models/work_shift.dart';
 import '../../providers/permission_provider.dart';
 import '../../services/location_service.dart';
 import '../../widgets/common/data_panel.dart';
-import '../../widgets/common/primary_button.dart';
 import '../../widgets/cards/rank_list_tile.dart';
 
 class NhanSuScreen extends StatefulWidget {
@@ -755,10 +755,11 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         ...provider.attendances.map((att) {
-          final employee = provider.employees.firstWhere(
-            (e) => e.id == att.employeeId,
-            orElse: () => provider.employees.first,
-          );
+          Employee? employee;
+          try {
+            employee = provider.employees.firstWhere((e) => e.id == att.employeeId);
+          } catch (_) {}
+          if (employee == null) return const SizedBox.shrink();
           final hasCheckOut = att.checkOutTime != null;
           String? workingTime;
           if (hasCheckOut && att.checkInTime != null) {
@@ -1204,20 +1205,22 @@ class _NhanSuScreenState extends State<NhanSuScreen>
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Check-out nhân viên'),
-        content: SizedBox(
-          width: 400,
-          height: 300,
-          child: ListView.builder(
-            itemCount: checkedIn.length,
-            itemBuilder: (context, index) {
-              final att = checkedIn[index];
-              final emp = provider.employees.firstWhere(
-                (e) => e.id == att.employeeId,
-                orElse: () => provider.employees.first,
-              );
-              return ListTile(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Check-out nhân viên'),
+          content: SizedBox(
+            width: 400,
+            height: 300,
+            child: ListView.builder(
+              itemCount: checkedIn.length,
+              itemBuilder: (context, index) {
+                final att = checkedIn[index];
+                Employee? emp;
+                try {
+                  emp = provider.employees.firstWhere((e) => e.id == att.employeeId);
+                } catch (_) {}
+                if (emp == null) return const SizedBox.shrink();
+                return ListTile(
                 leading: CircleAvatar(
                   backgroundColor: AppColors.successLight,
                   child: Text(
@@ -1232,10 +1235,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   onPressed: () async {
                     await provider.checkOut(att.employeeId);
                     if (!ctx.mounted) return;
-                    Navigator.pop(ctx);
+                    setDialogState(() => checkedIn.removeAt(index));
                     ScaffoldMessenger.of(this.context).showSnackBar(
                       SnackBar(
-                        content: Text('Đã check-out cho ${emp.fullName}!'),
+                        content: Text('Đã check-out cho ${emp!.fullName}!'),
                         behavior: SnackBarBehavior.floating,
                         backgroundColor: AppColors.success,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -1253,6 +1256,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
             child: const Text('Đóng'),
           ),
         ],
+      ),
       ),
     );
   }

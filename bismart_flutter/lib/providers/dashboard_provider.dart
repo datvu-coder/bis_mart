@@ -24,6 +24,7 @@ class DashboardProvider extends ChangeNotifier {
 
   Future<void> loadDashboard() async {
     _isLoading = true;
+    _error = null;
     notifyListeners();
 
     try {

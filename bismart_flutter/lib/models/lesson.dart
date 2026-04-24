@@ -19,7 +19,7 @@ class Lesson {
     return Lesson(
       id: json['id'] as String,
       title: json['title'] as String,
-      thumbnailUrl: json['thumbnailUrl'] as String,
+      thumbnailUrl: (json['thumbnailUrl'] as String?) ?? '',
       targetRole: json['targetRole'] as String,
       isRestricted: json['isRestricted'] as bool? ?? false,
       videoUrl: json['videoUrl'] as String?,

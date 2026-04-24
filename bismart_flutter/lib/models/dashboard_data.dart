@@ -21,7 +21,7 @@ class DashboardData {
 
   factory DashboardData.fromJson(Map<String, dynamic> json) {
     return DashboardData(
-      date: DateTime.parse(json['date'] as String),
+      date: json['date'] != null ? DateTime.parse(json['date'] as String) : DateTime.now(),
       announcement: json['announcement'] as String,
       featuredPrograms: (json['featuredPrograms'] as List<dynamic>?)
               ?.map((p) => p as String)
@@ -72,7 +72,7 @@ class DailyRevenue {
 
   factory DailyRevenue.fromJson(Map<String, dynamic> json) {
     return DailyRevenue(
-      date: DateTime.parse(json['date'] as String),
+      date: json['date'] != null ? DateTime.parse(json['date'] as String) : DateTime.now(),
       revenue: (json['revenue'] as num?)?.toDouble() ?? 0,
       target: (json['target'] as num?)?.toDouble() ?? 0,
     );

@@ -84,7 +84,7 @@ def get_current_user():
         return None
     try:
         return jwt.decode(auth[7:], JWT_SECRET, algorithms=["HS256"])
-    except:
+    except Exception:
         return None
 
 def login_required(f):
@@ -1422,14 +1422,8 @@ def api_create_post():
     data = request.get_json(silent=True) or {}
     db = get_db()
     _ensure_posts_columns(db)
-    author_id = None
+    author_id = g.current_user.get("user_id") if g.current_user else None
     try:
-        with db.cursor() as cur:
-            # resolve author_id from logged-in user
-            cur.execute("SELECT id FROM users WHERE id = %s", (g.user_id,))
-            user_row = cur.fetchone()
-            if user_row:
-                author_id = user_row["id"]
         with db.cursor() as cur:
             cur.execute(
                 "INSERT INTO community_posts (author_id, author_name, content, visibility, store_code) "
@@ -1484,7 +1478,9 @@ def api_delete_post(post_id: int):
 @login_required
 def api_toggle_like(post_id: int):
     db = get_db()
-    user_id = g.user_id
+    user_id = g.current_user.get("user_id") if g.current_user else None
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
     with db.cursor() as cur:
         cur.execute(
             "SELECT id FROM post_likes WHERE post_id = %s AND user_id = %s",

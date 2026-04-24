@@ -97,11 +97,11 @@ class TrainingProvider extends ChangeNotifier {
     if (index != -1) {
       _posts[index].commentCount++;
       notifyListeners();
-      try { await _api.addComment(int.parse(postId)); } catch (_) {}
+      try { await _api.addComment(int.parse(postId), text: '', authorName: 'Bạn'); } catch (_) {}
     }
   }
 
-  void addCommentText(String postId, String text, {String authorName = 'Bạn'}) {
+  void addCommentText(String postId, String text, {String authorName = 'Bạn'}) async {
     final index = _posts.indexWhere((p) => p.id == postId);
     if (index != -1) {
       _posts[index].comments.add(
@@ -114,7 +114,7 @@ class TrainingProvider extends ChangeNotifier {
       );
       _posts[index].commentCount++;
       notifyListeners();
-      try { _api.addComment(int.parse(postId), text: text, authorName: authorName); } catch (_) {}
+      try { await _api.addComment(int.parse(postId), text: text, authorName: authorName); } catch (_) {}
     }
   }
 

@@ -83,7 +83,7 @@ class StoreProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateStore(Store updated) async {
+  Future<void> updateStore(Store updated) async {
     try { await _api.updateStore(int.parse(updated.id), updated.toJson()); } catch (_) {}
     final index = _stores.indexWhere((s) => s.id == updated.id);
     if (index != -1) {
@@ -92,7 +92,7 @@ class StoreProvider extends ChangeNotifier {
     }
   }
 
-  void deleteStore(String id) async {
+  Future<void> deleteStore(String id) async {
     try { await _api.deleteStore(int.parse(id)); } catch (_) {}
     _stores.removeWhere((s) => s.id == id);
     notifyListeners();

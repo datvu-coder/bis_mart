@@ -106,7 +106,8 @@ class Employee {
     String? workLocation, int? score, int? rank, String? email, String? phone,
     String? dateOfBirth, String? cccd, String? address, String? status,
     String? department, String? province, String? area, String? storeCode,
-    String? rankLevel,
+    String? rankLevel, String? createdDate, String? probationDate,
+    String? officialDate, String? resignDate, String? resignReason, String? avatarUrl,
   }) {
     return Employee(
       id: id ?? this.id,
@@ -125,12 +126,12 @@ class Employee {
       department: department ?? this.department,
       province: province ?? this.province,
       area: area ?? this.area,
-      createdDate: createdDate,
-      probationDate: probationDate,
-      officialDate: officialDate,
-      resignDate: resignDate,
-      resignReason: resignReason,
-      avatarUrl: avatarUrl,
+      createdDate: createdDate ?? this.createdDate,
+      probationDate: probationDate ?? this.probationDate,
+      officialDate: officialDate ?? this.officialDate,
+      resignDate: resignDate ?? this.resignDate,
+      resignReason: resignReason ?? this.resignReason,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       storeCode: storeCode ?? this.storeCode,
       rankLevel: rankLevel ?? this.rankLevel,
     );
