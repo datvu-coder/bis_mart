@@ -1374,6 +1374,172 @@ def api_checkin():
     
     return jsonify({"ok": True, "time": time_str})
 
+# ---- COMMUNITY POSTS ----
+
+def _ensure_posts_columns(db):
+    """Add visibility and store_code columns if they don't exist yet."""
+    with db.cursor() as cur:
+        cur.execute("""
+            ALTER TABLE community_posts
+            ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public',
+            ADD COLUMN IF NOT EXISTS store_code TEXT
+        """)
+    db.commit()
+
+def _post_to_api_json(row, comments=None):
+    return {
+        "id": str(row["id"]),
+        "authorId": str(row["author_id"]) if row.get("author_id") else None,
+        "authorName": row.get("author_name") or "Ẩn danh",
+        "content": row.get("content"),
+        "imageUrls": [row["image_url"]] if row.get("image_url") else [],
+        "visibility": row.get("visibility") or "public",
+        "storeCode": row.get("store_code"),
+        "likeCount": int(row.get("like_count") or 0),
+        "commentCount": int(row.get("comment_count") or 0),
+        "isLiked": False,
+        "createdAt": row.get("created_at") or "",
+        "comments": comments or [],
+    }
+
+@app.get("/api/posts")
+@login_required
+def api_get_posts():
+    db = get_db()
+    _ensure_posts_columns(db)
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, author_id, author_name, content, image_url, visibility, store_code, "
+            "like_count, comment_count, created_at "
+            "FROM community_posts ORDER BY id DESC LIMIT 100"
+        )
+        rows = cur.fetchall()
+    return jsonify([_post_to_api_json(r) for r in rows])
+
+@app.post("/api/posts")
+@login_required
+def api_create_post():
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    _ensure_posts_columns(db)
+    author_id = None
+    try:
+        with db.cursor() as cur:
+            # resolve author_id from logged-in user
+            cur.execute("SELECT id FROM users WHERE id = %s", (g.user_id,))
+            user_row = cur.fetchone()
+            if user_row:
+                author_id = user_row["id"]
+        with db.cursor() as cur:
+            cur.execute(
+                "INSERT INTO community_posts (author_id, author_name, content, visibility, store_code) "
+                "VALUES (%s, %s, %s, %s, %s) "
+                "RETURNING id, author_id, author_name, content, image_url, visibility, store_code, "
+                "like_count, comment_count, created_at",
+                (
+                    author_id,
+                    data.get("authorName", "Ẩn danh"),
+                    data.get("content", ""),
+                    data.get("visibility", "public"),
+                    data.get("storeCode"),
+                ),
+            )
+            row = cur.fetchone()
+        db.commit()
+        return jsonify(_post_to_api_json(row)), 201
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 400
+
+@app.put("/api/posts/<int:post_id>")
+@login_required
+def api_update_post(post_id: int):
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    _ensure_posts_columns(db)
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE community_posts SET content = %s, visibility = %s "
+            "WHERE id = %s "
+            "RETURNING id, author_id, author_name, content, image_url, visibility, store_code, "
+            "like_count, comment_count, created_at",
+            (data.get("content"), data.get("visibility", "public"), post_id),
+        )
+        row = cur.fetchone()
+    db.commit()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(_post_to_api_json(row))
+
+@app.delete("/api/posts/<int:post_id>")
+@login_required
+def api_delete_post(post_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM community_posts WHERE id = %s", (post_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+@app.post("/api/posts/<int:post_id>/like")
+@login_required
+def api_toggle_like(post_id: int):
+    db = get_db()
+    user_id = g.user_id
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM post_likes WHERE post_id = %s AND user_id = %s",
+            (post_id, user_id),
+        )
+        existing = cur.fetchone()
+        if existing:
+            cur.execute("DELETE FROM post_likes WHERE post_id = %s AND user_id = %s", (post_id, user_id))
+            cur.execute("UPDATE community_posts SET like_count = GREATEST(like_count - 1, 0) WHERE id = %s", (post_id,))
+            liked = False
+        else:
+            cur.execute("INSERT INTO post_likes (post_id, user_id) VALUES (%s, %s)", (post_id, user_id))
+            cur.execute("UPDATE community_posts SET like_count = like_count + 1 WHERE id = %s", (post_id,))
+            liked = True
+        cur.execute("SELECT like_count FROM community_posts WHERE id = %s", (post_id,))
+        count_row = cur.fetchone()
+    db.commit()
+    return jsonify({"liked": liked, "likeCount": int(count_row["like_count"]) if count_row else 0})
+
+@app.get("/api/posts/<int:post_id>/comments")
+@login_required
+def api_get_comments(post_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, author_name, content, created_at FROM comments WHERE post_id = %s ORDER BY id ASC",
+            (post_id,),
+        )
+        rows = cur.fetchall()
+    return jsonify([
+        {"id": str(r["id"]), "authorName": r.get("author_name") or "Ẩn danh",
+         "text": r.get("content") or "", "createdAt": r.get("created_at") or ""}
+        for r in rows
+    ])
+
+@app.post("/api/posts/<int:post_id>/comment")
+@login_required
+def api_add_comment(post_id: int):
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO comments (post_id, author_name, content) VALUES (%s, %s, %s) "
+            "RETURNING id, author_name, content, created_at",
+            (post_id, data.get("authorName", "Ẩn danh"), data.get("text", "")),
+        )
+        row = cur.fetchone()
+        cur.execute("UPDATE community_posts SET comment_count = comment_count + 1 WHERE id = %s", (post_id,))
+    db.commit()
+    return jsonify({
+        "id": str(row["id"]), "authorName": row.get("author_name") or "Ẩn danh",
+        "text": row.get("content") or "", "createdAt": row.get("created_at") or ""
+    }), 201
+
+
 @app.get("/healthz")
 def healthz():
     db = get_db()

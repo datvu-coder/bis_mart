@@ -114,7 +114,7 @@ class TrainingProvider extends ChangeNotifier {
       );
       _posts[index].commentCount++;
       notifyListeners();
-      try { _api.addComment(int.parse(postId)); } catch (_) {}
+      try { _api.addComment(int.parse(postId), text: text, authorName: authorName); } catch (_) {}
     }
   }
 

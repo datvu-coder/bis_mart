@@ -248,8 +248,8 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> addComment(int postId) async {
-    final response = await _dio.post('/api/posts/$postId/comment');
+  Future<Map<String, dynamic>> addComment(int postId, {String text = '', String authorName = 'Bạn'}) async {
+    final response = await _dio.post('/api/posts/$postId/comment', data: {'text': text, 'authorName': authorName});
     return response.data as Map<String, dynamic>;
   }
 
