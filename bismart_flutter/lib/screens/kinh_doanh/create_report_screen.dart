@@ -9,6 +9,7 @@ import '../../models/sales_report.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sales_provider.dart';
+import '../../providers/store_provider.dart';
 
 class CreateReportScreen extends StatefulWidget {
   const CreateReportScreen({super.key});
@@ -46,6 +47,11 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     if (!productProvider.isLoading && productProvider.products.isEmpty) {
       productProvider.loadProducts();
     }
+
+    final storeProvider = context.read<StoreProvider>();
+    if (!storeProvider.isLoading && storeProvider.stores.isEmpty) {
+      storeProvider.loadStores();
+    }
   }
 
   @override
@@ -58,6 +64,13 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   @override
   Widget build(BuildContext context) {
     final user = context.read<AuthProvider>().currentUser;
+    final stores = context.watch<StoreProvider>().stores;
+    final currentStore = (user?.storeCode != null && stores.isNotEmpty)
+        ? stores.cast<dynamic>().firstWhere(
+            (s) => s.storeCode.toString().toUpperCase() == user!.storeCode!.toUpperCase(),
+            orElse: () => null,
+          )
+        : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -115,6 +128,34 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                       const Icon(Icons.person_rounded, size: 18, color: AppColors.textGrey),
                       const SizedBox(width: 10),
                       Text(user?.fullName ?? 'N/A', style: AppTextStyles.bodyText),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // Store info (fixed by employee assignment)
+                _buildLabel('Cửa hàng'),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.store_rounded, size: 18, color: AppColors.textGrey),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          currentStore != null
+                              ? '${currentStore.name} (${currentStore.storeCode})'
+                              : ((user?.storeCode != null && user!.storeCode!.isNotEmpty)
+                                  ? 'Mã cửa hàng ${user.storeCode}'
+                                  : 'Chưa gán cửa hàng'),
+                          style: AppTextStyles.bodyText,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -504,6 +545,14 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
       setState(() => _isSubmitting = true);
       final user = context.read<AuthProvider>().currentUser;
+      final stores = context.read<StoreProvider>().stores;
+      final currentStore = (user?.storeCode != null && stores.isNotEmpty)
+          ? stores.cast<dynamic>().firstWhere(
+              (s) => s.storeCode.toString().toUpperCase() == user!.storeCode!.toUpperCase(),
+              orElse: () => null,
+            )
+          : null;
+
       final report = SalesReport(
         id: _editingReport?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
         date: _selectedDate,
@@ -512,6 +561,9 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         saleOut: double.tryParse(_saleOutController.text) ?? 0,
         products: _products,
         revenue: double.tryParse(_revenueController.text) ?? 0,
+        storeCode: user?.storeCode,
+        storeName: currentStore?.name ?? user?.workLocation,
+        employeeCode: user?.employeeCode,
       );
 
       final bool success;

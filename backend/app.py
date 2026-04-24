@@ -217,6 +217,34 @@ def _employee_to_api_json(row: dict[str, Any], rank: int = 0) -> dict[str, Any]:
     }
 
 
+def _normalize_store_code(value: Any) -> str | None:
+    if value is None:
+        return None
+    code = str(value).strip().upper()
+    return code or None
+
+
+def _get_store_info_by_code(db, store_code: str | None) -> tuple[str | None, str | None]:
+    code = _normalize_store_code(store_code)
+    if not code:
+        return None, None
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT store_code, name FROM stores WHERE UPPER(store_code) = UPPER(%s) LIMIT 1",
+            (code,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return code, None
+    return (row.get("store_code") or code), (row.get("name") or None)
+
+
+def _derive_work_location(store_name: str | None, fallback: Any) -> str:
+    if store_name and str(store_name).strip():
+        return str(store_name).strip()
+    return str(fallback or "").strip()
+
+
 def _permission_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": int(row.get("id") or 0),
@@ -568,18 +596,29 @@ def api_create_store_manager():
     db = get_db()
     try:
         with db.cursor() as cur:
+            store_id = int(data.get("storeId", 0))
+            employee_id = int(data.get("employeeId", 0))
             cur.execute(
                 "INSERT INTO store_managers (store_id, employee_id, store_role) "
                 "VALUES (%s, %s, %s) "
                 "ON CONFLICT (store_id, employee_id) DO UPDATE SET store_role = EXCLUDED.store_role "
                 "RETURNING id, store_id, employee_id, store_role",
                 (
-                    int(data.get("storeId", 0)),
-                    int(data.get("employeeId", 0)),
+                    store_id,
+                    employee_id,
                     (data.get("storeRole") or "PG").upper(),
                 ),
             )
             row = cur.fetchone()
+
+            # Đồng bộ hồ sơ nhân viên: store_code là định danh chính, work_location là tên cửa hàng
+            cur.execute("SELECT store_code, name FROM stores WHERE id = %s LIMIT 1", (store_id,))
+            store_row = cur.fetchone()
+            if store_row:
+                cur.execute(
+                    "UPDATE employees SET store_code = %s, work_location = %s WHERE id = %s",
+                    (store_row.get("store_code"), store_row.get("name") or "", employee_id),
+                )
         db.commit()
         return jsonify({
             "id": int(row["id"]),
@@ -716,18 +755,21 @@ def api_get_employees():
 def api_create_employee():
     data = request.get_json(silent=True) or {}
     db = get_db()
+    store_code, store_name = _get_store_info_by_code(db, data.get("storeCode"))
+    work_location = _derive_work_location(store_name, data.get("workLocation"))
     with db.cursor() as cur:
         cur.execute(
-            "INSERT INTO employees (full_name, employee_code, position, work_location, email, score) "
-            "VALUES (%s, %s, %s, %s, %s, %s) "
+            "INSERT INTO employees (full_name, employee_code, position, work_location, email, score, store_code) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) "
             "RETURNING id, full_name, employee_code, position, work_location, score, email, phone, date_of_birth, cccd, address, status, department, province, area, created_date, probation_date, official_date, resign_date, resign_reason, avatar_url, store_code, rank_level",
             (
                 data.get("fullName", ""),
                 data.get("employeeCode", ""),
                 data.get("position", "PG"),
-                data.get("workLocation", ""),
+                work_location,
                 data.get("email"),
                 data.get("score", 0),
+                store_code,
             ),
         )
         row = cur.fetchone()
@@ -740,33 +782,49 @@ def api_create_employee():
 def api_update_employee(employee_id: int):
     data = request.get_json(silent=True) or {}
     db = get_db()
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, full_name, employee_code, position, work_location, score, email, phone, address, status, department, province, area, store_code, rank_level "
+            "FROM employees WHERE id = %s LIMIT 1",
+            (employee_id,),
+        )
+        existing = cur.fetchone()
+
+    if not existing:
+        return jsonify({"error": "Employee not found"}), 404
+
+    store_code_input = data["storeCode"] if "storeCode" in data else existing.get("store_code")
+    store_code, store_name = _get_store_info_by_code(db, store_code_input)
+    work_location_input = data["workLocation"] if "workLocation" in data else existing.get("work_location")
+    work_location = _derive_work_location(store_name, work_location_input)
+
     with db.cursor() as cur:
         cur.execute(
             "UPDATE employees SET full_name = %s, employee_code = %s, position = %s, work_location = %s, score = %s, email = %s, phone = %s, address = %s, status = %s, department = %s, province = %s, area = %s, store_code = %s, rank_level = %s "
             "WHERE id = %s "
             "RETURNING id, full_name, employee_code, position, work_location, score, email, phone, date_of_birth, cccd, address, status, department, province, area, created_date, probation_date, official_date, resign_date, resign_reason, avatar_url, store_code, rank_level",
             (
-                data.get("fullName", ""),
-                data.get("employeeCode", ""),
-                data.get("position", "PG"),
-                data.get("workLocation", ""),
-                data.get("score", 0),
-                data.get("email"),
-                data.get("phone"),
-                data.get("address"),
-                data.get("status"),
-                data.get("department"),
-                data.get("province"),
-                data.get("area"),
-                data.get("storeCode"),
-                data.get("rankLevel"),
+                data.get("fullName", existing.get("full_name") or ""),
+                data.get("employeeCode", existing.get("employee_code") or ""),
+                data.get("position", existing.get("position") or "PG"),
+                work_location,
+                data.get("score", existing.get("score") or 0),
+                data.get("email", existing.get("email")),
+                data.get("phone", existing.get("phone")),
+                data.get("address", existing.get("address")),
+                data.get("status", existing.get("status")),
+                data.get("department", existing.get("department")),
+                data.get("province", existing.get("province")),
+                data.get("area", existing.get("area")),
+                store_code,
+                data.get("rankLevel", existing.get("rank_level")),
                 employee_id,
             ),
         )
         row = cur.fetchone()
+
     db.commit()
-    if not row:
-        return jsonify({"error": "Employee not found"}), 404
     return jsonify(_employee_to_api_json(row, 0))
 
 
@@ -1156,7 +1214,33 @@ def api_create_report():
     db = get_db()
     user_id = g.current_user.get("user_id")
     report_date = _normalize_report_date(data.get("date"))
-    
+
+    # Ưu tiên store_code từ payload; nếu thiếu thì lấy theo nhân viên đăng nhập
+    store_code = _normalize_store_code(data.get("storeCode"))
+    store_name = (data.get("storeName") or "").strip()
+    employee_code = (data.get("employeeCode") or "").strip()
+    pg_name = (data.get("pgName") or "").strip()
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT e.employee_code, e.full_name, e.store_code FROM users u "
+            "LEFT JOIN employees e ON e.id = u.employee_id WHERE u.id = %s LIMIT 1",
+            (user_id,),
+        )
+        me = cur.fetchone()
+
+    if not store_code and me:
+        store_code = _normalize_store_code(me.get("store_code"))
+    if not employee_code and me:
+        employee_code = (me.get("employee_code") or "").strip()
+    if not pg_name and me:
+        pg_name = (me.get("full_name") or "").strip()
+
+    resolved_code, resolved_store_name = _get_store_info_by_code(db, store_code)
+    store_code = resolved_code
+    if not store_name:
+        store_name = resolved_store_name or ""
+
     # ATOMIC INSERT - gets report_id immediately, no race condition
     with db.cursor() as cur:
         cur.execute(
@@ -1166,15 +1250,15 @@ def api_create_report():
             "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
             (
                 report_date,
-                data.get("pgName", ""),
-                data.get("storeName", ""),
+                pg_name,
+                store_name,
                 data.get("nu", 0),
                 data.get("saleOut", 0),
-                data.get("storeCode", ""),
+                store_code,
                 data.get("reportMonth"),
                 data.get("revenue", 0),
                 data.get("points", 0),
-                data.get("employeeCode", ""),
+                employee_code,
                 user_id,
             ),
         )
