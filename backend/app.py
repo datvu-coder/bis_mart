@@ -1045,7 +1045,6 @@ def api_get_stores():
         managers_by_store: dict[int, list[dict[str, Any]]] = {sid: [] for sid in store_ids}
         if store_ids:
             cur.execute(
-                "SELECT sm.store_id, e.id AS employee_id, e.full_name, e.employee_code, e.email "
                 "SELECT sm.store_id, sm.store_role, e.id AS employee_id, e.full_name, e.employee_code, e.email "
                 "FROM store_managers sm JOIN employees e ON e.id = sm.employee_id "
                 "WHERE sm.store_id = ANY(%s::int[]) ORDER BY sm.id ASC",
