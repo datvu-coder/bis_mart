@@ -141,35 +141,52 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
     return RefreshIndicator(
       onRefresh: _bootstrap,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+        padding: EdgeInsets.zero,
         children: [
-          _buildHeader(progress, completed, total),
-          const SizedBox(height: 12),
-          if (_isAdmin)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: OutlinedButton.icon(
-                onPressed: _addPart,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Thêm phần mới'),
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 900),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                              _buildHeader(progress, completed, total),
+                    const SizedBox(height: 12),
+                    if (_isAdmin)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: _addPart,
+                            icon: const Icon(Icons.add_rounded, size: 18),
+                            label: const Text('Thêm phần mới'),
+                          ),
+                        ),
+                      ),
+                    for (int i = 0; i < lesson.parts.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _buildPartTile(lesson.parts[i], i),
+                      ),
+                    if (lesson.parts.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 32),
+                        child: Column(children: [
+                          Icon(Icons.video_library_outlined,
+                              size: 48, color: AppColors.textHint),
+                          const SizedBox(height: 8),
+                          Text('Bài giảng chưa có phần nào.',
+                              style: AppTextStyles.bodyText),
+                        ]),
+                      ),
+                  ],
+                ),
               ),
             ),
-          for (int i = 0; i < lesson.parts.length; i++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildPartTile(lesson.parts[i], i),
-            ),
-          if (lesson.parts.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Column(children: [
-                Icon(Icons.video_library_outlined,
-                    size: 48, color: AppColors.textHint),
-                const SizedBox(height: 8),
-                Text('Bài giảng chưa có phần nào.',
-                    style: AppTextStyles.bodyText),
-              ]),
-            ),
+          ),
         ],
       ),
     );
@@ -724,11 +741,15 @@ class _PartContentState extends State<_PartContent> {
   }
 
   Widget _buildPlayer() {
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: SelectionContainer.disabled(
+    final maxH = MediaQuery.of(context).size.height * 0.6;
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxH),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SelectionContainer.disabled(
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -833,6 +854,8 @@ class _PartContentState extends State<_PartContent> {
             ],
           ),
         ),
+      ),
+    ),
       ),
     );
   }
