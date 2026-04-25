@@ -268,6 +268,38 @@ class ApiService {
     return response.data as List<dynamic>;
   }
 
+  Future<Map<String, dynamic>> getLessonDetail(String lessonId) async {
+    final response = await _dio.get('/api/lessons/$lessonId');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createLesson(Map<String, dynamic> data) async {
+    final response = await _dio.post('/api/lessons', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteLesson(String lessonId) async {
+    await _dio.delete('/api/lessons/$lessonId');
+  }
+
+  Future<Map<String, dynamic>> submitQuiz({
+    required String lessonId,
+    required Map<String, String> answers,
+  }) async {
+    final response = await _dio.post('/api/quiz/submit',
+        data: {'lessonId': lessonId, 'answers': answers});
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<dynamic>> getQuizResults({String? lessonId, String scope = 'self'}) async {
+    final response = await _dio.get('/api/quiz/results',
+        queryParameters: {
+          if (lessonId != null) 'lessonId': lessonId,
+          'scope': scope,
+        });
+    return response.data as List<dynamic>;
+  }
+
   // ---- EVENTS ----
   Future<Map<String, dynamic>> getEvents() async {
     final response = await _dio.get('/api/events');
@@ -319,14 +351,6 @@ class ApiService {
   // ---- QUIZ ----
   Future<List<dynamic>> getQuizQuestions(String contentId) async {
     final response = await _dio.get('/api/quiz/$contentId');
-    return response.data as List<dynamic>;
-  }
-
-  Future<List<dynamic>> getQuizResults({String? contentId, String? employeeCode}) async {
-    final params = <String, dynamic>{};
-    if (contentId != null) params['contentId'] = contentId;
-    if (employeeCode != null) params['employeeCode'] = employeeCode;
-    final response = await _dio.get('/api/quiz-results', queryParameters: params);
     return response.data as List<dynamic>;
   }
 

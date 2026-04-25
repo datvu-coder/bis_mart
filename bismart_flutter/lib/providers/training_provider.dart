@@ -73,22 +73,10 @@ class TrainingProvider extends ChangeNotifier {
       'authorId': authorId,
       'visibility': visibility,
       'storeCode': storeCode,
+      'imageUrls': images,
     });
     final post = CommunityPost.fromJson(result);
-    if (images.isNotEmpty && post.imageUrls.isEmpty) {
-      _posts.insert(0, CommunityPost(
-        id: post.id,
-        authorId: post.authorId,
-        authorName: post.authorName,
-        createdAt: post.createdAt,
-        content: post.content,
-        imageUrls: images,
-        visibility: post.visibility,
-        storeCode: post.storeCode,
-      ));
-    } else {
-      _posts.insert(0, post);
-    }
+    _posts.insert(0, post);
     notifyListeners();
   }
 
@@ -155,6 +143,21 @@ class TrainingProvider extends ChangeNotifier {
       'content': content,
       'visibility': visibility,
     });
+  }
+
+  Future<void> createLesson(Map<String, dynamic> data) async {
+    await _api.createLesson(data);
+    final lessonData = await _api.getLessons();
+    _lessons = lessonData
+        .map((l) => Lesson.fromJson(l as Map<String, dynamic>))
+        .toList();
+    notifyListeners();
+  }
+
+  Future<void> deleteLesson(String lessonId) async {
+    await _api.deleteLesson(lessonId);
+    _lessons.removeWhere((l) => l.id == lessonId);
+    notifyListeners();
   }
 
   Future<void> addEvent(DateTime date, String title) async {

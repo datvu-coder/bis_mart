@@ -29,6 +29,9 @@ dependencies:
   intl: ^0.19.0
   url_launcher: ^6.2.5
 
+  # Video player (anti-piracy lesson playback)
+  video_player: ^2.9.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

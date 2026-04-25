@@ -94,8 +94,9 @@ class LmsProvider extends ChangeNotifier {
 
   Future<void> loadQuizResults({String? contentId, String? employeeCode}) async {
     try {
+      final lessonId = (contentId ?? '').replaceFirst('lesson_', '');
       final data = await _api.getQuizResults(
-          contentId: contentId, employeeCode: employeeCode);
+          lessonId: lessonId.isEmpty ? null : lessonId);
       _quizResults = data
           .map((r) => QuizResult.fromJson(r as Map<String, dynamic>))
           .toList();

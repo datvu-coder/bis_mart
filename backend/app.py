@@ -1377,14 +1377,27 @@ def api_checkin():
 # ---- COMMUNITY POSTS ----
 
 def _ensure_posts_columns(db):
-    """Add visibility and store_code columns if they don't exist yet."""
+    """Add visibility, store_code, images_json columns if not exist."""
     with db.cursor() as cur:
         cur.execute("""
             ALTER TABLE community_posts
             ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public',
-            ADD COLUMN IF NOT EXISTS store_code TEXT
+            ADD COLUMN IF NOT EXISTS store_code TEXT,
+            ADD COLUMN IF NOT EXISTS images_json TEXT
         """)
     db.commit()
+
+def _post_image_urls(row):
+    raw = row.get("images_json") if row else None
+    if raw:
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return [str(x) for x in data if x]
+        except Exception:
+            pass
+    legacy = row.get("image_url") if row else None
+    return [legacy] if legacy else []
 
 def _post_to_api_json(row, comments=None):
     return {
@@ -1392,7 +1405,7 @@ def _post_to_api_json(row, comments=None):
         "authorId": str(row["author_id"]) if row.get("author_id") else None,
         "authorName": row.get("author_name") or "Ẩn danh",
         "content": row.get("content"),
-        "imageUrls": [row["image_url"]] if row.get("image_url") else [],
+        "imageUrls": _post_image_urls(row),
         "visibility": row.get("visibility") or "public",
         "storeCode": row.get("store_code"),
         "likeCount": int(row.get("like_count") or 0),
@@ -1409,7 +1422,7 @@ def api_get_posts():
     _ensure_posts_columns(db)
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, author_id, author_name, content, image_url, visibility, store_code, "
+            "SELECT id, author_id, author_name, content, image_url, images_json, visibility, store_code, "
             "like_count, comment_count, created_at "
             "FROM community_posts ORDER BY id DESC LIMIT 100"
         )
@@ -1423,12 +1436,16 @@ def api_create_post():
     db = get_db()
     _ensure_posts_columns(db)
     author_id = g.current_user.get("user_id") if g.current_user else None
+    image_urls = data.get("imageUrls") or []
+    if not isinstance(image_urls, list):
+        image_urls = []
+    images_json = json.dumps([str(u) for u in image_urls if u])
     try:
         with db.cursor() as cur:
             cur.execute(
-                "INSERT INTO community_posts (author_id, author_name, content, visibility, store_code) "
-                "VALUES (%s, %s, %s, %s, %s) "
-                "RETURNING id, author_id, author_name, content, image_url, visibility, store_code, "
+                "INSERT INTO community_posts (author_id, author_name, content, visibility, store_code, images_json) "
+                "VALUES (%s, %s, %s, %s, %s, %s) "
+                "RETURNING id, author_id, author_name, content, image_url, images_json, visibility, store_code, "
                 "like_count, comment_count, created_at",
                 (
                     author_id,
@@ -1436,6 +1453,7 @@ def api_create_post():
                     data.get("content", ""),
                     data.get("visibility", "public"),
                     data.get("storeCode"),
+                    images_json,
                 ),
             )
             row = cur.fetchone()
@@ -1451,14 +1469,26 @@ def api_update_post(post_id: int):
     data = request.get_json(silent=True) or {}
     db = get_db()
     _ensure_posts_columns(db)
+    image_urls = data.get("imageUrls")
+    update_images = isinstance(image_urls, list)
+    images_json = json.dumps([str(u) for u in (image_urls or []) if u]) if update_images else None
     with db.cursor() as cur:
-        cur.execute(
-            "UPDATE community_posts SET content = %s, visibility = %s "
-            "WHERE id = %s "
-            "RETURNING id, author_id, author_name, content, image_url, visibility, store_code, "
-            "like_count, comment_count, created_at",
-            (data.get("content"), data.get("visibility", "public"), post_id),
-        )
+        if update_images:
+            cur.execute(
+                "UPDATE community_posts SET content = %s, visibility = %s, images_json = %s "
+                "WHERE id = %s "
+                "RETURNING id, author_id, author_name, content, image_url, images_json, visibility, store_code, "
+                "like_count, comment_count, created_at",
+                (data.get("content"), data.get("visibility", "public"), images_json, post_id),
+            )
+        else:
+            cur.execute(
+                "UPDATE community_posts SET content = %s, visibility = %s "
+                "WHERE id = %s "
+                "RETURNING id, author_id, author_name, content, image_url, images_json, visibility, store_code, "
+                "like_count, comment_count, created_at",
+                (data.get("content"), data.get("visibility", "public"), post_id),
+            )
         row = cur.fetchone()
     db.commit()
     if not row:
@@ -1534,6 +1564,422 @@ def api_add_comment(post_id: int):
         "id": str(row["id"]), "authorName": row.get("author_name") or "Ẩn danh",
         "text": row.get("content") or "", "createdAt": row.get("created_at") or ""
     }), 201
+
+
+# ---- LESSONS / QUIZ / EVENTS ----
+
+def _ensure_training_tables(db):
+    with db.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS lessons (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                thumbnail_url TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                target_role TEXT NOT NULL DEFAULT 'ALL',
+                is_restricted INTEGER NOT NULL DEFAULT 0,
+                video_url TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''")
+        cur.execute("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT CURRENT_TIMESTAMP")
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_questions (
+                id SERIAL PRIMARY KEY,
+                question_type TEXT DEFAULT 'TN',
+                question TEXT NOT NULL,
+                option_a TEXT,
+                option_b TEXT,
+                option_c TEXT,
+                option_d TEXT,
+                correct_answer TEXT,
+                points INTEGER NOT NULL DEFAULT 1,
+                content_id TEXT,
+                question_number INTEGER
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_results (
+                id SERIAL PRIMARY KEY,
+                submitted_at TEXT,
+                employee_code TEXT,
+                full_name TEXT,
+                store_name TEXT,
+                phone TEXT,
+                content_id TEXT,
+                score TEXT,
+                answers_json TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS training_events (
+                id SERIAL PRIMARY KEY,
+                event_date TEXT NOT NULL,
+                title TEXT NOT NULL,
+                created_by INTEGER
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_quiz_questions_content ON quiz_questions(content_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_quiz_results_content ON quiz_results(content_id)")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_training_events_date ON training_events(event_date)")
+    db.commit()
+
+
+def _is_admin_user():
+    user_id = (g.current_user or {}).get("user_id")
+    if not user_id:
+        return False
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT e.position FROM users u LEFT JOIN employees e ON e.id = u.employee_id WHERE u.id = %s",
+            (user_id,),
+        )
+        row = cur.fetchone()
+    role = ((row or {}).get("position") or "").upper()
+    return role in ("ADM", "ADMIN", "HR", "TLD")
+
+
+def _current_employee_info():
+    user_id = (g.current_user or {}).get("user_id")
+    if not user_id:
+        return {"employee_code": "", "full_name": "", "store_code": ""}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT u.username, e.employee_code, e.full_name, e.store_code, e.position "
+            "FROM users u LEFT JOIN employees e ON e.id = u.employee_id WHERE u.id = %s",
+            (user_id,),
+        )
+        row = cur.fetchone() or {}
+    return {
+        "employee_code": row.get("employee_code") or row.get("username") or "",
+        "full_name": row.get("full_name") or row.get("username") or "",
+        "store_code": row.get("store_code") or "",
+        "position": row.get("position") or "",
+    }
+
+
+def _lesson_to_json(row, question_count=0):
+    return {
+        "id": str(row["id"]),
+        "title": row.get("title") or "",
+        "description": row.get("description") or "",
+        "thumbnailUrl": row.get("thumbnail_url") or "",
+        "targetRole": row.get("target_role") or "ALL",
+        "isRestricted": bool(row.get("is_restricted")),
+        "videoUrl": row.get("video_url"),
+        "questionCount": int(question_count or 0),
+    }
+
+
+@app.get("/api/lessons")
+@login_required
+def api_get_lessons():
+    db = get_db()
+    _ensure_training_tables(db)
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT l.id, l.title, l.thumbnail_url, l.description, l.target_role, l.is_restricted, l.video_url, "
+            "(SELECT COUNT(*) FROM quiz_questions q WHERE q.content_id = ('lesson_' || l.id::text)) AS question_count "
+            "FROM lessons l ORDER BY l.id DESC"
+        )
+        rows = cur.fetchall()
+    return jsonify([_lesson_to_json(r, r.get("question_count")) for r in rows])
+
+
+@app.get("/api/lessons/<int:lesson_id>")
+@login_required
+def api_get_lesson_detail(lesson_id: int):
+    db = get_db()
+    _ensure_training_tables(db)
+    content_id = f"lesson_{lesson_id}"
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, title, thumbnail_url, description, target_role, is_restricted, video_url "
+            "FROM lessons WHERE id = %s",
+            (lesson_id,),
+        )
+        row = cur.fetchone()
+        if not row:
+            return jsonify({"error": "Not found"}), 404
+        cur.execute(
+            "SELECT id, question_type, question, option_a, option_b, option_c, option_d, points, question_number "
+            "FROM quiz_questions WHERE content_id = %s ORDER BY COALESCE(question_number, id) ASC",
+            (content_id,),
+        )
+        qs = cur.fetchall()
+    questions = [
+        {
+            "id": q["id"],
+            "type": q.get("question_type") or "TN",
+            "question": q.get("question") or "",
+            "options": [q.get("option_a"), q.get("option_b"), q.get("option_c"), q.get("option_d")],
+            "points": int(q.get("points") or 1),
+        }
+        for q in qs
+    ]
+    data = _lesson_to_json(row, len(questions))
+    data["questions"] = questions
+    return jsonify(data)
+
+
+@app.post("/api/lessons")
+@login_required
+def api_create_lesson():
+    if not _is_admin_user():
+        return jsonify({"error": "Forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "title required"}), 400
+    db = get_db()
+    _ensure_training_tables(db)
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO lessons (title, thumbnail_url, description, target_role, is_restricted, video_url) "
+            "VALUES (%s, %s, %s, %s, %s, %s) "
+            "RETURNING id, title, thumbnail_url, description, target_role, is_restricted, video_url",
+            (
+                title,
+                data.get("thumbnailUrl") or "",
+                data.get("description") or "",
+                data.get("targetRole") or "ALL",
+                1 if data.get("isRestricted") else 0,
+                data.get("videoUrl") or "",
+            ),
+        )
+        row = cur.fetchone()
+        lesson_id = row["id"]
+        content_id = f"lesson_{lesson_id}"
+        questions = data.get("questions") or []
+        for idx, q in enumerate(questions, start=1):
+            opts = q.get("options") or []
+            opts = (opts + [None, None, None, None])[:4]
+            cur.execute(
+                "INSERT INTO quiz_questions (question_type, question, option_a, option_b, option_c, option_d, "
+                "correct_answer, points, content_id, question_number) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    q.get("type") or "TN",
+                    q.get("question") or "",
+                    opts[0], opts[1], opts[2], opts[3],
+                    (q.get("correctAnswer") or "").upper(),
+                    int(q.get("points") or 1),
+                    content_id,
+                    idx,
+                ),
+            )
+    db.commit()
+    return jsonify(_lesson_to_json(row, len(questions))), 201
+
+
+@app.put("/api/lessons/<int:lesson_id>")
+@login_required
+def api_update_lesson(lesson_id: int):
+    if not _is_admin_user():
+        return jsonify({"error": "Forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    _ensure_training_tables(db)
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE lessons SET title = COALESCE(%s, title), thumbnail_url = COALESCE(%s, thumbnail_url), "
+            "description = COALESCE(%s, description), target_role = COALESCE(%s, target_role), "
+            "is_restricted = COALESCE(%s, is_restricted), video_url = COALESCE(%s, video_url) "
+            "WHERE id = %s "
+            "RETURNING id, title, thumbnail_url, description, target_role, is_restricted, video_url",
+            (
+                data.get("title"),
+                data.get("thumbnailUrl"),
+                data.get("description"),
+                data.get("targetRole"),
+                (1 if data.get("isRestricted") else 0) if "isRestricted" in data else None,
+                data.get("videoUrl"),
+                lesson_id,
+            ),
+        )
+        row = cur.fetchone()
+    db.commit()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(_lesson_to_json(row))
+
+
+@app.delete("/api/lessons/<int:lesson_id>")
+@login_required
+def api_delete_lesson(lesson_id: int):
+    if not _is_admin_user():
+        return jsonify({"error": "Forbidden"}), 403
+    db = get_db()
+    _ensure_training_tables(db)
+    content_id = f"lesson_{lesson_id}"
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM quiz_questions WHERE content_id = %s", (content_id,))
+        cur.execute("DELETE FROM lessons WHERE id = %s", (lesson_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/quiz/submit")
+@login_required
+def api_quiz_submit():
+    data = request.get_json(silent=True) or {}
+    lesson_id = data.get("lessonId")
+    answers = data.get("answers") or {}
+    if not lesson_id:
+        return jsonify({"error": "lessonId required"}), 400
+    db = get_db()
+    _ensure_training_tables(db)
+    content_id = f"lesson_{lesson_id}"
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, correct_answer, points FROM quiz_questions WHERE content_id = %s",
+            (content_id,),
+        )
+        qs = cur.fetchall()
+    if not qs:
+        return jsonify({"error": "No questions"}), 400
+    total = 0
+    earned = 0
+    correct_count = 0
+    for q in qs:
+        pts = int(q.get("points") or 1)
+        total += pts
+        ans = (answers.get(str(q["id"])) or "").strip().upper()
+        correct = (q.get("correct_answer") or "").strip().upper()
+        if ans and correct and ans == correct:
+            earned += pts
+            correct_count += 1
+    score_percent = (earned / total * 100) if total else 0
+    user = _current_employee_info()
+    submitted_at = datetime.now(VN_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    employee_code = user["employee_code"]
+    full_name = user["full_name"]
+    store_name = user["store_code"]
+    score_text = f"{earned}/{total}"
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO quiz_results (submitted_at, employee_code, full_name, store_name, content_id, score, answers_json) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (submitted_at, employee_code, full_name, store_name, content_id, score_text, json.dumps(answers)),
+        )
+        result_id = cur.fetchone()["id"]
+    db.commit()
+    return jsonify({
+        "id": result_id,
+        "lessonId": str(lesson_id),
+        "score": score_text,
+        "earned": earned,
+        "total": total,
+        "correctCount": correct_count,
+        "questionCount": len(qs),
+        "scorePercent": round(score_percent, 2),
+        "submittedAt": submitted_at,
+    }), 201
+
+
+@app.get("/api/quiz/results")
+@login_required
+def api_quiz_results():
+    db = get_db()
+    _ensure_training_tables(db)
+    user = _current_employee_info()
+    lesson_id = request.args.get("lessonId")
+    scope = (request.args.get("scope") or "self").lower()
+    sql = "SELECT id, submitted_at, employee_code, full_name, store_name, content_id, score, answers_json FROM quiz_results"
+    args = []
+    where = []
+    if scope != "all" or not _is_admin_user():
+        where.append("employee_code = %s")
+        args.append(user["employee_code"])
+    if lesson_id:
+        where.append("content_id = %s")
+        args.append(f"lesson_{lesson_id}")
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY id DESC LIMIT 200"
+    with db.cursor() as cur:
+        cur.execute(sql, tuple(args))
+        rows = cur.fetchall()
+    return jsonify([
+        {
+            "id": r["id"],
+            "submittedAt": r.get("submitted_at"),
+            "employeeCode": r.get("employee_code"),
+            "fullName": r.get("full_name"),
+            "storeName": r.get("store_name"),
+            "lessonId": (r.get("content_id") or "").replace("lesson_", ""),
+            "score": r.get("score"),
+        }
+        for r in rows
+    ])
+
+
+@app.get("/api/events")
+@login_required
+def api_get_events():
+    db = get_db()
+    _ensure_training_tables(db)
+    with db.cursor() as cur:
+        cur.execute("SELECT event_date, title FROM training_events ORDER BY event_date ASC, id ASC")
+        rows = cur.fetchall()
+    out: dict[str, list[str]] = {}
+    for r in rows:
+        d = r.get("event_date") or ""
+        if not d:
+            continue
+        out.setdefault(d, []).append(r.get("title") or "")
+    return jsonify(out)
+
+
+@app.post("/api/events")
+@login_required
+def api_create_event():
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    date_str = (data.get("date") or "").strip()
+    if not title or not date_str:
+        return jsonify({"error": "title and date required"}), 400
+    # Normalize to YYYY-MM-DD
+    try:
+        d = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        date_str = d.strftime("%Y-%m-%d")
+    except Exception:
+        date_str = date_str[:10]
+    db = get_db()
+    _ensure_training_tables(db)
+    user_id = g.current_user.get("user_id") if g.current_user else None
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO training_events (event_date, title, created_by) VALUES (%s, %s, %s) RETURNING id",
+            (date_str, title, user_id),
+        )
+    db.commit()
+    return jsonify({"ok": True, "date": date_str, "title": title}), 201
+
+
+@app.delete("/api/events")
+@login_required
+def api_delete_event():
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    date_str = (data.get("date") or "").strip()
+    try:
+        d = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        date_str = d.strftime("%Y-%m-%d")
+    except Exception:
+        date_str = date_str[:10]
+    db = get_db()
+    _ensure_training_tables(db)
+    with db.cursor() as cur:
+        cur.execute(
+            "DELETE FROM training_events WHERE event_date = %s AND title = %s",
+            (date_str, title),
+        )
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @app.get("/healthz")

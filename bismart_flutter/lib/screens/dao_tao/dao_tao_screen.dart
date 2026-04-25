@@ -16,6 +16,8 @@ import '../../widgets/common/data_panel.dart';
 import '../../widgets/cards/lesson_card.dart';
 import '../../widgets/cards/social_post_card.dart';
 import 'package:bismart_flutter/models/community_post.dart';
+import '../../models/lesson.dart';
+import 'lesson_detail_screen.dart';
 
 class DaoTaoScreen extends StatefulWidget {
   const DaoTaoScreen({super.key});
@@ -500,8 +502,16 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   }
 
   Widget _buildLessonPanel(TrainingProvider provider) {
+    final isAdmin = _isAdmin();
     return DataPanel(
       title: 'Bài giảng',
+      trailing: isAdmin
+          ? TextButton.icon(
+              onPressed: () => _showCreateLessonDialog(provider),
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: const Text('Thêm bài giảng'),
+            )
+          : null,
       child: provider.lessons.isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),
@@ -525,6 +535,11 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   .toList(),
             ),
     );
+  }
+
+  bool _isAdmin() {
+    final pos = (context.read<AuthProvider>().currentUser?.position ?? '').toUpperCase();
+    return pos == 'ADM' || pos == 'ADMIN' || pos == 'HR' || pos == 'TLD';
   }
 
   Widget _buildSchedulePanel(TrainingProvider provider) {
@@ -1497,36 +1512,228 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   }
 
   void _showLessonDetail(dynamic lesson) {
-    showModalBottomSheet(
+    final Lesson l = lesson is Lesson
+        ? lesson
+        : Lesson(
+            id: (lesson.id ?? '').toString(),
+            title: (lesson.title ?? '').toString(),
+            thumbnailUrl: (lesson.thumbnailUrl ?? '').toString(),
+            targetRole: (lesson.targetRole ?? 'ALL').toString(),
+            videoUrl: lesson.videoUrl as String?,
+          );
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => LessonDetailScreen(lesson: l)),
+    );
+  }
+
+  void _showCreateLessonDialog(TrainingProvider provider) {
+    final titleCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    final videoCtrl = TextEditingController();
+    final thumbCtrl = TextEditingController();
+    String role = 'ALL';
+    final List<_QuizDraft> drafts = [_QuizDraft()];
+
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600, maxHeight: 720),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text('Thêm bài giảng',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.w700)),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: titleCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Tên bài giảng *',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: descCtrl,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: 'Mô tả',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: videoCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'URL video (mp4 trực tiếp) *',
+                            hintText: 'https://...',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: thumbCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'URL ảnh thumbnail',
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          value: role,
+                          decoration: const InputDecoration(
+                            labelText: 'Đối tượng',
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'ALL', child: Text('Tất cả')),
+                            DropdownMenuItem(value: 'PG', child: Text('PG')),
+                            DropdownMenuItem(value: 'TLD', child: Text('TLD')),
+                            DropdownMenuItem(value: 'ADM', child: Text('ADM')),
+                          ],
+                          onChanged: (v) => setS(() => role = v ?? 'ALL'),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Text('Bài kiểm tra (${drafts.length} câu)',
+                                style: AppTextStyles.sectionHeader),
+                            const Spacer(),
+                            TextButton.icon(
+                              onPressed: () => setS(() => drafts.add(_QuizDraft())),
+                              icon: const Icon(Icons.add, size: 16),
+                              label: const Text('Thêm câu hỏi'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        for (int i = 0; i < drafts.length; i++)
+                          _buildQuizDraftEditor(i, drafts[i], () => setS(() => drafts.removeAt(i))),
+                      ],
+                    ),
+                  ),
+                ),
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        if (titleCtrl.text.trim().isEmpty || videoCtrl.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                              content: Text('Nhập tên và URL video')));
+                          return;
+                        }
+                        final qs = drafts
+                            .where((d) => d.questionCtrl.text.trim().isNotEmpty)
+                            .map((d) => {
+                                  'question': d.questionCtrl.text.trim(),
+                                  'options': d.optionCtrls
+                                      .map((c) => c.text.trim())
+                                      .toList(),
+                                  'correctAnswer': d.correct,
+                                  'points': 1,
+                                  'type': 'TN',
+                                })
+                            .toList();
+                        try {
+                          await provider.createLesson({
+                            'title': titleCtrl.text.trim(),
+                            'description': descCtrl.text.trim(),
+                            'videoUrl': videoCtrl.text.trim(),
+                            'thumbnailUrl': thumbCtrl.text.trim(),
+                            'targetRole': role,
+                            'questions': qs,
+                          });
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        } catch (e) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(content: Text('Lỗi: $e')));
+                        }
+                      },
+                      child: const Text('Lưu bài giảng'),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.5,
-        expand: false,
-        builder: (context, scrollController) => ListView(
-          controller: scrollController,
-          padding: const EdgeInsets.all(20),
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
+    );
+  }
+
+  Widget _buildQuizDraftEditor(int index, _QuizDraft d, VoidCallback onRemove) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Câu ${index + 1}', style: AppTextStyles.bodyTextMedium),
+              const Spacer(),
+              IconButton(
+                onPressed: onRemove,
+                icon: const Icon(Icons.delete_outline_rounded, size: 18),
+              ),
+            ],
+          ),
+          TextField(
+            controller: d.questionCtrl,
+            decoration: const InputDecoration(labelText: 'Nội dung câu hỏi'),
+          ),
+          for (int i = 0; i < 4; i++)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: TextField(
+                controller: d.optionCtrls[i],
+                decoration: InputDecoration(
+                  labelText: 'Đáp án ${["A", "B", "C", "D"][i]}',
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            Text(lesson.title ?? '', style: AppTextStyles.sectionHeader),
-            const SizedBox(height: 8),
-            Text(lesson.description ?? '', style: AppTextStyles.caption),
-          ],
-        ),
+          const SizedBox(height: 6),
+          DropdownButton<String>(
+            value: d.correct,
+            isDense: true,
+            items: const [
+              DropdownMenuItem(value: 'A', child: Text('Đáp án đúng: A')),
+              DropdownMenuItem(value: 'B', child: Text('Đáp án đúng: B')),
+              DropdownMenuItem(value: 'C', child: Text('Đáp án đúng: C')),
+              DropdownMenuItem(value: 'D', child: Text('Đáp án đúng: D')),
+            ],
+            onChanged: (v) {
+              d.correct = v ?? 'A';
+              if (mounted) setState(() {});
+            },
+          ),
+        ],
       ),
     );
   }
@@ -1676,6 +1883,15 @@ class _AiAssistantItem {
     required this.description,
     required this.url,
   });
+}
+
+class _QuizDraft {
+  final TextEditingController questionCtrl = TextEditingController();
+  final List<TextEditingController> optionCtrls = List.generate(
+    4,
+    (_) => TextEditingController(),
+  );
+  String correct = 'A';
 }
 
 class _CommunityAvatar extends StatelessWidget {
