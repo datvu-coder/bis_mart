@@ -90,7 +90,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: Row(
                   children: [
                     Text(
@@ -105,7 +105,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
               Expanded(
                 child: ListView.builder(
                   itemCount: employees.length,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 2),
                   itemBuilder: (context, index) {
                     final emp = employees[index];
                     return Container(

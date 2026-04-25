@@ -93,7 +93,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           );
         }
 
-        final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 1.5;
+        final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 2.0;
 
         // Tab layout for all screen sizes
         final body = Column(
