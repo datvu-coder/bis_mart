@@ -96,7 +96,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                     : ListView.builder(
                         itemCount: products.length,
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
                         itemBuilder: (context, index) {
                           final product = products[index];
                           return Container(

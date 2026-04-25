@@ -60,13 +60,14 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         }
 
         final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 2.0;
+        final contentPad = isWide ? hPad : 10.0;
 
         // Tab layout for all screen sizes
         final body = Column(
           children: [
             if (!isCompactMobile)
               Padding(
-                padding: EdgeInsets.fromLTRB(hPad, isWide ? 20 : 14, hPad, 10),
+                padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
                 child: _buildScreenHeader(provider, isWide),
               ),
             if (isCompactMobile)
@@ -128,11 +129,11 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 controller: _tabController,
                 children: [
                   SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12),
+                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
                     child: _buildReportList(provider),
                   ),
                   SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12),
+                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
                     child: Column(
                       children: [
                         _buildTopPgPanel(provider),
@@ -142,7 +143,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     ),
                   ),
                   SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 12),
+                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
                     child: _buildFilterPanel(provider),
                   ),
                 ],

@@ -102,7 +102,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                 : ListView.builder(
               itemCount: stores.length,
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               itemBuilder: (context, index) {
                 final store = stores[index];
                 return Container(

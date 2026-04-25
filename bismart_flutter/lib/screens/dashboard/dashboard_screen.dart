@@ -65,6 +65,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
         }
 
         final hPad = isDesktop ? 32.0 : (isWide ? 24.0 : 2.0);
+        final contentPad = isWide ? hPad : 10.0;
 
         // Desktop: grid layout without tabs
         if (isDesktop) {
@@ -153,7 +154,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                 controller: _tabController,
                 children: [
                   SingleChildScrollView(
-                    padding: EdgeInsets.all(hPad),
+                    padding: EdgeInsets.all(contentPad),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -166,7 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                   ),
                   SingleChildScrollView(
-                    padding: EdgeInsets.all(hPad),
+                    padding: EdgeInsets.all(contentPad),
                     child: Column(
                       children: [
                         _buildChartCard(AppStrings.bieuDoDoanhSo, Icons.bar_chart_rounded, RevenueBarChart(data: data.revenueChart)),
@@ -176,7 +177,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     ),
                   ),
                   SingleChildScrollView(
-                    padding: EdgeInsets.all(hPad),
+                    padding: EdgeInsets.all(contentPad),
                     child: Column(
                       children: [
                         if (data.featuredPrograms.isNotEmpty) _buildFeaturedPrograms(data),
