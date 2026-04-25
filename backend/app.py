@@ -1453,7 +1453,7 @@ def _post_image_urls(row):
     legacy = row.get("image_url") if row else None
     return [legacy] if legacy else []
 
-def _post_to_api_json(row, comments=None):
+def _post_to_api_json(row, comments=None, is_liked=False):
     return {
         "id": str(row["id"]),
         "authorId": str(row["author_id"]) if row.get("author_id") else None,
@@ -1465,7 +1465,7 @@ def _post_to_api_json(row, comments=None):
         "storeCode": row.get("store_code"),
         "likeCount": int(row.get("like_count") or 0),
         "commentCount": int(row.get("comment_count") or 0),
-        "isLiked": False,
+        "isLiked": bool(is_liked or row.get("liked_by_me")),
         "createdAt": row.get("created_at") or "",
         "comments": comments or [],
     }
@@ -1475,11 +1475,14 @@ def _post_to_api_json(row, comments=None):
 def api_get_posts():
     db = get_db()
     _ensure_posts_columns(db)
+    user_id = (g.current_user or {}).get("user_id")
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, author_id, author_name, content, image_url, images_json, video_url, visibility, store_code, "
-            "like_count, comment_count, created_at "
-            "FROM community_posts ORDER BY id DESC LIMIT 100"
+            "SELECT p.id, p.author_id, p.author_name, p.content, p.image_url, p.images_json, p.video_url, "
+            "p.visibility, p.store_code, p.like_count, p.comment_count, p.created_at, "
+            "EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = %s) AS liked_by_me "
+            "FROM community_posts p ORDER BY p.id DESC LIMIT 100",
+            (user_id,),
         )
         rows = cur.fetchall()
     return jsonify([_post_to_api_json(r) for r in rows])

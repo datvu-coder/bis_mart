@@ -47,14 +47,33 @@ class TrainingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Track in-flight toggleLike to prevent rapid double-taps from racing.
+  final Set<String> _likeInFlight = <String>{};
+
   void toggleLike(String postId) async {
+    if (_likeInFlight.contains(postId)) return;
     final index = _posts.indexWhere((p) => p.id == postId);
-    if (index != -1) {
-      final post = _posts[index];
-      post.isLiked = !post.isLiked;
-      post.likeCount += post.isLiked ? 1 : -1;
+    if (index == -1) return;
+    final post = _posts[index];
+    final prevLiked = post.isLiked;
+    final prevCount = post.likeCount;
+    // Optimistic toggle
+    post.isLiked = !prevLiked;
+    post.likeCount = (prevCount + (post.isLiked ? 1 : -1)).clamp(0, 1 << 31);
+    _likeInFlight.add(postId);
+    notifyListeners();
+    try {
+      final res = await _api.toggleLike(int.parse(postId));
+      // Reconcile with server truth
+      post.isLiked = (res['liked'] as bool?) ?? post.isLiked;
+      post.likeCount = (res['likeCount'] as int?) ?? post.likeCount;
+    } catch (_) {
+      // Rollback on failure
+      post.isLiked = prevLiked;
+      post.likeCount = prevCount;
+    } finally {
+      _likeInFlight.remove(postId);
       notifyListeners();
-      try { await _api.toggleLike(int.parse(postId)); } catch (_) {}
     }
   }
 
