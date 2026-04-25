@@ -1613,13 +1613,19 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                                         : () async {
                                             try {
                                               final res = await FilePicker.platform.pickFiles(
-                                                type: FileType.custom,
-                                                allowedExtensions: const ['mp4', 'webm', 'mov', 'm4v'],
+                                                type: FileType.any,
                                                 withData: true,
                                                 allowMultiple: false,
                                               );
                                               if (res != null && res.files.isNotEmpty) {
                                                 final f = res.files.first;
+                                                final name = f.name.toLowerCase();
+                                                const allowed = ['.mp4', '.webm', '.mov', '.m4v'];
+                                                final ok = allowed.any(name.endsWith);
+                                                if (!ok) {
+                                                  setS(() => errorMsg = 'Định dạng không hỗ trợ. Chỉ nhận: mp4, webm, mov, m4v');
+                                                  return;
+                                                }
                                                 if (f.bytes != null) {
                                                   setS(() {
                                                     videoBytes = f.bytes;
