@@ -12,6 +12,8 @@ class SocialPostCard extends StatelessWidget {
   final VoidCallback? onShare;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onTap;
+  final VoidCallback? onTapMedia; // forward when user taps media area
 
   const SocialPostCard({
     super.key,
@@ -21,18 +23,24 @@ class SocialPostCard extends StatelessWidget {
     this.onShare,
     this.onEdit,
     this.onDelete,
+    this.onTap,
+    this.onTapMedia,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 1),
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Material(
+      color: AppColors.white,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 1),
+          decoration: const BoxDecoration(
+            color: AppColors.white,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
           // ── Author header ────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
@@ -143,24 +151,13 @@ class SocialPostCard extends StatelessWidget {
               child: Text(post.content!, style: AppTextStyles.bodyText),
             ),
 
-          // ── Image ────────────────────────────────────────────────────────
-          if (post.imageUrls.isNotEmpty)
+          // ── Media (images + video) ──────────────────────────────
+          if (post.imageUrls.isNotEmpty || (post.videoUrl ?? '').isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 10),
-              child: ClipRRect(
-                child: Image.network(
-                  post.imageUrls.first,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 180,
-                    color: AppColors.surfaceVariant,
-                    child: const Center(
-                      child: Icon(Icons.image_rounded,
-                          size: 40, color: AppColors.textHint),
-                    ),
-                  ),
-                ),
+              child: _PostMedia(
+                post: post,
+                onTap: onTapMedia ?? onTap,
               ),
             ),
 
@@ -238,6 +235,8 @@ class SocialPostCard extends StatelessWidget {
             ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }
@@ -270,6 +269,168 @@ class _Avatar extends StatelessWidget {
             fontWeight: FontWeight.w700,
             fontSize: size * 0.36,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Renders a post's images and/or video preview with a sensible cap on height
+/// so big photos don't blow up the feed. Multiple images become a grid; a
+/// video becomes a 16:9 thumbnail with a play overlay (real playback is in
+/// the post detail screen).
+class _PostMedia extends StatelessWidget {
+  final CommunityPost post;
+  final VoidCallback? onTap;
+  const _PostMedia({required this.post, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final hasVideo = (post.videoUrl ?? '').isNotEmpty;
+    final imgs = post.imageUrls;
+    final children = <Widget>[];
+    if (hasVideo) {
+      children.add(_videoThumb(context));
+    }
+    if (imgs.isNotEmpty) {
+      if (hasVideo) children.add(const SizedBox(height: 4));
+      children.add(_imageBlock(context, imgs));
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+    );
+  }
+
+  Widget _videoThumb(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Container(
+        color: Colors.black,
+        alignment: Alignment.center,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1F2937), Color(0xFF374151)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+            ),
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.play_arrow_rounded,
+                    size: 36, color: Colors.white),
+              ),
+            ),
+            const Positioned(
+              left: 10,
+              top: 10,
+              child: Row(children: [
+                Icon(Icons.videocam_rounded, color: Colors.white, size: 16),
+                SizedBox(width: 4),
+                Text('Video',
+                    style: TextStyle(color: Colors.white, fontSize: 12)),
+              ]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _imageBlock(BuildContext context, List<String> imgs) {
+    final maxH = MediaQuery.of(context).size.height * 0.5;
+    if (imgs.length == 1) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxH),
+        child: _img(imgs.first, fit: BoxFit.cover),
+      );
+    }
+    if (imgs.length == 2) {
+      return SizedBox(
+        height: 220,
+        child: Row(children: [
+          Expanded(child: _img(imgs[0])),
+          const SizedBox(width: 2),
+          Expanded(child: _img(imgs[1])),
+        ]),
+      );
+    }
+    if (imgs.length == 3) {
+      return SizedBox(
+        height: 260,
+        child: Row(children: [
+          Expanded(flex: 2, child: _img(imgs[0])),
+          const SizedBox(width: 2),
+          Expanded(
+            child: Column(children: [
+              Expanded(child: _img(imgs[1])),
+              const SizedBox(height: 2),
+              Expanded(child: _img(imgs[2])),
+            ]),
+          ),
+        ]),
+      );
+    }
+    // 4+ : 2x2 grid; if more than 4, overlay "+N" on last cell.
+    final extra = imgs.length - 4;
+    return SizedBox(
+      height: 280,
+      child: Column(children: [
+        Expanded(
+          child: Row(children: [
+            Expanded(child: _img(imgs[0])),
+            const SizedBox(width: 2),
+            Expanded(child: _img(imgs[1])),
+          ]),
+        ),
+        const SizedBox(height: 2),
+        Expanded(
+          child: Row(children: [
+            Expanded(child: _img(imgs[2])),
+            const SizedBox(width: 2),
+            Expanded(
+              child: Stack(fit: StackFit.expand, children: [
+                _img(imgs[3]),
+                if (extra > 0)
+                  Container(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    alignment: Alignment.center,
+                    child: Text('+$extra',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold)),
+                  ),
+              ]),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+
+  Widget _img(String url, {BoxFit fit = BoxFit.cover}) {
+    return Image.network(
+      url,
+      fit: fit,
+      width: double.infinity,
+      errorBuilder: (_, __, ___) => Container(
+        color: AppColors.surfaceVariant,
+        child: const Center(
+          child:
+              Icon(Icons.image_rounded, color: AppColors.textHint, size: 32),
         ),
       ),
     );

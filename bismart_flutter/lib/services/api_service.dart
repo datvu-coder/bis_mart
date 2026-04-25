@@ -262,6 +262,49 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Upload a video to attach to a community post. Returns the stored
+  /// filename (relative path) which should be passed back as `videoUrl`
+  /// when creating the post.
+  Future<String> uploadPostVideo({
+    required List<int> bytes,
+    required String filename,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    final form = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+    });
+    try {
+      final response = await _dio.post(
+        '/api/posts/upload-video',
+        data: form,
+        options: Options(
+          contentType: 'multipart/form-data',
+          sendTimeout: const Duration(minutes: 30),
+          receiveTimeout: const Duration(minutes: 5),
+        ),
+        onSendProgress: onProgress,
+      );
+      final data = response.data as Map<String, dynamic>;
+      return data['videoUrl'] as String;
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      String msg;
+      if (body is Map && body['error'] != null) {
+        msg = body['error'].toString();
+      } else {
+        msg = e.message ?? 'upload failed';
+      }
+      throw Exception('Upload lỗi: $msg');
+    }
+  }
+
+  /// Streaming URL for an authenticated community post video.
+  Future<String> buildPostVideoUrl(String postId) async {
+    final t = await getToken();
+    final base = _baseUrl;
+    return '$base/api/posts/$postId/video?t=${Uri.encodeQueryComponent(t ?? '')}';
+  }
+
   // ---- LESSONS ----
   Future<List<dynamic>> getLessons() async {
     final response = await _dio.get('/api/lessons');

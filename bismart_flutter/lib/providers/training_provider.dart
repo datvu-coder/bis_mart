@@ -65,6 +65,7 @@ class TrainingProvider extends ChangeNotifier {
     String visibility = 'public',
     String? storeCode,
     List<String>? imageDataUrls,
+    String? videoUrl,
   }) async {
     final images = imageDataUrls ?? [];
     final result = await _api.createPost({
@@ -74,6 +75,7 @@ class TrainingProvider extends ChangeNotifier {
       'visibility': visibility,
       'storeCode': storeCode,
       'imageUrls': images,
+      if (videoUrl != null && videoUrl.isNotEmpty) 'videoUrl': videoUrl,
     });
     final post = CommunityPost.fromJson(result);
     _posts.insert(0, post);

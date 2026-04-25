@@ -38,6 +38,12 @@ try:
 except Exception:
     LESSON_VIDEO_DIR = Path(os.getenv("BASE_DIR", ".")) / "lesson_videos"
     LESSON_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+POST_VIDEO_DIR = Path(os.getenv("POST_VIDEO_DIR", "/data/post_videos"))
+try:
+    POST_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    POST_VIDEO_DIR = Path(os.getenv("BASE_DIR", ".")) / "post_videos"
+    POST_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 MAX_VIDEO_BYTES = int(os.getenv("MAX_VIDEO_BYTES", str(1024 * 1024 * 1024)))  # 1GB
 ALLOWED_VIDEO_EXT = {".mp4", ".webm", ".mov", ".m4v"}
 CORS_ALLOW_HEADERS = "Content-Type, Authorization"
@@ -1389,13 +1395,14 @@ def api_checkin():
 # ---- COMMUNITY POSTS ----
 
 def _ensure_posts_columns(db):
-    """Add visibility, store_code, images_json columns if not exist."""
+    """Add visibility, store_code, images_json, video_url columns if not exist."""
     with db.cursor() as cur:
         cur.execute("""
             ALTER TABLE community_posts
             ADD COLUMN IF NOT EXISTS visibility TEXT NOT NULL DEFAULT 'public',
             ADD COLUMN IF NOT EXISTS store_code TEXT,
-            ADD COLUMN IF NOT EXISTS images_json TEXT
+            ADD COLUMN IF NOT EXISTS images_json TEXT,
+            ADD COLUMN IF NOT EXISTS video_url TEXT
         """)
     db.commit()
 
@@ -1418,6 +1425,7 @@ def _post_to_api_json(row, comments=None):
         "authorName": row.get("author_name") or "Ẩn danh",
         "content": row.get("content"),
         "imageUrls": _post_image_urls(row),
+        "videoUrl": row.get("video_url") or None,
         "visibility": row.get("visibility") or "public",
         "storeCode": row.get("store_code"),
         "likeCount": int(row.get("like_count") or 0),
@@ -1434,7 +1442,7 @@ def api_get_posts():
     _ensure_posts_columns(db)
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, author_id, author_name, content, image_url, images_json, visibility, store_code, "
+            "SELECT id, author_id, author_name, content, image_url, images_json, video_url, visibility, store_code, "
             "like_count, comment_count, created_at "
             "FROM community_posts ORDER BY id DESC LIMIT 100"
         )
@@ -1452,12 +1460,13 @@ def api_create_post():
     if not isinstance(image_urls, list):
         image_urls = []
     images_json = json.dumps([str(u) for u in image_urls if u])
+    video_url = (data.get("videoUrl") or "").strip() or None
     try:
         with db.cursor() as cur:
             cur.execute(
-                "INSERT INTO community_posts (author_id, author_name, content, visibility, store_code, images_json) "
-                "VALUES (%s, %s, %s, %s, %s, %s) "
-                "RETURNING id, author_id, author_name, content, image_url, images_json, visibility, store_code, "
+                "INSERT INTO community_posts (author_id, author_name, content, visibility, store_code, images_json, video_url) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+                "RETURNING id, author_id, author_name, content, image_url, images_json, video_url, visibility, store_code, "
                 "like_count, comment_count, created_at",
                 (
                     author_id,
@@ -1466,6 +1475,7 @@ def api_create_post():
                     data.get("visibility", "public"),
                     data.get("storeCode"),
                     images_json,
+                    video_url,
                 ),
             )
             row = cur.fetchone()
@@ -1489,7 +1499,7 @@ def api_update_post(post_id: int):
             cur.execute(
                 "UPDATE community_posts SET content = %s, visibility = %s, images_json = %s "
                 "WHERE id = %s "
-                "RETURNING id, author_id, author_name, content, image_url, images_json, visibility, store_code, "
+                "RETURNING id, author_id, author_name, content, image_url, images_json, video_url, visibility, store_code, "
                 "like_count, comment_count, created_at",
                 (data.get("content"), data.get("visibility", "public"), images_json, post_id),
             )
@@ -1497,7 +1507,7 @@ def api_update_post(post_id: int):
             cur.execute(
                 "UPDATE community_posts SET content = %s, visibility = %s "
                 "WHERE id = %s "
-                "RETURNING id, author_id, author_name, content, image_url, images_json, visibility, store_code, "
+                "RETURNING id, author_id, author_name, content, image_url, images_json, video_url, visibility, store_code, "
                 "like_count, comment_count, created_at",
                 (data.get("content"), data.get("visibility", "public"), post_id),
             )
@@ -1515,6 +1525,105 @@ def api_delete_post(post_id: int):
         cur.execute("DELETE FROM community_posts WHERE id = %s", (post_id,))
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.post("/api/posts/upload-video")
+@login_required
+def api_upload_post_video():
+    f = request.files.get("file") or request.files.get("video")
+    if not f:
+        return jsonify({"error": "no file"}), 400
+    name = secure_filename(f.filename or "video")
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in ALLOWED_VIDEO_EXT:
+        return jsonify({"error": f"ext {ext} not allowed"}), 400
+    fname = f"{uuid.uuid4().hex}{ext}"
+    target = POST_VIDEO_DIR / fname
+    f.save(target)
+    try:
+        size = target.stat().st_size
+    except Exception:
+        size = 0
+    if size > MAX_VIDEO_BYTES:
+        try:
+            target.unlink()
+        except Exception:
+            pass
+        return jsonify({"error": "file too large"}), 413
+    return jsonify({"videoUrl": fname, "size": size})
+
+
+@app.get("/api/posts/<int:post_id>/video")
+def api_stream_post_video(post_id: int):
+    user = _resolve_video_token()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    db = get_db()
+    _ensure_posts_columns(db)
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT video_url FROM community_posts WHERE id = %s", (post_id,)
+        )
+        row = cur.fetchone()
+    if not row or not row.get("video_url"):
+        return jsonify({"error": "no video"}), 404
+    fname = secure_filename(row["video_url"])
+    full = POST_VIDEO_DIR / fname
+    if not full.is_file():
+        return jsonify({"error": "missing"}), 404
+
+    file_size = full.stat().st_size
+    mime = mimetypes.guess_type(str(full))[0] or "video/mp4"
+    range_header = request.headers.get("Range", "").strip()
+    chunk_size = 1024 * 1024
+
+    def _send(start: int, length: int):
+        with open(full, "rb") as fh:
+            fh.seek(start)
+            remaining = length
+            while remaining > 0:
+                read_n = min(chunk_size, remaining)
+                data = fh.read(read_n)
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, no-store, max-age=0",
+        "Content-Disposition": "inline",
+        "X-Content-Type-Options": "nosniff",
+    }
+    if range_header.startswith("bytes="):
+        try:
+            rng = range_header[6:].split(",")[0]
+            start_s, end_s = rng.split("-", 1)
+            start = int(start_s) if start_s else 0
+            end = int(end_s) if end_s else file_size - 1
+            if start < 0 or start >= file_size:
+                return Response(status=416)
+            end = min(end, file_size - 1)
+            length = end - start + 1
+            headers.update({
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Content-Length": str(length),
+                "Content-Type": mime,
+            })
+            return Response(
+                stream_with_context(_send(start, length)),
+                status=206,
+                headers=headers,
+            )
+        except Exception:
+            return Response(status=416)
+    headers.update({"Content-Length": str(file_size), "Content-Type": mime})
+    return Response(
+        stream_with_context(_send(0, file_size)),
+        status=200,
+        headers=headers,
+    )
+
 
 @app.post("/api/posts/<int:post_id>/like")
 @login_required

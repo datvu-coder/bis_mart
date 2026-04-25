@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +23,7 @@ import 'package:bismart_flutter/models/community_post.dart';
 import '../../models/lesson.dart';
 import 'lesson_detail_screen.dart';
 import 'lesson_history_screen.dart';
+import 'post_detail_screen.dart';
 
 class DaoTaoScreen extends StatefulWidget {
   const DaoTaoScreen({super.key});
@@ -491,8 +493,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         else
           ...visiblePosts.map<Widget>((post) => SocialPostCard(
                 post: post,
+                onTap: () => _openPostDetail(post.id),
+                onTapMedia: () => _openPostDetail(post.id),
                 onLike: () => provider.toggleLike(post.id),
-                onComment: () => _showCommentDialog(post.id, provider),
+                onComment: () => _openPostDetail(post.id),
                 onShare: () => _sharePost(post),
                 onEdit: _canManagePost(post, currentUser)
                     ? () => _showEditPostDialog(provider, post)
@@ -686,24 +690,106 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 ..accept = videoOnly ? 'video/*' : 'image/*,video/*'
                 ..multiple = true;
               html.document.body!.append(uploadInput);
-              uploadInput.onChange.listen((event) {
+              uploadInput.onChange.listen((event) async {
                 final files = uploadInput.files;
                 if (files == null) return;
                 for (final file in files) {
-                  final reader = html.FileReader();
-                  reader.onLoadEnd.listen((_) {
-                    final dataUrl = reader.result as String?;
-                    if (dataUrl != null) {
-                      setDialogState(() {
-                        pickedFiles.add({
-                          'name': file.name,
-                          'dataUrl': dataUrl,
-                          'isVideo': file.type.startsWith('video/'),
-                        });
-                      });
+                  final isVideo = file.type.startsWith('video/');
+                  if (isVideo) {
+                    // Only one video per post.
+                    if (pickedFiles.any((f) => f['isVideo'] == true)) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                            content:
+                                Text('Mỗi bài chỉ được đính kèm 1 video.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                      continue;
                     }
-                  });
-                  reader.readAsDataUrl(file);
+                    if (file.size > 1024 * 1024 * 1024) {
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                            content: Text('Video vượt quá 1GB.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                      continue;
+                    }
+                    // Insert placeholder while uploading.
+                    final placeholder = <String, dynamic>{
+                      'name': file.name,
+                      'isVideo': true,
+                      'uploading': true,
+                      'progress': 0.0,
+                    };
+                    setDialogState(() => pickedFiles.add(placeholder));
+                    try {
+                      final reader = html.FileReader();
+                      final completer = Completer<List<int>>();
+                      reader.onLoadEnd.listen((_) {
+                        final result = reader.result;
+                        if (result is List<int>) {
+                          completer.complete(result);
+                        } else if (result is ByteBuffer) {
+                          completer
+                              .complete(Uint8List.view(result));
+                        } else {
+                          completer.completeError(
+                              StateError('unexpected reader result'));
+                        }
+                      });
+                      reader.onError.listen((_) =>
+                          completer.completeError(StateError('read error')));
+                      reader.readAsArrayBuffer(file);
+                      final bytes = await completer.future;
+                      final remote = await ApiService().uploadPostVideo(
+                        bytes: bytes,
+                        filename: file.name,
+                        onProgress: (sent, total) {
+                          if (total > 0) {
+                            setDialogState(() {
+                              placeholder['progress'] = sent / total;
+                            });
+                          }
+                        },
+                      );
+                      setDialogState(() {
+                        placeholder['uploading'] = false;
+                        placeholder['remoteUrl'] = remote;
+                        placeholder['progress'] = 1.0;
+                      });
+                    } catch (e) {
+                      setDialogState(() => pickedFiles.remove(placeholder));
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(
+                            content: Text('Tải video lỗi: $e'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    }
+                  } else {
+                    final reader = html.FileReader();
+                    reader.onLoadEnd.listen((_) {
+                      final dataUrl = reader.result as String?;
+                      if (dataUrl != null) {
+                        setDialogState(() {
+                          pickedFiles.add({
+                            'name': file.name,
+                            'dataUrl': dataUrl,
+                            'isVideo': false,
+                          });
+                        });
+                      }
+                    });
+                    reader.readAsDataUrl(file);
+                  }
                 }
               });
               uploadInput.click();
@@ -991,6 +1077,33 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                         onPressed: () async {
                           final text = textController.text.trim();
                           if (text.isEmpty && pickedFiles.isEmpty) return;
+                          // Block submit while video upload is still in
+                          // progress.
+                          final stillUploading = pickedFiles.any((f) =>
+                              f['isVideo'] == true && f['uploading'] == true);
+                          if (stillUploading) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Vui lòng đợi video tải lên hoàn tất.'),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                            return;
+                          }
+                          final imageDataUrls = pickedFiles
+                              .where((f) =>
+                                  f['isVideo'] != true &&
+                                  f['dataUrl'] != null)
+                              .map((f) => f['dataUrl'] as String)
+                              .toList();
+                          final video = pickedFiles
+                              .where((f) =>
+                                  f['isVideo'] == true &&
+                                  (f['remoteUrl'] ?? '') != '')
+                              .cast<Map<String, dynamic>?>()
+                              .firstWhere((_) => true,
+                                  orElse: () => null);
                           try {
                             await provider.createPost(
                               text,
@@ -998,9 +1111,8 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                               authorId: currentUser?.id,
                               visibility: selectedVisibility,
                               storeCode: currentUser?.storeCode,
-                              imageDataUrls: pickedFiles
-                                  .map((f) => f['dataUrl'] as String)
-                                  .toList(),
+                              imageDataUrls: imageDataUrls,
+                              videoUrl: video?['remoteUrl'] as String?,
                             );
                             if (ctx.mounted) Navigator.pop(ctx);
                           } catch (e) {
@@ -1152,6 +1264,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           ),
         ),
       );
+
+  void _openPostDetail(String postId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PostDetailScreen(postId: postId),
+      ),
+    );
+  }
 
   void _showCommentDialog(String postId, TrainingProvider provider) {
     final commentController = TextEditingController();

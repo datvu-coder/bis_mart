@@ -28,6 +28,7 @@ class CommunityPost {
   final DateTime createdAt;
   final String? content;
   final List<String> imageUrls;
+  final String? videoUrl;
   final String visibility; // public | store
   final String? storeCode;
   int likeCount;
@@ -42,6 +43,7 @@ class CommunityPost {
     required this.createdAt,
     this.content,
     this.imageUrls = const [],
+    this.videoUrl,
     this.visibility = 'public',
     this.storeCode,
     this.likeCount = 0,
@@ -63,6 +65,7 @@ class CommunityPost {
               ?.map((u) => u as String)
               .toList() ??
           [],
+      videoUrl: json['videoUrl'] as String?,
       visibility: (json['visibility'] as String?) == 'store' ? 'store' : 'public',
       storeCode: json['storeCode'] as String?,
       likeCount: json['likeCount'] as int? ?? 0,
