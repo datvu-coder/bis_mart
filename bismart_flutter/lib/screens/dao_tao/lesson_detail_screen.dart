@@ -3,8 +3,6 @@ import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -12,12 +10,9 @@ import '../../models/lesson.dart';
 import '../../services/api_service.dart';
 import 'lesson_quiz_screen.dart';
 
-/// Anti-piracy video lesson:
-/// - Custom controls (play/pause + read-only progress, no scrubbing)
-/// - Forward seek blocked; rewind allowed
-/// - Right-click + selection blocked on web
-/// - Best-effort screenshot mitigation: blur on focus loss; ban PrintScreen
-/// - Disables PiP / download on the underlying <video>
+/// Anti-piracy lesson player using a native HTML5 <video> element via
+/// HtmlElementView. Avoids the `video_player` plugin (which can throw
+/// "init has not been implemented" on web).
 class LessonDetailScreen extends StatefulWidget {
   final Lesson lesson;
   const LessonDetailScreen({super.key, required this.lesson});
@@ -28,13 +23,17 @@ class LessonDetailScreen extends StatefulWidget {
 
 class _LessonDetailScreenState extends State<LessonDetailScreen>
     with WidgetsBindingObserver {
-  VideoPlayerController? _controller;
+  html.VideoElement? _video;
+  late final String _viewType;
   bool _initializing = true;
   String? _error;
   bool _videoFinished = false;
   bool _isPlaying = false;
   Duration _maxWatched = Duration.zero;
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
   bool _windowBlurred = false;
+  Timer? _tick;
   StreamSubscription<html.Event>? _blurSub;
   StreamSubscription<html.Event>? _focusSub;
   StreamSubscription<html.Event>? _ctxSub;
@@ -45,6 +44,8 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
   @override
   void initState() {
     super.initState();
+    _viewType =
+        'lesson-video-${widget.lesson.id}-${DateTime.now().microsecondsSinceEpoch}';
     WidgetsBinding.instance.addObserver(this);
     _attachWebGuards();
     _bootstrap();
@@ -53,11 +54,16 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _tick?.cancel();
     _blurSub?.cancel();
     _focusSub?.cancel();
     _ctxSub?.cancel();
     _keySub?.cancel();
-    _controller?.dispose();
+    try {
+      _video?.pause();
+      _video?.removeAttribute('src');
+      _video?.load();
+    } catch (_) {}
     super.dispose();
   }
 
@@ -66,13 +72,12 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
     _ctxSub = html.document.onContextMenu.listen((e) => e.preventDefault());
     _blurSub = html.window.onBlur.listen((_) {
       if (mounted) setState(() => _windowBlurred = true);
-      _controller?.pause();
+      _video?.pause();
     });
     _focusSub = html.window.onFocus.listen((_) {
       if (mounted) setState(() => _windowBlurred = false);
     });
     _keySub = html.window.onKeyDown.listen((e) {
-      // Block PrintScreen, Ctrl/Cmd+P, Ctrl/Cmd+S, F12
       final k = e.key ?? '';
       final isCmd = e.ctrlKey || e.metaKey;
       if (k == 'PrintScreen' ||
@@ -84,7 +89,6 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
           if (mounted) setState(() => _windowBlurred = false);
         });
       }
-      // Block media keyboard seek
       if (k == 'ArrowRight' || k == 'ArrowLeft') {
         e.preventDefault();
       }
@@ -111,110 +115,140 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
         });
         return;
       }
-      // Disable native controls / download on the underlying <video> on web
-      if (kIsWeb) {
-        // ignore: undefined_prefixed_name
-        ui_web.platformViewRegistry; // no-op import to keep tree
-      }
-      final controller = VideoPlayerController.networkUrl(
-        Uri.parse(url),
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
-      );
-      await controller.initialize();
-      controller.addListener(_onTick);
-      await controller.setLooping(false);
-      _hardenWebVideoElement();
-      if (!mounted) {
-        controller.dispose();
-        return;
-      }
-      setState(() {
-        _controller = controller;
-        _initializing = false;
+
+      final video = html.VideoElement()
+        ..src = url
+        ..autoplay = false
+        ..controls = false
+        ..setAttribute(
+            'controlslist', 'nodownload noplaybackrate noremoteplayback')
+        ..setAttribute('disablepictureinpicture', 'true')
+        ..setAttribute('playsinline', 'true')
+        ..setAttribute('preload', 'auto')
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.objectFit = 'contain'
+        ..style.backgroundColor = '#000';
+      video.onContextMenu.listen((e) => e.preventDefault());
+
+      video.onLoadedMetadata.listen((_) {
+        final d = video.duration;
+        if (d.isFinite && mounted) {
+          setState(() {
+            _duration = Duration(milliseconds: (d * 1000).toInt());
+            _initializing = false;
+          });
+        }
+      });
+      video.onPlay.listen((_) {
+        if (mounted) setState(() => _isPlaying = true);
+      });
+      video.onPause.listen((_) {
+        if (mounted) setState(() => _isPlaying = false);
+      });
+      video.onEnded.listen((_) {
+        if (mounted) {
+          setState(() {
+            _videoFinished = true;
+            _isPlaying = false;
+          });
+        }
+      });
+      video.onError.listen((_) {
+        final err = video.error;
+        String msg;
+        if (err != null) {
+          switch (err.code) {
+            case 1:
+              msg = 'Trình duyệt huỷ tải video.';
+              break;
+            case 2:
+              msg = 'Lỗi mạng khi tải video.';
+              break;
+            case 3:
+              msg = 'Không giải mã được video. Hãy upload .mp4 (H.264).';
+              break;
+            case 4:
+              msg = 'Định dạng không hỗ trợ.\nHãy upload .mp4 (H.264 + AAC).';
+              break;
+            default:
+              msg = 'Lỗi khi phát video (code ${err.code}).';
+          }
+        } else {
+          msg = 'Không tải được video.';
+        }
+        if (mounted) {
+          setState(() {
+            _initializing = false;
+            _error = msg;
+          });
+        }
+      });
+
+      // ignore: undefined_prefixed_name
+      ui_web.platformViewRegistry
+          .registerViewFactory(_viewType, (int _) => video);
+
+      _video = video;
+      if (mounted) setState(() {});
+
+      _tick = Timer.periodic(const Duration(milliseconds: 250), (_) => _onTick());
+
+      Future.delayed(const Duration(seconds: 8), () {
+        if (mounted && _initializing && _error == null) {
+          setState(() => _initializing = false);
+        }
       });
     } catch (e) {
       if (!mounted) return;
-      final raw = e.toString();
-      String msg;
-      if (raw.contains('MEDIA_ERR') ||
-          raw.contains('NotSupportedError') ||
-          raw.contains('format') ||
-          raw.contains('decode')) {
-        msg = 'Trình duyệt không phát được video này.\n'
-            'Hãy dùng URL .mp4 (H.264) trực tiếp.\n'
-            'Link Google Drive / YouTube không phát được.';
-      } else if (raw.contains('CORS') || raw.contains('cross-origin')) {
-        msg = 'Server video chặn CORS. Hãy bật CORS hoặc dùng host khác.';
-      } else if (raw.contains('Mixed Content') || raw.contains('http:')) {
-        msg = 'Video dùng HTTP nhưng trang HTTPS — vui lòng dùng URL https://';
-      } else {
-        msg = 'Không tải được video.\n$raw';
-      }
       setState(() {
         _initializing = false;
-        _error = msg;
+        _error = 'Không tải được video.\n$e';
       });
     }
   }
 
-  void _hardenWebVideoElement() {
-    if (!kIsWeb) return;
-    Future.delayed(const Duration(milliseconds: 400), () {
-      final videos = html.document.querySelectorAll('video');
-      for (final v in videos) {
-        v.setAttribute('controlslist', 'nodownload noplaybackrate noremoteplayback');
-        v.setAttribute('disablepictureinpicture', 'true');
-        v.setAttribute('oncontextmenu', 'return false;');
-        // Remove default controls — we render our own
-        (v as html.VideoElement).controls = false;
-      }
-    });
-  }
-
   void _onTick() {
-    final c = _controller;
-    if (c == null || !c.value.isInitialized) return;
-    final pos = c.value.position;
-    if (pos > _maxWatched + const Duration(milliseconds: 250)) {
-      // Forward jump detected (manual seek attempt) — clamp back to maxWatched
-      c.seekTo(_maxWatched);
+    final v = _video;
+    if (v == null) return;
+    final cur = v.currentTime;
+    if (!cur.isFinite) return;
+    final pos = Duration(milliseconds: (cur * 1000).toInt());
+    if (pos > _maxWatched + const Duration(milliseconds: 350)) {
+      v.currentTime = _maxWatched.inMilliseconds / 1000.0;
       return;
     }
-    if (pos > _maxWatched) {
-      _maxWatched = pos;
-    }
-    final isEnd = c.value.duration > Duration.zero &&
-        pos >= c.value.duration - const Duration(milliseconds: 600);
-    if (isEnd && !_videoFinished) {
-      _videoFinished = true;
-      c.pause();
-    }
+    if (pos > _maxWatched) _maxWatched = pos;
     if (mounted) {
-      setState(() => _isPlaying = c.value.isPlaying);
+      setState(() {
+        _position = pos;
+        if (_duration == Duration.zero && v.duration.isFinite) {
+          _duration = Duration(milliseconds: (v.duration * 1000).toInt());
+        }
+      });
     }
   }
 
   void _togglePlay() {
-    final c = _controller;
-    if (c == null) return;
-    if (c.value.isPlaying) {
-      c.pause();
+    final v = _video;
+    if (v == null) return;
+    if (!v.paused) {
+      v.pause();
     } else {
       if (_videoFinished) {
         _videoFinished = false;
         _maxWatched = Duration.zero;
-        c.seekTo(Duration.zero).then((_) => c.play());
-      } else {
-        c.play();
+        v.currentTime = 0;
       }
+      v.play();
     }
   }
 
   void _rewind() {
-    final c = _controller;
-    if (c == null) return;
-    final back = c.value.position - const Duration(seconds: 10);
-    c.seekTo(back < Duration.zero ? Duration.zero : back);
+    final v = _video;
+    if (v == null) return;
+    final back = v.currentTime - 10;
+    v.currentTime = back < 0 ? 0 : back;
   }
 
   String _fmt(Duration d) {
@@ -253,7 +287,8 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: Text(widget.lesson.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(widget.lesson.title,
+            maxLines: 1, overflow: TextOverflow.ellipsis),
       ),
       body: SelectionContainer.disabled(
         child: SingleChildScrollView(
@@ -288,6 +323,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
           fit: StackFit.expand,
           children: [
             Container(color: Colors.black),
+            if (_video != null) HtmlElementView(viewType: _viewType),
             if (_initializing)
               const Center(
                 child: CircularProgressIndicator(color: Colors.white),
@@ -311,20 +347,19 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
                       const SizedBox(height: 12),
                       const Text(
                         'Vui lòng liên hệ quản trị viên.',
-                        style: TextStyle(
-                            color: Colors.white54, fontSize: 12),
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
                       ),
                     ],
                   ),
                 ),
-              )
-            else if (_controller != null && _controller!.value.isInitialized)
-              VideoPlayer(_controller!),
-            // Tap blocker layer (no double-click fullscreen, no native menu)
-            Positioned.fill(
+              ),
+            // Tap layer for play/pause; leaves a 56px strip at bottom for controls.
+            Positioned(
+              left: 0, right: 0, top: 0, bottom: 56,
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: _togglePlay,
+                child: const SizedBox.expand(),
               ),
             ),
             if (_windowBlurred)
@@ -343,8 +378,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
                   ),
                 ),
               ),
-            // Custom controls bar
-            if (_controller != null && _controller!.value.isInitialized)
+            if (_video != null && _error == null)
               Positioned(
                 left: 0, right: 0, bottom: 0,
                 child: Container(
@@ -385,7 +419,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
                           ),
                           const Spacer(),
                           Text(
-                            '${_fmt(_controller!.value.position)} / ${_fmt(_controller!.value.duration)}',
+                            '${_fmt(_position)} / ${_fmt(_duration)}',
                             style: const TextStyle(
                                 color: Colors.white, fontSize: 12),
                           ),
@@ -409,9 +443,8 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
   }
 
   Widget _buildProgressBar() {
-    final c = _controller!;
-    final dur = c.value.duration.inMilliseconds.clamp(1, 1 << 31).toDouble();
-    final pos = c.value.position.inMilliseconds.toDouble();
+    final dur = _duration.inMilliseconds.clamp(1, 1 << 31).toDouble();
+    final pos = _position.inMilliseconds.toDouble();
     final watched = _maxWatched.inMilliseconds.toDouble();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -424,7 +457,6 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          // watched (light)
           FractionallySizedBox(
             widthFactor: (watched / dur).clamp(0.0, 1.0),
             child: Container(
@@ -435,7 +467,6 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
               ),
             ),
           ),
-          // current (primary)
           FractionallySizedBox(
             widthFactor: (pos / dur).clamp(0.0, 1.0),
             child: Container(
@@ -478,7 +509,8 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
                         fontWeight: FontWeight.w600)),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.lock_rounded, size: 14, color: AppColors.textHint),
+              const Icon(Icons.lock_rounded,
+                  size: 14, color: AppColors.textHint),
               const SizedBox(width: 4),
               Text('Không tải/tua nhanh/chụp màn hình',
                   style: AppTextStyles.caption),
