@@ -217,14 +217,6 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
     return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 
-  void _openVideoInNewTab() {
-    final url = (_detail?['videoUrl'] as String?) ?? widget.lesson.videoUrl ?? '';
-    if (url.isEmpty) return;
-    if (kIsWeb) {
-      html.window.open(url, '_blank');
-    }
-  }
-
   Future<void> _openQuiz() async {
     final detail = _detail;
     if (detail == null) return;
@@ -300,40 +292,20 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.error_outline_rounded,
+                      const Icon(Icons.lock_rounded,
                           color: Colors.white70, size: 36),
                       const SizedBox(height: 10),
                       Text(
                         _error!,
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        style: const TextStyle(
+                            color: Colors.white, fontSize: 13, height: 1.4),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        alignment: WrapAlignment.center,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: _openVideoInNewTab,
-                            icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                            label: const Text('Mở video tab mới'),
-                          ),
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _videoFinished = true;
-                                _error = null;
-                              });
-                            },
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              side: const BorderSide(color: Colors.white54),
-                            ),
-                            icon: const Icon(Icons.check_rounded, size: 16),
-                            label: const Text('Đã xem — vào kiểm tra'),
-                          ),
-                        ],
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Vui lòng liên hệ quản trị viên.',
+                        style: TextStyle(
+                            color: Colors.white54, fontSize: 12),
                       ),
                     ],
                   ),
