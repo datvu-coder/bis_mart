@@ -127,9 +127,25 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
       });
     } catch (e) {
       if (!mounted) return;
+      final raw = e.toString();
+      String msg;
+      if (raw.contains('MEDIA_ERR') ||
+          raw.contains('NotSupportedError') ||
+          raw.contains('format') ||
+          raw.contains('decode')) {
+        msg = 'Trình duyệt không phát được video này.\n'
+            'Hãy dùng URL .mp4 (H.264) trực tiếp.\n'
+            'Link Google Drive / YouTube không phát được.';
+      } else if (raw.contains('CORS') || raw.contains('cross-origin')) {
+        msg = 'Server video chặn CORS. Hãy bật CORS hoặc dùng host khác.';
+      } else if (raw.contains('Mixed Content') || raw.contains('http:')) {
+        msg = 'Video dùng HTTP nhưng trang HTTPS — vui lòng dùng URL https://';
+      } else {
+        msg = 'Không tải được video.\n$raw';
+      }
       setState(() {
         _initializing = false;
-        _error = 'Không tải được video: $e';
+        _error = msg;
       });
     }
   }
@@ -199,6 +215,14 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     final h = d.inHours;
     return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
+
+  void _openVideoInNewTab() {
+    final url = (_detail?['videoUrl'] as String?) ?? widget.lesson.videoUrl ?? '';
+    if (url.isEmpty) return;
+    if (kIsWeb) {
+      html.window.open(url, '_blank');
+    }
   }
 
   Future<void> _openQuiz() async {
@@ -272,11 +296,46 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
             else if (_error != null)
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.white),
-                    textAlign: TextAlign.center,
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.error_outline_rounded,
+                          color: Colors.white70, size: 36),
+                      const SizedBox(height: 10),
+                      Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 14),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _openVideoInNewTab,
+                            icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                            label: const Text('Mở video tab mới'),
+                          ),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _videoFinished = true;
+                                _error = null;
+                              });
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              side: const BorderSide(color: Colors.white54),
+                            ),
+                            icon: const Icon(Icons.check_rounded, size: 16),
+                            label: const Text('Đã xem — vào kiểm tra'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               )
