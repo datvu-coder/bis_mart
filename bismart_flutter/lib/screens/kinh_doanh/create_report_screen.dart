@@ -111,20 +111,23 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                       children: [
                         Expanded(
                           flex: 5,
-                          child: _buildInfoCard(user, currentStore, innerPad),
+                          child: _buildInfoCard(user, currentStore, innerPad,
+                              showSaleOutBanner: false),
                         ),
                         const SizedBox(width: 20),
                         Expanded(
                           flex: 6,
-                          child: _buildProductsCard(innerPad),
+                          child: _buildProductsCard(innerPad,
+                              showBanner: true),
                         ),
                       ],
                     )
                   : Column(
                       children: [
-                        _buildInfoCard(user, currentStore, innerPad),
+                        _buildProductsCard(innerPad, showBanner: false),
                         const SizedBox(height: 16),
-                        _buildProductsCard(innerPad),
+                        _buildInfoCard(user, currentStore, innerPad,
+                            showSaleOutBanner: true),
                       ],
                     ),
             ),
@@ -140,7 +143,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
       );
 
-  Widget _buildInfoCard(dynamic user, dynamic currentStore, double pad) {
+  Widget _buildInfoCard(dynamic user, dynamic currentStore, double pad,
+      {bool showSaleOutBanner = false}) {
     return Container(
       padding: EdgeInsets.all(pad),
       decoration: _cardDecoration,
@@ -254,6 +258,12 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           ),
           const SizedBox(height: 16),
 
+          // Sale Out banner (mobile only — above Doanh thu)
+          if (showSaleOutBanner) ...[
+            _buildSaleOutBanner(),
+            const SizedBox(height: 16),
+          ],
+
           // Doanh thu
           _buildLabel(AppStrings.doanhThu, required: true),
           TextFormField(
@@ -303,65 +313,68 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     );
   }
 
-  Widget _buildProductsCard(double pad) {
+  Widget _buildSaleOutBanner() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withValues(alpha: 0.08),
+            AppColors.accent.withValues(alpha: 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: const Icon(Icons.point_of_sale_rounded,
+                color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Sale Out', style: AppTextStyles.metricLabel),
+                const SizedBox(height: 2),
+                Text(
+                  CurrencyFormatter.formatVND(_saleOut),
+                  style: AppTextStyles.sectionHeader.copyWith(
+                    color: AppColors.primary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '${_products.length} SP',
+            style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductsCard(double pad, {bool showBanner = true}) {
     return Container(
       padding: EdgeInsets.all(pad),
       decoration: _cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Sale Out summary (auto = sum of products)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primary.withValues(alpha: 0.08),
-                  AppColors.accent.withValues(alpha: 0.04),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 38, height: 38,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: const Icon(Icons.point_of_sale_rounded,
-                      color: AppColors.primary, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Sale Out',
-                          style: AppTextStyles.metricLabel),
-                      const SizedBox(height: 2),
-                      Text(
-                        CurrencyFormatter.formatVND(_saleOut),
-                        style: AppTextStyles.sectionHeader.copyWith(
-                          color: AppColors.primary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-                Text(
-                  '${_products.length} SP',
-                  style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
+          if (showBanner) ...[
+            _buildSaleOutBanner(),
+            const SizedBox(height: 16),
+          ],
           _buildLabel(AppStrings.danhSachSanPhamField),
           if (_products.isEmpty)
             Container(
