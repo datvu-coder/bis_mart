@@ -22,11 +22,13 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
   final _formKey = GlobalKey<FormState>();
   DateTime _selectedDate = DateTime.now();
   int _nu = 0;
-  final _saleOutController = TextEditingController();
   final _revenueController = TextEditingController();
   final List<SaleItem> _products = [];
   bool _isSubmitting = false;
   SalesReport? _editingReport;
+
+  double get _saleOut =>
+      _products.fold<double>(0, (sum, p) => sum + p.total);
 
   @override
   void didChangeDependencies() {
@@ -37,7 +39,6 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         _editingReport = arg;
         _selectedDate = arg.date;
         _nu = arg.nu;
-        _saleOutController.text = arg.saleOut.toStringAsFixed(0);
         _revenueController.text = arg.revenue.toStringAsFixed(0);
         _products.addAll(arg.products);
       }
@@ -56,9 +57,22 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
 
   @override
   void dispose() {
-    _saleOutController.dispose();
     _revenueController.dispose();
     super.dispose();
+  }
+
+  void _updateQty(int index, int delta) {
+    final item = _products[index];
+    final newQty = item.quantity + delta;
+    if (newQty < 1) return;
+    setState(() {
+      _products[index] = SaleItem(
+        productId: item.productId,
+        productName: item.productName,
+        quantity: newQty,
+        unitPrice: item.unitPrice,
+      );
+    });
   }
 
   @override
@@ -72,251 +86,442 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           )
         : null;
 
+    final width = MediaQuery.of(context).size.width;
+    final isDesktop = width >= 1100;
+    final isTablet = width >= 700 && width < 1100;
+    final outerPad = isDesktop ? 32.0 : (isTablet ? 24.0 : 12.0);
+    final innerPad = isDesktop ? 28.0 : (isTablet ? 22.0 : 16.0);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(_editingReport != null ? 'Chỉnh sửa báo cáo' : AppStrings.taoPhieuBaoCao),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColors.cardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+        padding: EdgeInsets.all(outerPad),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: isDesktop ? 1100 : 720),
+            child: Form(
+              key: _formKey,
+              child: isDesktop
+                  ? Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 5,
+                          child: _buildInfoCard(user, currentStore, innerPad),
+                        ),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          flex: 6,
+                          child: _buildProductsCard(innerPad),
+                        ),
+                      ],
+                    )
+                  : Column(
+                      children: [
+                        _buildInfoCard(user, currentStore, innerPad),
+                        const SizedBox(height: 16),
+                        _buildProductsCard(innerPad),
+                      ],
+                    ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+        ),
+      ),
+    );
+  }
+
+  BoxDecoration get _cardDecoration => BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+      );
+
+  Widget _buildInfoCard(dynamic user, dynamic currentStore, double pad) {
+    return Container(
+      padding: EdgeInsets.all(pad),
+      decoration: _cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(AppStrings.taoPhieuBaoCao, style: AppTextStyles.appTitle),
+          const SizedBox(height: 4),
+          Text('Điền thông tin báo cáo bán hàng hàng ngày',
+              style: AppTextStyles.caption),
+          const SizedBox(height: 24),
+
+          // Date picker
+          _buildLabel(AppStrings.ngay, required: true),
+          InkWell(
+            onTap: _pickDate,
+            borderRadius: BorderRadius.circular(12),
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                suffixIcon: Icon(Icons.calendar_today_rounded, size: 20),
+              ),
+              child: Text(
+                '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
+                style: AppTextStyles.bodyText,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // PG (auto-fill)
+          _buildLabel(AppStrings.pg, required: true),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
               children: [
-                Text(AppStrings.taoPhieuBaoCao, style: AppTextStyles.appTitle),
-                const SizedBox(height: 4),
-                Text('Điền thông tin báo cáo bán hàng hàng ngày',
-                    style: AppTextStyles.caption),
-                const SizedBox(height: 24),
-
-                // Date picker
-                _buildLabel(AppStrings.ngay, required: true),
-                InkWell(
-                  onTap: _pickDate,
-                  borderRadius: BorderRadius.circular(12),
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      suffixIcon: Icon(Icons.calendar_today_rounded, size: 20),
-                    ),
-                    child: Text(
-                      '${_selectedDate.day.toString().padLeft(2, '0')}/${_selectedDate.month.toString().padLeft(2, '0')}/${_selectedDate.year}',
-                      style: AppTextStyles.bodyText,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // PG (auto-fill)
-                _buildLabel(AppStrings.pg, required: true),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.person_rounded, size: 18, color: AppColors.textGrey),
-                      const SizedBox(width: 10),
-                      Text(user?.fullName ?? 'N/A', style: AppTextStyles.bodyText),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Store info (fixed by employee assignment)
-                _buildLabel('Cửa hàng'),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.store_rounded, size: 18, color: AppColors.textGrey),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          currentStore != null
-                              ? '${currentStore.name} (${currentStore.storeCode})'
-                              : ((user?.storeCode != null && user!.storeCode!.isNotEmpty)
-                                  ? 'Mã cửa hàng ${user.storeCode}'
-                                  : 'Chưa gán cửa hàng'),
-                          style: AppTextStyles.bodyText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // NU stepper
-                _buildLabel(AppStrings.nu),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        onPressed: () {
-                          if (_nu > 0) setState(() => _nu--);
-                        },
-                        icon: const Icon(Icons.remove_circle_rounded, size: 22),
-                        color: AppColors.primary,
-                      ),
-                      Container(
-                        width: 48,
-                        alignment: Alignment.center,
-                        child: Text(
-                          '$_nu',
-                          style: AppTextStyles.sectionHeader,
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => setState(() => _nu++),
-                        icon: const Icon(Icons.add_circle_rounded, size: 22),
-                        color: AppColors.primary,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Sale Out
-                _buildLabel('Sale Out'),
-                TextFormField(
-                  controller: _saleOutController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    hintText: 'Nhập Sale Out',
-                    suffixText: 'đ',
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Product list
-                _buildLabel(AppStrings.danhSachSanPhamField),
-                if (_products.isNotEmpty)
-                  ..._products.asMap().entries.map((entry) {
-                    final item = entry.value;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 6),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item.productName,
-                                    style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500)),
-                                Text(
-                                  'SL: ${item.quantity} × ${CurrencyFormatter.formatVND(item.unitPrice)}',
-                                  style: AppTextStyles.caption,
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            CurrencyFormatter.formatVND(item.total),
-                            style: AppTextStyles.bodyText.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          InkWell(
-                            onTap: () => setState(() => _products.removeAt(entry.key)),
-                            borderRadius: BorderRadius.circular(6),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: AppColors.errorLight,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Icon(Icons.close_rounded,
-                                  size: 16, color: AppColors.error),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }),
-                TextButton.icon(
-                  onPressed: _addProduct,
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Thêm sản phẩm'),
-                  style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-                ),
-                const SizedBox(height: 16),
-
-                // Doanh thu
-                _buildLabel(AppStrings.doanhThu, required: true),
-                TextFormField(
-                  controller: _revenueController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    hintText: 'Nhập doanh thu',
-                    suffixText: 'đ',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Vui lòng nhập doanh thu';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 28),
-
-                // Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text(AppStrings.huy),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton.icon(
-                        onPressed: _isSubmitting ? null : _submitForm,
-                        icon: _isSubmitting
-                            ? const SizedBox(
-                                width: 18, height: 18,
-                                child: CircularProgressIndicator(
-                                    color: AppColors.white, strokeWidth: 2),
-                              )
-                            : const Icon(Icons.save_rounded, size: 18),
-                        label: const Text(AppStrings.luu),
-                      ),
-                    ),
-                  ],
+                const Icon(Icons.person_rounded, size: 18, color: AppColors.textGrey),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(user?.fullName ?? 'N/A',
+                      style: AppTextStyles.bodyText, overflow: TextOverflow.ellipsis),
                 ),
               ],
             ),
           ),
-        ),
+          const SizedBox(height: 12),
+
+          // Store info (fixed by employee assignment)
+          _buildLabel('Cửa hàng'),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.store_rounded, size: 18, color: AppColors.textGrey),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    currentStore != null
+                        ? '${currentStore.name} (${currentStore.storeCode})'
+                        : ((user?.storeCode != null && user!.storeCode!.isNotEmpty)
+                            ? 'Mã cửa hàng ${user.storeCode}'
+                            : 'Chưa gán cửa hàng'),
+                    style: AppTextStyles.bodyText,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // NU stepper
+          _buildLabel(AppStrings.nu),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    if (_nu > 0) setState(() => _nu--);
+                  },
+                  icon: const Icon(Icons.remove_circle_rounded, size: 22),
+                  color: AppColors.primary,
+                ),
+                Container(
+                  width: 48,
+                  alignment: Alignment.center,
+                  child: Text('$_nu', style: AppTextStyles.sectionHeader),
+                ),
+                IconButton(
+                  onPressed: () => setState(() => _nu++),
+                  icon: const Icon(Icons.add_circle_rounded, size: 22),
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Doanh thu
+          _buildLabel(AppStrings.doanhThu, required: true),
+          TextFormField(
+            controller: _revenueController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              hintText: 'Nhập doanh thu',
+              suffixText: 'đ',
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Vui lòng nhập doanh thu';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 24),
+
+          // Buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(AppStrings.huy),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: _isSubmitting ? null : _submitForm,
+                  icon: _isSubmitting
+                      ? const SizedBox(
+                          width: 18, height: 18,
+                          child: CircularProgressIndicator(
+                              color: AppColors.white, strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_rounded, size: 18),
+                  label: const Text(AppStrings.luu),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProductsCard(double pad) {
+    return Container(
+      padding: EdgeInsets.all(pad),
+      decoration: _cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Sale Out summary (auto = sum of products)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.primary.withValues(alpha: 0.08),
+                  AppColors.accent.withValues(alpha: 0.04),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 38, height: 38,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Icon(Icons.point_of_sale_rounded,
+                      color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Sale Out',
+                          style: AppTextStyles.metricLabel),
+                      const SizedBox(height: 2),
+                      Text(
+                        CurrencyFormatter.formatVND(_saleOut),
+                        style: AppTextStyles.sectionHeader.copyWith(
+                          color: AppColors.primary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  '${_products.length} SP',
+                  style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          _buildLabel(AppStrings.danhSachSanPhamField),
+          if (_products.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.border.withValues(alpha: 0.4),
+                  style: BorderStyle.solid,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.inventory_2_outlined,
+                      size: 32, color: AppColors.textHint),
+                  const SizedBox(height: 8),
+                  Text('Chưa có sản phẩm',
+                      style: AppTextStyles.caption),
+                ],
+              ),
+            ),
+          ..._products.asMap().entries.map((entry) {
+            final i = entry.key;
+            final item = entry.value;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border.withValues(alpha: 0.35)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.productName,
+                          style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => setState(() => _products.removeAt(i)),
+                        borderRadius: BorderRadius.circular(6),
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: AppColors.errorLight,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(Icons.close_rounded,
+                              size: 16, color: AppColors.error),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Đơn giá: ${CurrencyFormatter.formatVND(item.unitPrice)}',
+                    style: AppTextStyles.caption,
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      // Quantity stepper
+                      Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.cardBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InkWell(
+                              onTap: item.quantity > 1
+                                  ? () => _updateQty(i, -1)
+                                  : null,
+                              borderRadius: const BorderRadius.horizontal(
+                                  left: Radius.circular(10)),
+                              child: Container(
+                                width: 36, height: 36,
+                                alignment: Alignment.center,
+                                child: Icon(
+                                  Icons.remove_rounded,
+                                  size: 18,
+                                  color: item.quantity > 1
+                                      ? AppColors.primary
+                                      : AppColors.textHint,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              width: 44, height: 36,
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(
+                                border: Border.symmetric(
+                                  vertical: BorderSide(color: AppColors.border),
+                                ),
+                              ),
+                              child: Text(
+                                '${item.quantity}',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textDark,
+                                ),
+                              ),
+                            ),
+                            InkWell(
+                              onTap: () => _updateQty(i, 1),
+                              borderRadius: const BorderRadius.horizontal(
+                                  right: Radius.circular(10)),
+                              child: Container(
+                                width: 36, height: 36,
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.add_rounded,
+                                  size: 18,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        CurrencyFormatter.formatVND(item.total),
+                        style: AppTextStyles.bodyText.copyWith(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _addProduct,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('Thêm sản phẩm'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: BorderSide(
+                    color: AppColors.primary.withValues(alpha: 0.4)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -558,7 +763,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         date: _selectedDate,
         pgName: user?.fullName ?? '',
         nu: _nu,
-        saleOut: double.tryParse(_saleOutController.text) ?? 0,
+        saleOut: _saleOut,
         products: _products,
         revenue: double.tryParse(_revenueController.text) ?? 0,
         storeCode: user?.storeCode,
