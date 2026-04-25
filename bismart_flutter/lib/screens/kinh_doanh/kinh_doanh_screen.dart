@@ -11,6 +11,7 @@ import '../../providers/sales_provider.dart';
 import '../../services/export_service.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/filter_dropdown.dart';
+import '../../widgets/common/weighted_tab_selector.dart';
 
 class KinhDoanhScreen extends StatefulWidget {
   const KinhDoanhScreen({super.key});
@@ -93,9 +94,9 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 borderRadius: BorderRadius.circular(14),
               ),
               child: isDesktop
-                  ? _buildDesktopTabSelector(
+                  ? WeightedTabSelector(
+                      controller: _tabController,
                       labels: const ['Báo cáo', 'Thống kê', 'Bộ lọc'],
-                      flexes: const [2, 1, 1],
                     )
                   : TabBar(
                       controller: _tabController,
@@ -109,10 +110,10 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                       indicatorSize: TabBarIndicatorSize.tab,
                       dividerColor: Colors.transparent,
                       labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-                      labelStyle:
-                          const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                      unselectedLabelStyle:
-                          const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      labelStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700),
+                      unselectedLabelStyle: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w500),
                       tabs: const [
                         Tab(text: 'Báo cáo'),
                         Tab(text: 'Thống kê'),
@@ -152,50 +153,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   }
 
   // ── Header ────────────────────────────────────────────────────────────────
-
-  Widget _buildDesktopTabSelector({
-    required List<String> labels,
-    required List<int> flexes,
-  }) {
-    return AnimatedBuilder(
-      animation: _tabController,
-      builder: (context, _) {
-        return Row(
-          children: List.generate(labels.length, (index) {
-            final selected = _tabController.index == index;
-            return Expanded(
-              flex: flexes[index],
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () => _tabController.animateTo(index),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      labels[index],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                        color: selected ? AppColors.primary : AppColors.textGrey,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
 
   Widget _buildScreenHeader(SalesProvider provider, bool emphasize) {
     final totalRev = provider.totalRevenue;

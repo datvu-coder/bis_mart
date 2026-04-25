@@ -15,6 +15,7 @@ import '../../models/work_shift.dart';
 import '../../providers/permission_provider.dart';
 import '../../services/location_service.dart';
 import '../../widgets/common/data_panel.dart';
+import '../../widgets/common/weighted_tab_selector.dart';
 import '../../widgets/cards/rank_list_tile.dart';
 
 class NhanSuScreen extends StatefulWidget {
@@ -109,9 +110,9 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 borderRadius: BorderRadius.circular(14),
               ),
               child: isDesktop
-                  ? _buildDesktopTabSelector(
+                  ? WeightedTabSelector(
+                      controller: _tabController,
                       labels: const ['Chấm công', 'Ca làm', 'Xếp hạng', 'Lịch'],
-                      flexes: const [2, 2, 1, 1],
                     )
                   : TabBar(
                       controller: _tabController,
@@ -159,50 +160,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               ),
             ),
           ],
-        );
-      },
-    );
-  }
-
-  Widget _buildDesktopTabSelector({
-    required List<String> labels,
-    required List<int> flexes,
-  }) {
-    return AnimatedBuilder(
-      animation: _tabController,
-      builder: (context, _) {
-        return Row(
-          children: List.generate(labels.length, (index) {
-            final selected = _tabController.index == index;
-            return Expanded(
-              flex: flexes[index],
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () => _tabController.animateTo(index),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.white : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      labels[index],
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                        color: selected ? AppColors.primary : AppColors.textGrey,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
         );
       },
     );
