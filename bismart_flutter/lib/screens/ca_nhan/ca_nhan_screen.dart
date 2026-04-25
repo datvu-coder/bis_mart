@@ -33,8 +33,52 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width > 800;
+    final width = MediaQuery.of(context).size.width;
+    final isWide = width > 800;
+    final isDesktop = width >= 1100;
     final user = context.watch<AuthProvider>().currentUser;
+
+    if (isDesktop) {
+      return SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(32, 24, 32, 32),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1200),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(AppStrings.caNhan, style: AppTextStyles.appTitle),
+                const SizedBox(height: 4),
+                Text('Thông tin cá nhân & quản lý', style: AppTextStyles.caption),
+                const SizedBox(height: 24),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildProfileCard(context, user),
+                          const SizedBox(height: 20),
+                          _buildStatsRow(user),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      flex: 7,
+                      child: _buildMenuSection(context),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(isWide ? 24 : 16),

@@ -10,6 +10,7 @@ import '../../models/sales_report.dart';
 import '../../providers/sales_provider.dart';
 import '../../services/export_service.dart';
 import '../../widgets/common/data_panel.dart';
+import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/filter_dropdown.dart';
 import '../../widgets/common/weighted_tab_selector.dart';
 
@@ -61,7 +62,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
 
         // Tab layout for all screen sizes
-        return Column(
+        final body = Column(
           children: [
             if (!isCompactMobile)
               Padding(
@@ -148,6 +149,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
             ),
           ],
         );
+        return isDesktop ? DesktopMaxWidth(child: body) : body;
       },
     );
   }

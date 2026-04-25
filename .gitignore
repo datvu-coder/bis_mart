@@ -16,7 +16,6 @@ bismart.db-wal
 bismart_flutter/.dart_tool/
 bismart_flutter/.idea/
 bismart_flutter/.packages
-bismart_flutter/build/
 bismart_flutter/.flutter-plugins
 bismart_flutter/.flutter-plugins-dependencies
 bismart_flutter/android/.gradle/

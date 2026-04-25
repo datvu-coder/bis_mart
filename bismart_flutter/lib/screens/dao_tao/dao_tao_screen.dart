@@ -10,6 +10,7 @@ import '../../core/constants/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/training_provider.dart';
+import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/weighted_tab_selector.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/cards/lesson_card.dart';
@@ -76,7 +77,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
 
         // Tab layout for all screen sizes
-        return Column(
+        final body = Column(
             children: [
               if (!isCompactMobile)
                 Padding(
@@ -144,6 +145,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               ),
             ],
           );
+        return isDesktop ? DesktopMaxWidth(child: body) : body;
       },
     );
   }
