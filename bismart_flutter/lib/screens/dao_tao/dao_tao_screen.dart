@@ -82,7 +82,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           );
         }
 
-        final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
+        final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 1.5;
 
         // Tab layout for all screen sizes
         final body = Column(
