@@ -93,10 +93,17 @@ class _LessonDetailScreenState extends State<LessonDetailScreen>
 
   Future<void> _bootstrap() async {
     try {
-      final detail = await ApiService().getLessonDetail(widget.lesson.id);
+      final api = ApiService();
+      final detail = await api.getLessonDetail(widget.lesson.id);
       if (!mounted) return;
       _detail = detail;
-      final url = (detail['videoUrl'] as String?) ?? widget.lesson.videoUrl ?? '';
+      String url = '';
+      final videoPath = (detail['videoPath'] as String?) ?? '';
+      if (videoPath.isNotEmpty) {
+        url = await api.buildLessonVideoUrl(widget.lesson.id);
+      } else {
+        url = (detail['videoUrl'] as String?) ?? widget.lesson.videoUrl ?? '';
+      }
       if (url.isEmpty) {
         setState(() {
           _initializing = false;

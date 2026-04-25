@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 // ignore: avoid_web_libraries_in_flutter
@@ -10,6 +12,7 @@ import '../../core/constants/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/training_provider.dart';
+import '../../services/api_service.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/weighted_tab_selector.dart';
 import '../../widgets/common/data_panel.dart';
@@ -1530,12 +1533,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   void _showCreateLessonDialog(TrainingProvider provider) {
     final titleCtrl = TextEditingController();
     final descCtrl = TextEditingController();
-    final videoCtrl = TextEditingController();
     final thumbCtrl = TextEditingController();
     String role = 'ALL';
     final List<_QuizDraft> drafts = [_QuizDraft()];
     String? errorMsg;
     bool busy = false;
+    double uploadProgress = 0;
+    Uint8List? videoBytes;
+    String? videoFilename;
     final parentMessenger = ScaffoldMessenger.of(context);
 
     showDialog(
@@ -1586,11 +1591,68 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                           ),
                         ),
                         const SizedBox(height: 10),
-                        TextField(
-                          controller: videoCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'URL video (mp4 trực tiếp) *',
-                            hintText: 'https://...',
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: AppColors.border.withValues(alpha: 0.4)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('File video *',
+                                  style: AppTextStyles.bodyTextMedium),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: busy
+                                        ? null
+                                        : () async {
+                                            final res = await FilePicker.platform.pickFiles(
+                                              type: FileType.video,
+                                              withData: true,
+                                            );
+                                            if (res != null && res.files.isNotEmpty) {
+                                              final f = res.files.first;
+                                              if (f.bytes != null) {
+                                                setS(() {
+                                                  videoBytes = f.bytes;
+                                                  videoFilename = f.name;
+                                                });
+                                              }
+                                            }
+                                          },
+                                    icon: const Icon(
+                                        Icons.upload_file_rounded,
+                                        size: 18),
+                                    label: const Text('Chọn file'),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      videoFilename == null
+                                          ? 'Chưa chọn file (mp4/webm/mov)'
+                                          : '$videoFilename (${(videoBytes!.length / 1024 / 1024).toStringAsFixed(1)} MB)',
+                                      style: AppTextStyles.caption,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (busy && uploadProgress > 0 && uploadProgress < 1) ...[
+                                const SizedBox(height: 8),
+                                LinearProgressIndicator(value: uploadProgress),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Đang upload: ${(uploadProgress * 100).toStringAsFixed(0)}%',
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                         const SizedBox(height: 10),
@@ -1653,8 +1715,12 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                       onPressed: busy
                           ? null
                           : () async {
-                        if (titleCtrl.text.trim().isEmpty || videoCtrl.text.trim().isEmpty) {
-                          setS(() => errorMsg = 'Vui lòng nhập tên bài giảng và URL video');
+                        if (titleCtrl.text.trim().isEmpty) {
+                          setS(() => errorMsg = 'Vui lòng nhập tên bài giảng');
+                          return;
+                        }
+                        if (videoBytes == null) {
+                          setS(() => errorMsg = 'Vui lòng chọn file video');
                           return;
                         }
                         final qs = drafts
@@ -1672,12 +1738,23 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                         setS(() {
                           busy = true;
                           errorMsg = null;
+                          uploadProgress = 0;
                         });
                         try {
+                          final videoPath =
+                              await ApiService().uploadLessonVideo(
+                            bytes: videoBytes!,
+                            filename: videoFilename ?? 'video.mp4',
+                            onProgress: (sent, total) {
+                              if (total > 0) {
+                                setS(() => uploadProgress = sent / total);
+                              }
+                            },
+                          );
                           await provider.createLesson({
                             'title': titleCtrl.text.trim(),
                             'description': descCtrl.text.trim(),
-                            'videoUrl': videoCtrl.text.trim(),
+                            'videoPath': videoPath,
                             'thumbnailUrl': thumbCtrl.text.trim(),
                             'targetRole': role,
                             'questions': qs,
@@ -1692,7 +1769,11 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                           });
                         }
                       },
-                      child: Text(busy ? 'Đang lưu...' : 'Lưu bài giảng'),
+                      child: Text(busy
+                          ? (uploadProgress > 0 && uploadProgress < 1
+                              ? 'Upload ${(uploadProgress * 100).toStringAsFixed(0)}%'
+                              : 'Đang lưu...')
+                          : 'Lưu bài giảng'),
                     ),
                   ),
                 ),

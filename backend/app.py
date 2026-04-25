@@ -7,7 +7,9 @@ from __future__ import annotations
 
 import json
 import math
+import mimetypes
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
@@ -16,8 +18,9 @@ from typing import Any
 import jwt
 import psycopg
 from psycopg.rows import dict_row
-from flask import Flask, g, jsonify, request
+from flask import Flask, Response, g, jsonify, request, stream_with_context
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 
 # PostgreSQL ONLY - no SQLite fallback
 BASE_DIR = Path(__file__).resolve().parent
@@ -29,10 +32,19 @@ DB_READY = False
 VN_TZ = timezone(timedelta(hours=7))
 JWT_SECRET = os.getenv("SECRET_KEY", "bismart-dev-secret-key")
 JWT_EXP_HOURS = 72
+LESSON_VIDEO_DIR = Path(os.getenv("LESSON_VIDEO_DIR", "/data/lesson_videos"))
+try:
+    LESSON_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    LESSON_VIDEO_DIR = Path(os.getenv("BASE_DIR", ".")) / "lesson_videos"
+    LESSON_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+MAX_VIDEO_BYTES = int(os.getenv("MAX_VIDEO_BYTES", str(1024 * 1024 * 1024)))  # 1GB
+ALLOWED_VIDEO_EXT = {".mp4", ".webm", ".mov", ".m4v"}
 CORS_ALLOW_HEADERS = "Content-Type, Authorization"
 CORS_ALLOW_METHODS = "GET, POST, PUT, DELETE, OPTIONS"
 app = Flask(__name__)
 app.config["SECRET_KEY"] = JWT_SECRET
+app.config["MAX_CONTENT_LENGTH"] = MAX_VIDEO_BYTES + (5 * 1024 * 1024)
 DBIntegrityError = psycopg.IntegrityError
 
 def get_db():
@@ -1584,6 +1596,7 @@ def _ensure_training_tables(db):
         """)
         cur.execute("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS description TEXT NOT NULL DEFAULT ''")
         cur.execute("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT CURRENT_TIMESTAMP")
+        cur.execute("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS video_path TEXT")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS quiz_questions (
                 id SERIAL PRIMARY KEY,
@@ -1670,6 +1683,7 @@ def _lesson_to_json(row, question_count=0):
         "targetRole": row.get("target_role") or "ALL",
         "isRestricted": bool(row.get("is_restricted")),
         "videoUrl": row.get("video_url"),
+        "videoPath": row.get("video_path") or "",
         "questionCount": int(question_count or 0),
     }
 
@@ -1681,7 +1695,7 @@ def api_get_lessons():
     _ensure_training_tables(db)
     with db.cursor() as cur:
         cur.execute(
-            "SELECT l.id, l.title, l.thumbnail_url, l.description, l.target_role, l.is_restricted, l.video_url, "
+            "SELECT l.id, l.title, l.thumbnail_url, l.description, l.target_role, l.is_restricted, l.video_url, l.video_path, "
             "(SELECT COUNT(*) FROM quiz_questions q WHERE q.content_id = ('lesson_' || l.id::text)) AS question_count "
             "FROM lessons l ORDER BY l.id DESC"
         )
@@ -1697,7 +1711,7 @@ def api_get_lesson_detail(lesson_id: int):
     content_id = f"lesson_{lesson_id}"
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, title, thumbnail_url, description, target_role, is_restricted, video_url "
+            "SELECT id, title, thumbnail_url, description, target_role, is_restricted, video_url, video_path "
             "FROM lessons WHERE id = %s",
             (lesson_id,),
         )
@@ -1738,9 +1752,9 @@ def api_create_lesson():
     _ensure_training_tables(db)
     with db.cursor() as cur:
         cur.execute(
-            "INSERT INTO lessons (title, thumbnail_url, description, target_role, is_restricted, video_url) "
-            "VALUES (%s, %s, %s, %s, %s, %s) "
-            "RETURNING id, title, thumbnail_url, description, target_role, is_restricted, video_url",
+            "INSERT INTO lessons (title, thumbnail_url, description, target_role, is_restricted, video_url, video_path) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING id, title, thumbnail_url, description, target_role, is_restricted, video_url, video_path",
             (
                 title,
                 data.get("thumbnailUrl") or "",
@@ -1748,6 +1762,7 @@ def api_create_lesson():
                 data.get("targetRole") or "ALL",
                 1 if data.get("isRestricted") else 0,
                 data.get("videoUrl") or "",
+                data.get("videoPath") or "",
             ),
         )
         row = cur.fetchone()
@@ -1820,6 +1835,120 @@ def api_delete_lesson(lesson_id: int):
         cur.execute("DELETE FROM lessons WHERE id = %s", (lesson_id,))
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.post("/api/lessons/upload-video")
+@login_required
+def api_upload_lesson_video():
+    if not _is_admin_user():
+        return jsonify({"error": "Forbidden"}), 403
+    f = request.files.get("file") or request.files.get("video")
+    if not f:
+        return jsonify({"error": "no file"}), 400
+    name = secure_filename(f.filename or "video")
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in ALLOWED_VIDEO_EXT:
+        return jsonify({"error": f"ext {ext} not allowed"}), 400
+    fname = f"{uuid.uuid4().hex}{ext}"
+    target = LESSON_VIDEO_DIR / fname
+    f.save(target)
+    try:
+        size = target.stat().st_size
+    except Exception:
+        size = 0
+    if size > MAX_VIDEO_BYTES:
+        try:
+            target.unlink()
+        except Exception:
+            pass
+        return jsonify({"error": "file too large"}), 413
+    return jsonify({"videoPath": fname, "size": size})
+
+
+def _resolve_video_token():
+    """Auth for video streaming: accept Bearer header OR ?t= query param."""
+    user = get_current_user()
+    if user:
+        return user
+    tok = request.args.get("t")
+    if not tok:
+        return None
+    try:
+        return jwt.decode(tok, JWT_SECRET, algorithms=["HS256"])
+    except Exception:
+        return None
+
+
+@app.get("/api/lessons/<int:lesson_id>/video")
+def api_stream_lesson_video(lesson_id: int):
+    user = _resolve_video_token()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    db = get_db()
+    _ensure_training_tables(db)
+    with db.cursor() as cur:
+        cur.execute("SELECT video_path FROM lessons WHERE id = %s", (lesson_id,))
+        row = cur.fetchone()
+    if not row or not row.get("video_path"):
+        return jsonify({"error": "no video"}), 404
+    fname = secure_filename(row["video_path"])
+    full = LESSON_VIDEO_DIR / fname
+    if not full.is_file():
+        return jsonify({"error": "missing"}), 404
+
+    file_size = full.stat().st_size
+    mime = mimetypes.guess_type(str(full))[0] or "video/mp4"
+    range_header = request.headers.get("Range", "").strip()
+    chunk_size = 1024 * 1024  # 1MB
+
+    def _send(start: int, length: int):
+        with open(full, "rb") as fh:
+            fh.seek(start)
+            remaining = length
+            while remaining > 0:
+                read_n = min(chunk_size, remaining)
+                data = fh.read(read_n)
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Cache-Control": "private, no-store, max-age=0",
+        "Content-Disposition": "inline",
+        "X-Content-Type-Options": "nosniff",
+    }
+
+    if range_header.startswith("bytes="):
+        try:
+            rng = range_header[6:].split(",")[0]
+            start_s, end_s = rng.split("-", 1)
+            start = int(start_s) if start_s else 0
+            end = int(end_s) if end_s else file_size - 1
+            if start < 0 or start >= file_size:
+                return Response(status=416)
+            end = min(end, file_size - 1)
+            length = end - start + 1
+            headers.update({
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Content-Length": str(length),
+                "Content-Type": mime,
+            })
+            return Response(
+                stream_with_context(_send(start, length)),
+                status=206,
+                headers=headers,
+            )
+        except Exception:
+            return Response(status=416)
+
+    headers.update({"Content-Length": str(file_size), "Content-Type": mime})
+    return Response(
+        stream_with_context(_send(0, file_size)),
+        status=200,
+        headers=headers,
+    )
 
 
 @app.post("/api/quiz/submit")

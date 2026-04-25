@@ -6,6 +6,7 @@ class Lesson {
   final String targetRole; // PG | ADM | TLD | ALL
   final bool isRestricted;
   final String? videoUrl;
+  final String? videoPath;
   final int questionCount;
 
   Lesson({
@@ -16,6 +17,7 @@ class Lesson {
     required this.targetRole,
     this.isRestricted = false,
     this.videoUrl,
+    this.videoPath,
     this.questionCount = 0,
   });
 
@@ -28,6 +30,7 @@ class Lesson {
       targetRole: (json['targetRole'] as String?) ?? 'ALL',
       isRestricted: json['isRestricted'] as bool? ?? false,
       videoUrl: json['videoUrl'] as String?,
+      videoPath: json['videoPath'] as String?,
       questionCount: (json['questionCount'] as num?)?.toInt() ?? 0,
     );
   }
@@ -40,6 +43,7 @@ class Lesson {
         'targetRole': targetRole,
         'isRestricted': isRestricted,
         'videoUrl': videoUrl,
+        'videoPath': videoPath,
         'questionCount': questionCount,
       };
 }

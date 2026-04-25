@@ -295,6 +295,47 @@ class ApiService {
     await _dio.delete('/api/lessons/$lessonId');
   }
 
+  Future<String> uploadLessonVideo({
+    required List<int> bytes,
+    required String filename,
+    void Function(int sent, int total)? onProgress,
+  }) async {
+    final form = FormData.fromMap({
+      'file': MultipartFile.fromBytes(bytes, filename: filename),
+    });
+    try {
+      final response = await _dio.post(
+        '/api/lessons/upload-video',
+        data: form,
+        options: Options(
+          contentType: 'multipart/form-data',
+          sendTimeout: const Duration(minutes: 30),
+          receiveTimeout: const Duration(minutes: 5),
+        ),
+        onSendProgress: onProgress,
+      );
+      final data = response.data as Map<String, dynamic>;
+      return data['videoPath'] as String;
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      String msg;
+      if (body is Map && body['error'] != null) {
+        msg = body['error'].toString();
+      } else {
+        msg = e.message ?? 'upload failed';
+      }
+      throw Exception('Upload lỗi: $msg');
+    }
+  }
+
+  /// Streaming URL for an authenticated lesson video. Token is appended as ?t=
+  /// because the HTML <video> element cannot send custom headers.
+  Future<String> buildLessonVideoUrl(String lessonId) async {
+    final t = await getToken();
+    final base = _baseUrl;
+    return '$base/api/lessons/$lessonId/video?t=${Uri.encodeQueryComponent(t ?? '')}';
+  }
+
   Future<Map<String, dynamic>> submitQuiz({
     required String lessonId,
     required Map<String, String> answers,
