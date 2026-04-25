@@ -101,7 +101,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     )
                   : TabBar(
                       controller: _tabController,
-                      isScrollable: true,
+                      isScrollable: false,
                       labelColor: AppColors.primary,
                       unselectedLabelColor: AppColors.textGrey,
                       indicator: BoxDecoration(
@@ -110,7 +110,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                       ),
                       indicatorSize: TabBarIndicatorSize.tab,
                       dividerColor: Colors.transparent,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      labelPadding: EdgeInsets.zero,
                       labelStyle: const TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w700),
                       unselectedLabelStyle: const TextStyle(
