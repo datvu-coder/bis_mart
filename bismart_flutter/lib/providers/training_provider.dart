@@ -108,6 +108,38 @@ class TrainingProvider extends ChangeNotifier {
     }
   }
 
+  /// Fetch comments for a single post from the server and replace the locally
+  /// cached list. Safe to call from a screen's initState — silently ignores
+  /// errors so a flaky network won't crash the detail view.
+  Future<void> loadComments(String postId) async {
+    final index = _posts.indexWhere((p) => p.id == postId);
+    if (index == -1) return;
+    try {
+      final raw = await _api.getComments(int.parse(postId));
+      final list = <PostComment>[];
+      for (final item in raw) {
+        if (item is! Map) continue;
+        final m = item.cast<String, dynamic>();
+        final created = DateTime.tryParse(m['createdAt']?.toString() ?? '') ??
+            DateTime.now();
+        list.add(PostComment(
+          id: (m['id'] ?? '').toString(),
+          authorName: (m['authorName'] ?? 'Ẩn danh').toString(),
+          text: (m['text'] ?? '').toString(),
+          createdAt: created,
+        ));
+      }
+      _posts[index].comments
+        ..clear()
+        ..addAll(list);
+      // Server is the source of truth for the count too.
+      _posts[index].commentCount = list.length;
+      notifyListeners();
+    } catch (_) {
+      // Swallow errors so the detail screen still shows whatever cache we have.
+    }
+  }
+
   Future<void> deletePost(String postId) async {
     await _api.deletePost(int.parse(postId));
     _posts.removeWhere((p) => p.id == postId);

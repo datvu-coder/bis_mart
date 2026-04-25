@@ -29,6 +29,23 @@ class PostDetailScreen extends StatefulWidget {
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final TextEditingController _commentCtrl = TextEditingController();
   bool _sending = false;
+  bool _loadingComments = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshComments();
+    });
+  }
+
+  Future<void> _refreshComments() async {
+    if (!mounted) return;
+    setState(() => _loadingComments = true);
+    final provider = context.read<TrainingProvider>();
+    await provider.loadComments(widget.postId);
+    if (mounted) setState(() => _loadingComments = false);
+  }
 
   CommunityPost? _findPost(TrainingProvider p) {
     for (final post in p.posts) {
@@ -45,6 +62,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       provider.addCommentText(widget.postId, text, authorName: name);
       _commentCtrl.clear();
       FocusScope.of(context).unfocus();
+      // Re-pull from server so any other comments made elsewhere appear too,
+      // and the new one gets its real server id / timestamp.
+      Future.delayed(const Duration(milliseconds: 350), _refreshComments);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -102,16 +122,23 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
             child: Center(
-              child: Column(children: [
-                Icon(Icons.mode_comment_outlined,
-                    size: 36, color: AppColors.textHint),
-                const SizedBox(height: 8),
-                Text('Chưa có bình luận nào.',
-                    style: AppTextStyles.caption),
-                const SizedBox(height: 2),
-                Text('Hãy là người đầu tiên bình luận.',
-                    style: AppTextStyles.caption),
-              ]),
+              child: _loadingComments
+                  ? const SizedBox(
+                      width: 28,
+                      height: 28,
+                      child:
+                          CircularProgressIndicator(strokeWidth: 2.5),
+                    )
+                  : Column(children: [
+                      Icon(Icons.mode_comment_outlined,
+                          size: 36, color: AppColors.textHint),
+                      const SizedBox(height: 8),
+                      Text('Chưa có bình luận nào.',
+                          style: AppTextStyles.caption),
+                      const SizedBox(height: 2),
+                      Text('Hãy là người đầu tiên bình luận.',
+                          style: AppTextStyles.caption),
+                    ]),
             ),
           )
         else
