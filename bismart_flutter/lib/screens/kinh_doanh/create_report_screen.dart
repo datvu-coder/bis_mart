@@ -112,7 +112,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                         Expanded(
                           flex: 5,
                           child: _buildInfoCard(user, currentStore, innerPad,
-                              showSaleOutBanner: false),
+                              showRevenueAndActions: true),
                         ),
                         const SizedBox(width: 20),
                         Expanded(
@@ -124,10 +124,12 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                     )
                   : Column(
                       children: [
-                        _buildProductsCard(innerPad, showBanner: false),
-                        const SizedBox(height: 16),
                         _buildInfoCard(user, currentStore, innerPad,
-                            showSaleOutBanner: true),
+                            showRevenueAndActions: false),
+                        const SizedBox(height: 16),
+                        _buildProductsCard(innerPad, showBanner: true),
+                        const SizedBox(height: 16),
+                        _buildRevenueCard(innerPad),
                       ],
                     ),
             ),
@@ -144,7 +146,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       );
 
   Widget _buildInfoCard(dynamic user, dynamic currentStore, double pad,
-      {bool showSaleOutBanner = false}) {
+      {bool showRevenueAndActions = true}) {
     return Container(
       padding: EdgeInsets.all(pad),
       decoration: _cardDecoration,
@@ -258,13 +260,64 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Sale Out banner (mobile only — above Doanh thu)
-          if (showSaleOutBanner) ...[
-            _buildSaleOutBanner(),
-            const SizedBox(height: 16),
-          ],
+          if (showRevenueAndActions) ...[
+            // Doanh thu
+            _buildLabel(AppStrings.doanhThu, required: true),
+            TextFormField(
+              controller: _revenueController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                hintText: 'Nhập doanh thu',
+                suffixText: 'đ',
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'Vui lòng nhập doanh thu';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 24),
 
-          // Doanh thu
+            // Buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(AppStrings.huy),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton.icon(
+                    onPressed: _isSubmitting ? null : _submitForm,
+                    icon: _isSubmitting
+                        ? const SizedBox(
+                            width: 18, height: 18,
+                            child: CircularProgressIndicator(
+                                color: AppColors.white, strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_rounded, size: 18),
+                    label: const Text(AppStrings.luu),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRevenueCard(double pad) {
+    return Container(
+      padding: EdgeInsets.all(pad),
+      decoration: _cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           _buildLabel(AppStrings.doanhThu, required: true),
           TextFormField(
             controller: _revenueController,
@@ -280,9 +333,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
               return null;
             },
           ),
-          const SizedBox(height: 24),
-
-          // Buttons
+          const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
