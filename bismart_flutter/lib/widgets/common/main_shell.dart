@@ -118,7 +118,12 @@ class _MainShellState extends State<MainShell> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.white,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        scrolledUnderElevation: 0,
+        shape: const Border(
+          bottom: BorderSide(color: AppColors.sidebarBorder, width: 1),
+        ),
         leading: Builder(
           builder: (ctx) => IconButton(
             icon: const Icon(Icons.menu_rounded, color: AppColors.textDark),
@@ -128,9 +133,10 @@ class _MainShellState extends State<MainShell> {
         title: Text(
           _navItems[_selectedIndex].label,
           style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
             color: AppColors.textDark,
+            letterSpacing: -0.3,
           ),
         ),
         centerTitle: true,
@@ -205,6 +211,13 @@ class _MobileDrawer extends StatelessWidget {
                         colors: [AppColors.gradientStart, AppColors.gradientEnd],
                       ),
                       borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.28),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
                     child: const Center(
                       child: Text('B',
@@ -213,7 +226,7 @@ class _MobileDrawer extends StatelessWidget {
                   ),
                   const SizedBox(width: 14),
                   const Text(AppStrings.appName,
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.white)),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark, letterSpacing: -0.4)),
                 ],
               ),
             ),
@@ -223,10 +236,11 @@ class _MobileDrawer extends StatelessWidget {
             if (user != null)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.sidebarSurface,
-                  borderRadius: BorderRadius.circular(16),
+                  color: AppColors.sidebarSurfaceHover,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.sidebarBorder, width: 1),
                 ),
                 child: Row(
                   children: [
@@ -252,11 +266,11 @@ class _MobileDrawer extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(user.fullName,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.sidebarActive),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark),
                             overflow: TextOverflow.ellipsis),
                           const SizedBox(height: 2),
                           Text(user.positionLabel,
-                            style: TextStyle(fontSize: 12, color: AppColors.sidebarText.withValues(alpha: 0.7))),
+                            style: const TextStyle(fontSize: 12, color: AppColors.sidebarMuted, fontWeight: FontWeight.w500)),
                         ],
                       ),
                     ),
@@ -273,39 +287,44 @@ class _MobileDrawer extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
                 child: InkWell(
                   onTap: () => onItemTap(i),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
                       color: isSelected ? AppColors.sidebarSurface : Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(12),
+                      border: isSelected
+                          ? Border.all(color: AppColors.primary.withValues(alpha: 0.12), width: 1)
+                          : null,
                     ),
                     child: Row(
                       children: [
-                        if (isSelected)
-                          Container(
-                            width: 3, height: 20,
-                            margin: const EdgeInsets.only(right: 12),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
                         Icon(
                           isSelected ? item.selectedIcon : item.icon,
                           color: isSelected ? AppColors.sidebarActive : AppColors.sidebarText,
                           size: 22,
                         ),
                         const SizedBox(width: 14),
-                        Text(
-                          item.label,
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                            color: isSelected ? AppColors.sidebarActive : AppColors.sidebarText,
+                        Expanded(
+                          child: Text(
+                            item.label,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                              color: isSelected ? AppColors.sidebarActive : AppColors.sidebarText,
+                            ),
                           ),
                         ),
+                        if (isSelected)
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -363,19 +382,50 @@ class _DesktopSidebar extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeOutCubic,
-      width: isExpanded ? 260 : 80,
-      decoration: const BoxDecoration(
+      width: isExpanded ? 264 : 84,
+      decoration: BoxDecoration(
         color: AppColors.sidebarBg,
-        borderRadius: BorderRadius.only(
-          topRight: Radius.circular(24),
-          bottomRight: Radius.circular(24),
+        border: const Border(
+          right: BorderSide(color: AppColors.sidebarBorder, width: 1),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 24,
+            offset: const Offset(4, 0),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           _buildLogo(),
-          const SizedBox(height: 32),
+          const SizedBox(height: 12),
+          if (isExpanded)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 22),
+              child: Divider(color: AppColors.sidebarBorder, height: 1, thickness: 1),
+            ),
+          const SizedBox(height: 16),
+
+          // Section label
+          if (isExpanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(28, 4, 22, 10),
+              child: Row(
+                children: [
+                  Text(
+                    'MENU CHÍNH',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                      color: AppColors.sidebarMuted.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
           // Nav items
           Expanded(
@@ -408,26 +458,26 @@ class _DesktopSidebar extends StatelessWidget {
 
   Widget _buildLogo() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 22),
       child: Row(
         mainAxisAlignment:
             isExpanded ? MainAxisAlignment.start : MainAxisAlignment.center,
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [AppColors.gradientStart, AppColors.gradientEnd],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(13),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+                  color: AppColors.primary.withValues(alpha: 0.28),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
@@ -444,15 +494,30 @@ class _DesktopSidebar extends StatelessWidget {
             ),
           ),
           if (isExpanded) ...[
-            const SizedBox(width: 14),
-            const Text(
-              AppStrings.appName,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.white,
-                letterSpacing: -0.5,
-              ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  AppStrings.appName,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textDark,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                Text(
+                  'Business Suite',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.sidebarMuted.withValues(alpha: 0.9),
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -498,7 +563,7 @@ class _DesktopSidebar extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: 52,
+            width: 56,
             height: 48,
             decoration: BoxDecoration(
               color: isSelected
@@ -512,9 +577,9 @@ class _DesktopSidebar extends StatelessWidget {
                 Icon(icon, color: color, size: 22),
                 if (isSelected)
                   Positioned(
-                    left: 0,
-                    top: 10,
-                    bottom: 10,
+                    left: -2,
+                    top: 12,
+                    bottom: 12,
                     child: Container(
                       width: 3,
                       decoration: BoxDecoration(
@@ -532,41 +597,43 @@ class _DesktopSidebar extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.sidebarSurface
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
+          border: isSelected
+              ? Border.all(color: AppColors.primary.withValues(alpha: 0.12), width: 1)
+              : null,
         ),
         child: Row(
           children: [
-            if (isSelected)
-              Container(
-                width: 3,
-                height: 20,
-                margin: const EdgeInsets.only(right: 10),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
             Icon(icon, color: color, size: 20),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Text(
                 label,
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                   color: color,
-                  letterSpacing: 0,
+                  letterSpacing: -0.1,
                 ),
               ),
             ),
+            if (isSelected && !isLogout)
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+              ),
           ],
         ),
       ),
@@ -576,10 +643,11 @@ class _DesktopSidebar extends StatelessWidget {
   Widget _buildUserInfo(dynamic user) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 2),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.sidebarSurface,
-        borderRadius: BorderRadius.circular(16),
+        color: AppColors.sidebarSurfaceHover,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.sidebarBorder, width: 1),
       ),
       child: Row(
         children: [
@@ -590,7 +658,7 @@ class _DesktopSidebar extends StatelessWidget {
               gradient: const LinearGradient(
                 colors: [AppColors.gradientStart, AppColors.gradientEnd],
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(11),
             ),
             child: Center(
               child: Text(
@@ -612,17 +680,18 @@ class _DesktopSidebar extends StatelessWidget {
                   user.fullName,
                   style: const TextStyle(
                     fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.sidebarActive,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textDark,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   user.position ?? '',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 11,
-                    color: AppColors.sidebarText.withValues(alpha: 0.7),
+                    color: AppColors.sidebarMuted,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],

@@ -40,11 +40,14 @@ class AppColors {
   // Misc
   static const white = Color(0xFFFFFFFF);
 
-  // Sidebar
-  static const sidebarBg = Color(0xFF0F172A);
-  static const sidebarSurface = Color(0xFF1E293B);
-  static const sidebarText = Color(0xFF94A3B8);
-  static const sidebarActive = Color(0xFFFFFFFF);
+  // Sidebar — light elegant theme
+  static const sidebarBg = Color(0xFFFFFFFF);
+  static const sidebarSurface = Color(0xFFFFF4EF); // warm primary tint for active
+  static const sidebarSurfaceHover = Color(0xFFF7F8FB);
+  static const sidebarText = Color(0xFF6B7280);
+  static const sidebarActive = Color(0xFFE05C27); // brand orange
+  static const sidebarBorder = Color(0xFFEFEFF4);
+  static const sidebarMuted = Color(0xFF9CA3AF);
 
   // Gradients
   static const gradientStart = Color(0xFFE05C27);
