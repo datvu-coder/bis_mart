@@ -38,6 +38,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= 1100;
     final isWide = screenWidth > 800;
     final isCompactMobile = screenWidth < 390;
 
@@ -63,9 +64,65 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           );
         }
 
-        final hPad = isWide ? 24.0 : 16.0;
+        final hPad = isDesktop ? 32.0 : (isWide ? 24.0 : 16.0);
 
-        // Tab layout for all screen sizes
+        // Desktop: grid layout without tabs
+        if (isDesktop) {
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(hPad, 24, hPad, 32),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildHeader(provider, data),
+                const SizedBox(height: 20),
+                _buildMetricCards(data, true),
+                const SizedBox(height: 20),
+                _buildAnnouncementBanner(data),
+                const SizedBox(height: 20),
+                // Two-column: charts (left 2/3) + ranking (right 1/3)
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          children: [
+                            _buildChartCard(
+                              AppStrings.bieuDoDoanhSo,
+                              Icons.bar_chart_rounded,
+                              RevenueBarChart(data: data.revenueChart),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildChartCard(
+                              AppStrings.bieuDoSanPham,
+                              Icons.pie_chart_rounded,
+                              ProductHChart(data: data.productChart),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        flex: 1,
+                        child: Column(
+                          children: [
+                            if (data.featuredPrograms.isNotEmpty) ...[
+                              _buildFeaturedPrograms(data),
+                            ],
+                            _buildTopEmployees(data),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Tab layout for mobile/tablet
         return Column(
           children: [
             Container(
@@ -196,7 +253,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
                     padding: EdgeInsets.only(
                       right: c == cards.last ? 0 : 12,
                     ),
-                    child: _buildMetricCard(c),
+                    child: _buildMetricCard(c, inRow: true),
                   ),
                 ))
             .toList(),
@@ -208,9 +265,9 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildMetricCard(_MetricData metric) {
+  Widget _buildMetricCard(_MetricData metric, {bool inRow = false}) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: inRow ? EdgeInsets.zero : const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(20),
       decoration: AppDecorations.card,
       child: Row(
