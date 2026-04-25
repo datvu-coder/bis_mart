@@ -409,84 +409,123 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       return post.storeCode == currentStore;
     }).toList();
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── Inline composer (Facebook-style) ─────────────────────────────
-        Container(
-          margin: const EdgeInsets.only(bottom: 1),
-          color: AppColors.white,
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            children: [
-              Row(
+        // ── Inline composer ─────────────────────────────
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 680),
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                    color: AppColors.border.withValues(alpha: 0.6)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(14),
+              child: Column(
                 children: [
-                  _CommunityAvatar(name: userName, size: 40),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => _showCreatePostDialog(provider),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceVariant,
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Text(
-                          'Bạn đang nghĩ gì?',
-                          style: AppTextStyles.bodyText
-                              .copyWith(color: AppColors.textHint),
+                  Row(
+                    children: [
+                      _CommunityAvatar(name: userName, size: 40),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => _showCreatePostDialog(provider),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 11),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceVariant,
+                              borderRadius: BorderRadius.circular(24),
+                              border:
+                                  Border.all(color: AppColors.border),
+                            ),
+                            child: Text(
+                              'Bạn đang nghĩ gì, $userName?',
+                              style: AppTextStyles.bodyText
+                                  .copyWith(color: AppColors.textHint),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Divider(height: 1, color: AppColors.border),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _ComposerAction(
+                        icon: Icons.image_rounded,
+                        label: 'Ảnh',
+                        color: AppColors.success,
+                        onTap: () => _showCreatePostDialog(provider,
+                            initialTab: 'photo'),
+                      ),
+                      _ComposerAction(
+                        icon: Icons.videocam_rounded,
+                        label: 'Video',
+                        color: AppColors.error,
+                        onTap: () => _showCreatePostDialog(provider,
+                            initialTab: 'video'),
+                      ),
+                      _ComposerAction(
+                        icon: Icons.edit_rounded,
+                        label: 'Viết bài',
+                        color: AppColors.primary,
+                        onTap: () => _showCreatePostDialog(provider,
+                            initialTab: 'text'),
+                      ),
+                    ],
                   ),
                 ],
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Divider(height: 1, color: AppColors.border),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _ComposerAction(
-                    icon: Icons.image_rounded,
-                    label: 'Ảnh',
-                    color: AppColors.success,
-                    onTap: () => _showCreatePostDialog(provider, initialTab: 'photo'),
-                  ),
-                  _ComposerAction(
-                    icon: Icons.videocam_rounded,
-                    label: 'Video',
-                    color: AppColors.error,
-                    onTap: () => _showCreatePostDialog(provider, initialTab: 'video'),
-                  ),
-                  _ComposerAction(
-                    icon: Icons.edit_rounded,
-                    label: 'Viết bài',
-                    color: AppColors.primary,
-                    onTap: () => _showCreatePostDialog(provider, initialTab: 'text'),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
         // ── Feed ─────────────────────────────────────────────────────────
         if (visiblePosts.isEmpty)
-          Container(
-            color: AppColors.white,
-            padding: const EdgeInsets.all(32),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(Icons.forum_rounded,
-                      size: 48, color: AppColors.textHint),
-                  const SizedBox(height: 8),
-                  Text('Chưa có bài viết nào',
-                      style: AppTextStyles.caption),
-                ],
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.all(40),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                      color: AppColors.border.withValues(alpha: 0.6)),
+                ),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.forum_rounded,
+                          size: 56, color: AppColors.textHint),
+                      const SizedBox(height: 12),
+                      Text('Chưa có bài viết nào',
+                          style: AppTextStyles.bodyText.copyWith(
+                              color: AppColors.textGrey,
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      Text('Hãy là người đầu tiên chia sẻ!',
+                          style: AppTextStyles.caption),
+                    ],
+                  ),
+                ),
               ),
             ),
           )
@@ -1097,13 +1136,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                                   f['dataUrl'] != null)
                               .map((f) => f['dataUrl'] as String)
                               .toList();
-                          final video = pickedFiles
-                              .where((f) =>
-                                  f['isVideo'] == true &&
-                                  (f['remoteUrl'] ?? '') != '')
-                              .cast<Map<String, dynamic>?>()
-                              .firstWhere((_) => true,
-                                  orElse: () => null);
+                          Map<String, dynamic>? video;
+                          for (final f in pickedFiles) {
+                            if (f['isVideo'] == true &&
+                                (f['remoteUrl'] ?? '') != '') {
+                              video = f;
+                              break;
+                            }
+                          }
                           try {
                             await provider.createPost(
                               text,
@@ -1192,23 +1232,82 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   Widget _mediaPreview(Map<String, dynamic> file, {double? height}) {
     final isVideo = file['isVideo'] as bool? ?? false;
     if (isVideo) {
+      final uploading = file['uploading'] == true;
+      final progress = (file['progress'] as double?) ?? 0.0;
       return Container(
         width: double.infinity,
-        height: height,
-        color: AppColors.surfaceVariant,
+        height: height ?? 160,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF111827), Color(0xFF374151)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
         alignment: Alignment.center,
+        padding: const EdgeInsets.all(12),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.videocam_rounded,
-                size: 34, color: AppColors.error),
+            Icon(
+              uploading
+                  ? Icons.cloud_upload_rounded
+                  : Icons.play_circle_fill_rounded,
+              size: 40,
+              color: Colors.white,
+            ),
             const SizedBox(height: 6),
             Text(
               file['name'] as String? ?? 'Video',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppTextStyles.caption,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600),
             ),
+            if (uploading) ...[
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress > 0 ? progress : null,
+                  backgroundColor: Colors.white24,
+                  valueColor:
+                      const AlwaysStoppedAnimation<Color>(Colors.white),
+                  minHeight: 4,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Đang tải lên ${(progress * 100).clamp(0, 100).toStringAsFixed(0)}%',
+                style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500),
+              ),
+            ] else if ((file['remoteUrl'] ?? '') != '') ...[
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.check_circle_rounded,
+                      size: 12, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text('Sẵn sàng',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600)),
+                ]),
+              ),
+            ],
           ],
         ),
       );
