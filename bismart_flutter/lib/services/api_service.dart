@@ -328,30 +328,87 @@ class ApiService {
     }
   }
 
-  /// Streaming URL for an authenticated lesson video. Token is appended as ?t=
-  /// because the HTML <video> element cannot send custom headers.
+  /// Streaming URL for an authenticated lesson part video. Token is appended
+  /// as ?t= because the HTML <video> element cannot send custom headers.
+  Future<String> buildPartVideoUrl(String lessonId, String partId) async {
+    final t = await getToken();
+    final base = _baseUrl;
+    return '$base/api/lessons/$lessonId/parts/$partId/video?t=${Uri.encodeQueryComponent(t ?? '')}';
+  }
+
+  // Legacy helper kept for any old caller.
   Future<String> buildLessonVideoUrl(String lessonId) async {
     final t = await getToken();
     final base = _baseUrl;
     return '$base/api/lessons/$lessonId/video?t=${Uri.encodeQueryComponent(t ?? '')}';
   }
 
+  Future<Map<String, dynamic>> updateLesson(
+      String lessonId, Map<String, dynamic> data) async {
+    final res = await _dio.put('/api/lessons/$lessonId', data: data);
+    return res.data as Map<String, dynamic>;
+  }
+
+  // ---- LESSON PARTS ----
+  Future<Map<String, dynamic>> createLessonPart(
+      String lessonId, Map<String, dynamic> data) async {
+    try {
+      final res =
+          await _dio.post('/api/lessons/$lessonId/parts', data: data);
+      return res.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      String msg;
+      if (body is Map && body['error'] != null) {
+        msg = body['error'].toString();
+      } else {
+        msg = e.message ?? 'Network error';
+      }
+      throw Exception('HTTP ${e.response?.statusCode ?? '?'}: $msg');
+    }
+  }
+
+  Future<Map<String, dynamic>> updateLessonPart(
+      String lessonId, String partId, Map<String, dynamic> data) async {
+    final res =
+        await _dio.put('/api/lessons/$lessonId/parts/$partId', data: data);
+    return res.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteLessonPart(String lessonId, String partId) async {
+    await _dio.delete('/api/lessons/$lessonId/parts/$partId');
+  }
+
   Future<Map<String, dynamic>> submitQuiz({
-    required String lessonId,
+    String? lessonId,
+    String? partId,
     required Map<String, String> answers,
   }) async {
-    final response = await _dio.post('/api/quiz/submit',
-        data: {'lessonId': lessonId, 'answers': answers});
+    final response = await _dio.post('/api/quiz/submit', data: {
+      if (lessonId != null) 'lessonId': lessonId,
+      if (partId != null) 'partId': partId,
+      'answers': answers,
+    });
     return response.data as Map<String, dynamic>;
   }
 
-  Future<List<dynamic>> getQuizResults({String? lessonId, String scope = 'self'}) async {
-    final response = await _dio.get('/api/quiz/results',
-        queryParameters: {
-          if (lessonId != null) 'lessonId': lessonId,
-          'scope': scope,
-        });
+  Future<List<dynamic>> getQuizResults({
+    String? lessonId,
+    String? partId,
+    String scope = 'self',
+  }) async {
+    final response =
+        await _dio.get('/api/quiz/results', queryParameters: {
+      if (lessonId != null) 'lessonId': lessonId,
+      if (partId != null) 'partId': partId,
+      'scope': scope,
+    });
     return response.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> getLessonHistory(String lessonId) async {
+    final res = await _dio.get('/api/lessons/$lessonId/history');
+    return res.data as Map<String, dynamic>;
   }
 
   // ---- EVENTS ----

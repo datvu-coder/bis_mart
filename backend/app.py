@@ -1598,6 +1598,18 @@ def _ensure_training_tables(db):
         cur.execute("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS created_at TEXT DEFAULT CURRENT_TIMESTAMP")
         cur.execute("ALTER TABLE lessons ADD COLUMN IF NOT EXISTS video_path TEXT")
         cur.execute("""
+            CREATE TABLE IF NOT EXISTS lesson_parts (
+                id SERIAL PRIMARY KEY,
+                lesson_id INTEGER NOT NULL,
+                title TEXT NOT NULL DEFAULT '',
+                description TEXT NOT NULL DEFAULT '',
+                video_path TEXT NOT NULL DEFAULT '',
+                order_index INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_lesson_parts_lesson ON lesson_parts(lesson_id, order_index)")
+        cur.execute("""
             CREATE TABLE IF NOT EXISTS quiz_questions (
                 id SERIAL PRIMARY KEY,
                 question_type TEXT DEFAULT 'TN',
@@ -1636,6 +1648,29 @@ def _ensure_training_tables(db):
         cur.execute("CREATE INDEX IF NOT EXISTS idx_quiz_questions_content ON quiz_questions(content_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_quiz_results_content ON quiz_results(content_id)")
         cur.execute("CREATE INDEX IF NOT EXISTS idx_training_events_date ON training_events(event_date)")
+        # Migration: turn each legacy lesson (video_path/video_url + questions on lesson_X)
+        # into a single Part #1, then re-link questions/results to part_Y.
+        cur.execute(
+            "SELECT id, title, video_path, video_url FROM lessons l "
+            "WHERE NOT EXISTS (SELECT 1 FROM lesson_parts p WHERE p.lesson_id = l.id) "
+            "AND ("
+            "  COALESCE(l.video_path,'') <> '' OR COALESCE(l.video_url,'') <> '' "
+            "  OR EXISTS (SELECT 1 FROM quiz_questions q WHERE q.content_id = ('lesson_' || l.id::text)) "
+            "  OR EXISTS (SELECT 1 FROM quiz_results r WHERE r.content_id = ('lesson_' || l.id::text))"
+            ")"
+        )
+        legacy = cur.fetchall()
+        for lr in legacy:
+            cur.execute(
+                "INSERT INTO lesson_parts (lesson_id, title, description, video_path, order_index) "
+                "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                (lr["id"], "Phần 1", "", lr.get("video_path") or "", 1),
+            )
+            new_part_id = cur.fetchone()["id"]
+            old_cid = f"lesson_{lr['id']}"
+            new_cid = f"part_{new_part_id}"
+            cur.execute("UPDATE quiz_questions SET content_id = %s WHERE content_id = %s", (new_cid, old_cid))
+            cur.execute("UPDATE quiz_results SET content_id = %s WHERE content_id = %s", (new_cid, old_cid))
     db.commit()
 
 
@@ -1651,7 +1686,8 @@ def _is_admin_user():
         )
         row = cur.fetchone()
     role = ((row or {}).get("position") or "").upper()
-    return role in ("ADM", "ADMIN", "HR", "TLD")
+    # Bài giảng được phép Thêm/Sửa/Xoá: TMK (chính) + ADM/ADMIN (super-admin)
+    return role in ("ADM", "ADMIN", "TMK")
 
 
 def _current_employee_info():
@@ -1674,7 +1710,69 @@ def _current_employee_info():
     }
 
 
-def _lesson_to_json(row, question_count=0):
+def _question_to_json(q):
+    return {
+        "id": q["id"],
+        "type": q.get("question_type") or "TN",
+        "question": q.get("question") or "",
+        "options": [q.get("option_a"), q.get("option_b"), q.get("option_c"), q.get("option_d")],
+        "points": int(q.get("points") or 1),
+    }
+
+
+def _fetch_part_questions(cur, part_id):
+    cur.execute(
+        "SELECT id, question_type, question, option_a, option_b, option_c, option_d, points, question_number "
+        "FROM quiz_questions WHERE content_id = %s ORDER BY COALESCE(question_number, id) ASC",
+        (f"part_{part_id}",),
+    )
+    return [_question_to_json(q) for q in cur.fetchall()]
+
+
+def _part_to_json(p, questions=None):
+    return {
+        "id": str(p["id"]),
+        "lessonId": str(p["lesson_id"]),
+        "title": p.get("title") or "",
+        "description": p.get("description") or "",
+        "videoPath": p.get("video_path") or "",
+        "orderIndex": int(p.get("order_index") or 0),
+        "questionCount": len(questions) if questions is not None else int(p.get("question_count") or 0),
+        "questions": questions if questions is not None else [],
+    }
+
+
+def _user_completed_parts(cur, lesson_id, employee_code):
+    """Return set of part_ids the user has submitted a result for, on any part of this lesson."""
+    if not employee_code:
+        return set()
+    cur.execute(
+        "SELECT DISTINCT content_id FROM quiz_results r "
+        "WHERE r.employee_code = %s AND r.content_id IN ("
+        "  SELECT 'part_' || p.id::text FROM lesson_parts p WHERE p.lesson_id = %s"
+        ")",
+        (employee_code, lesson_id),
+    )
+    out = set()
+    for r in cur.fetchall():
+        cid = r.get("content_id") or ""
+        if cid.startswith("part_"):
+            try:
+                out.add(int(cid[5:]))
+            except Exception:
+                pass
+    return out
+
+
+def _lesson_to_json(row, parts=None, user_completed_part_ids=None):
+    parts_json = parts or []
+    total = len(parts_json)
+    completed = (
+        sum(1 for p in parts_json if int(p["id"]) in (user_completed_part_ids or set()))
+        if user_completed_part_ids is not None
+        else 0
+    )
+    progress = (completed / total) if total else 0.0
     return {
         "id": str(row["id"]),
         "title": row.get("title") or "",
@@ -1682,9 +1780,10 @@ def _lesson_to_json(row, question_count=0):
         "thumbnailUrl": row.get("thumbnail_url") or "",
         "targetRole": row.get("target_role") or "ALL",
         "isRestricted": bool(row.get("is_restricted")),
-        "videoUrl": row.get("video_url"),
-        "videoPath": row.get("video_path") or "",
-        "questionCount": int(question_count or 0),
+        "parts": parts_json,
+        "partCount": total,
+        "completedPartCount": completed,
+        "progress": round(progress, 4),
     }
 
 
@@ -1693,14 +1792,42 @@ def _lesson_to_json(row, question_count=0):
 def api_get_lessons():
     db = get_db()
     _ensure_training_tables(db)
+    user = _current_employee_info()
+    emp = user.get("employee_code") or ""
     with db.cursor() as cur:
         cur.execute(
-            "SELECT l.id, l.title, l.thumbnail_url, l.description, l.target_role, l.is_restricted, l.video_url, l.video_path, "
-            "(SELECT COUNT(*) FROM quiz_questions q WHERE q.content_id = ('lesson_' || l.id::text)) AS question_count "
+            "SELECT l.id, l.title, l.thumbnail_url, l.description, l.target_role, l.is_restricted "
             "FROM lessons l ORDER BY l.id DESC"
         )
-        rows = cur.fetchall()
-    return jsonify([_lesson_to_json(r, r.get("question_count")) for r in rows])
+        lessons = cur.fetchall()
+        cur.execute(
+            "SELECT p.id, p.lesson_id, p.title, p.description, p.video_path, p.order_index, "
+            "(SELECT COUNT(*) FROM quiz_questions q WHERE q.content_id = ('part_' || p.id::text)) AS question_count "
+            "FROM lesson_parts p ORDER BY p.lesson_id ASC, p.order_index ASC, p.id ASC"
+        )
+        all_parts = cur.fetchall()
+        parts_by_lesson: dict = {}
+        for p in all_parts:
+            parts_by_lesson.setdefault(p["lesson_id"], []).append(_part_to_json(p))
+        # Completed part_ids per lesson for current user
+        completed_by_lesson: dict = {}
+        if emp:
+            cur.execute(
+                "SELECT DISTINCT p.lesson_id, p.id AS part_id FROM lesson_parts p "
+                "JOIN quiz_results r ON r.content_id = ('part_' || p.id::text) "
+                "WHERE r.employee_code = %s",
+                (emp,),
+            )
+            for r in cur.fetchall():
+                completed_by_lesson.setdefault(r["lesson_id"], set()).add(r["part_id"])
+    return jsonify([
+        _lesson_to_json(
+            l,
+            parts=parts_by_lesson.get(l["id"], []),
+            user_completed_part_ids=completed_by_lesson.get(l["id"], set()),
+        )
+        for l in lessons
+    ])
 
 
 @app.get("/api/lessons/<int:lesson_id>")
@@ -1708,10 +1835,11 @@ def api_get_lessons():
 def api_get_lesson_detail(lesson_id: int):
     db = get_db()
     _ensure_training_tables(db)
-    content_id = f"lesson_{lesson_id}"
+    user = _current_employee_info()
+    emp = user.get("employee_code") or ""
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, title, thumbnail_url, description, target_role, is_restricted, video_url, video_path "
+            "SELECT id, title, thumbnail_url, description, target_role, is_restricted "
             "FROM lessons WHERE id = %s",
             (lesson_id,),
         )
@@ -1719,24 +1847,17 @@ def api_get_lesson_detail(lesson_id: int):
         if not row:
             return jsonify({"error": "Not found"}), 404
         cur.execute(
-            "SELECT id, question_type, question, option_a, option_b, option_c, option_d, points, question_number "
-            "FROM quiz_questions WHERE content_id = %s ORDER BY COALESCE(question_number, id) ASC",
-            (content_id,),
+            "SELECT id, lesson_id, title, description, video_path, order_index "
+            "FROM lesson_parts WHERE lesson_id = %s ORDER BY order_index ASC, id ASC",
+            (lesson_id,),
         )
-        qs = cur.fetchall()
-    questions = [
-        {
-            "id": q["id"],
-            "type": q.get("question_type") or "TN",
-            "question": q.get("question") or "",
-            "options": [q.get("option_a"), q.get("option_b"), q.get("option_c"), q.get("option_d")],
-            "points": int(q.get("points") or 1),
-        }
-        for q in qs
-    ]
-    data = _lesson_to_json(row, len(questions))
-    data["questions"] = questions
-    return jsonify(data)
+        part_rows = cur.fetchall()
+        parts = []
+        for p in part_rows:
+            qs = _fetch_part_questions(cur, p["id"])
+            parts.append(_part_to_json(p, questions=qs))
+        completed = _user_completed_parts(cur, lesson_id, emp)
+    return jsonify(_lesson_to_json(row, parts=parts, user_completed_part_ids=completed))
 
 
 @app.post("/api/lessons")
@@ -1750,44 +1871,59 @@ def api_create_lesson():
         return jsonify({"error": "title required"}), 400
     db = get_db()
     _ensure_training_tables(db)
+    parts_in = data.get("parts") or []
     with db.cursor() as cur:
         cur.execute(
-            "INSERT INTO lessons (title, thumbnail_url, description, target_role, is_restricted, video_url, video_path) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) "
-            "RETURNING id, title, thumbnail_url, description, target_role, is_restricted, video_url, video_path",
+            "INSERT INTO lessons (title, thumbnail_url, description, target_role, is_restricted) "
+            "VALUES (%s, %s, %s, %s, %s) "
+            "RETURNING id, title, thumbnail_url, description, target_role, is_restricted",
             (
                 title,
                 data.get("thumbnailUrl") or "",
                 data.get("description") or "",
                 data.get("targetRole") or "ALL",
                 1 if data.get("isRestricted") else 0,
-                data.get("videoUrl") or "",
-                data.get("videoPath") or "",
             ),
         )
         row = cur.fetchone()
         lesson_id = row["id"]
-        content_id = f"lesson_{lesson_id}"
-        questions = data.get("questions") or []
-        for idx, q in enumerate(questions, start=1):
-            opts = q.get("options") or []
-            opts = (opts + [None, None, None, None])[:4]
+        out_parts = []
+        for idx, p in enumerate(parts_in, start=1):
             cur.execute(
-                "INSERT INTO quiz_questions (question_type, question, option_a, option_b, option_c, option_d, "
-                "correct_answer, points, content_id, question_number) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "INSERT INTO lesson_parts (lesson_id, title, description, video_path, order_index) "
+                "VALUES (%s, %s, %s, %s, %s) "
+                "RETURNING id, lesson_id, title, description, video_path, order_index",
                 (
-                    q.get("type") or "TN",
-                    q.get("question") or "",
-                    opts[0], opts[1], opts[2], opts[3],
-                    (q.get("correctAnswer") or "").upper(),
-                    int(q.get("points") or 1),
-                    content_id,
+                    lesson_id,
+                    (p.get("title") or f"Phần {idx}").strip(),
+                    p.get("description") or "",
+                    p.get("videoPath") or "",
                     idx,
                 ),
             )
+            prow = cur.fetchone()
+            part_id = prow["id"]
+            cid = f"part_{part_id}"
+            qs_in = p.get("questions") or []
+            for qidx, q in enumerate(qs_in, start=1):
+                opts = (q.get("options") or []) + [None, None, None, None]
+                cur.execute(
+                    "INSERT INTO quiz_questions (question_type, question, option_a, option_b, option_c, option_d, "
+                    "correct_answer, points, content_id, question_number) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        q.get("type") or "TN",
+                        q.get("question") or "",
+                        opts[0], opts[1], opts[2], opts[3],
+                        (q.get("correctAnswer") or "").upper(),
+                        int(q.get("points") or 1),
+                        cid,
+                        qidx,
+                    ),
+                )
+            out_parts.append(_part_to_json(prow, questions=_fetch_part_questions(cur, part_id)))
     db.commit()
-    return jsonify(_lesson_to_json(row, len(questions))), 201
+    return jsonify(_lesson_to_json(row, parts=out_parts, user_completed_part_ids=set())), 201
 
 
 @app.put("/api/lessons/<int:lesson_id>")
@@ -1802,16 +1938,15 @@ def api_update_lesson(lesson_id: int):
         cur.execute(
             "UPDATE lessons SET title = COALESCE(%s, title), thumbnail_url = COALESCE(%s, thumbnail_url), "
             "description = COALESCE(%s, description), target_role = COALESCE(%s, target_role), "
-            "is_restricted = COALESCE(%s, is_restricted), video_url = COALESCE(%s, video_url) "
+            "is_restricted = COALESCE(%s, is_restricted) "
             "WHERE id = %s "
-            "RETURNING id, title, thumbnail_url, description, target_role, is_restricted, video_url",
+            "RETURNING id, title, thumbnail_url, description, target_role, is_restricted",
             (
                 data.get("title"),
                 data.get("thumbnailUrl"),
                 data.get("description"),
                 data.get("targetRole"),
                 (1 if data.get("isRestricted") else 0) if "isRestricted" in data else None,
-                data.get("videoUrl"),
                 lesson_id,
             ),
         )
@@ -1829,10 +1964,159 @@ def api_delete_lesson(lesson_id: int):
         return jsonify({"error": "Forbidden"}), 403
     db = get_db()
     _ensure_training_tables(db)
-    content_id = f"lesson_{lesson_id}"
     with db.cursor() as cur:
-        cur.execute("DELETE FROM quiz_questions WHERE content_id = %s", (content_id,))
+        # find part_ids to clean up questions/results/files
+        cur.execute("SELECT id, video_path FROM lesson_parts WHERE lesson_id = %s", (lesson_id,))
+        parts = cur.fetchall()
+        for p in parts:
+            cid = f"part_{p['id']}"
+            cur.execute("DELETE FROM quiz_questions WHERE content_id = %s", (cid,))
+            cur.execute("DELETE FROM quiz_results WHERE content_id = %s", (cid,))
+            vp = p.get("video_path") or ""
+            if vp:
+                try:
+                    (LESSON_VIDEO_DIR / secure_filename(vp)).unlink(missing_ok=True)  # type: ignore[arg-type]
+                except Exception:
+                    pass
+        cur.execute("DELETE FROM lesson_parts WHERE lesson_id = %s", (lesson_id,))
+        # legacy cleanup
+        cur.execute("DELETE FROM quiz_questions WHERE content_id = %s", (f"lesson_{lesson_id}",))
+        cur.execute("DELETE FROM quiz_results WHERE content_id = %s", (f"lesson_{lesson_id}",))
         cur.execute("DELETE FROM lessons WHERE id = %s", (lesson_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/lessons/<int:lesson_id>/parts")
+@login_required
+def api_create_part(lesson_id: int):
+    if not _is_admin_user():
+        return jsonify({"error": "Forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    _ensure_training_tables(db)
+    with db.cursor() as cur:
+        cur.execute("SELECT id FROM lessons WHERE id = %s", (lesson_id,))
+        if not cur.fetchone():
+            return jsonify({"error": "Lesson not found"}), 404
+        cur.execute(
+            "SELECT COALESCE(MAX(order_index), 0) AS m FROM lesson_parts WHERE lesson_id = %s",
+            (lesson_id,),
+        )
+        next_idx = int((cur.fetchone() or {}).get("m") or 0) + 1
+        cur.execute(
+            "INSERT INTO lesson_parts (lesson_id, title, description, video_path, order_index) "
+            "VALUES (%s, %s, %s, %s, %s) "
+            "RETURNING id, lesson_id, title, description, video_path, order_index",
+            (
+                lesson_id,
+                (data.get("title") or f"Phần {next_idx}").strip(),
+                data.get("description") or "",
+                data.get("videoPath") or "",
+                int(data.get("orderIndex") or next_idx),
+            ),
+        )
+        prow = cur.fetchone()
+        part_id = prow["id"]
+        cid = f"part_{part_id}"
+        qs_in = data.get("questions") or []
+        for qidx, q in enumerate(qs_in, start=1):
+            opts = (q.get("options") or []) + [None, None, None, None]
+            cur.execute(
+                "INSERT INTO quiz_questions (question_type, question, option_a, option_b, option_c, option_d, "
+                "correct_answer, points, content_id, question_number) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (
+                    q.get("type") or "TN",
+                    q.get("question") or "",
+                    opts[0], opts[1], opts[2], opts[3],
+                    (q.get("correctAnswer") or "").upper(),
+                    int(q.get("points") or 1),
+                    cid,
+                    qidx,
+                ),
+            )
+        out = _part_to_json(prow, questions=_fetch_part_questions(cur, part_id))
+    db.commit()
+    return jsonify(out), 201
+
+
+@app.put("/api/lessons/<int:lesson_id>/parts/<int:part_id>")
+@login_required
+def api_update_part(lesson_id: int, part_id: int):
+    if not _is_admin_user():
+        return jsonify({"error": "Forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    _ensure_training_tables(db)
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE lesson_parts SET title = COALESCE(%s, title), description = COALESCE(%s, description), "
+            "video_path = COALESCE(%s, video_path), order_index = COALESCE(%s, order_index) "
+            "WHERE id = %s AND lesson_id = %s "
+            "RETURNING id, lesson_id, title, description, video_path, order_index",
+            (
+                data.get("title"),
+                data.get("description"),
+                data.get("videoPath"),
+                data.get("orderIndex"),
+                part_id, lesson_id,
+            ),
+        )
+        prow = cur.fetchone()
+        if not prow:
+            return jsonify({"error": "Not found"}), 404
+        # Optionally replace questions if "questions" key present
+        if "questions" in data:
+            cid = f"part_{part_id}"
+            cur.execute("DELETE FROM quiz_questions WHERE content_id = %s", (cid,))
+            qs_in = data.get("questions") or []
+            for qidx, q in enumerate(qs_in, start=1):
+                opts = (q.get("options") or []) + [None, None, None, None]
+                cur.execute(
+                    "INSERT INTO quiz_questions (question_type, question, option_a, option_b, option_c, option_d, "
+                    "correct_answer, points, content_id, question_number) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    (
+                        q.get("type") or "TN",
+                        q.get("question") or "",
+                        opts[0], opts[1], opts[2], opts[3],
+                        (q.get("correctAnswer") or "").upper(),
+                        int(q.get("points") or 1),
+                        cid,
+                        qidx,
+                    ),
+                )
+        out = _part_to_json(prow, questions=_fetch_part_questions(cur, part_id))
+    db.commit()
+    return jsonify(out)
+
+
+@app.delete("/api/lessons/<int:lesson_id>/parts/<int:part_id>")
+@login_required
+def api_delete_part(lesson_id: int, part_id: int):
+    if not _is_admin_user():
+        return jsonify({"error": "Forbidden"}), 403
+    db = get_db()
+    _ensure_training_tables(db)
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT video_path FROM lesson_parts WHERE id = %s AND lesson_id = %s",
+            (part_id, lesson_id),
+        )
+        prow = cur.fetchone()
+        if not prow:
+            return jsonify({"error": "Not found"}), 404
+        cid = f"part_{part_id}"
+        cur.execute("DELETE FROM quiz_questions WHERE content_id = %s", (cid,))
+        cur.execute("DELETE FROM quiz_results WHERE content_id = %s", (cid,))
+        cur.execute("DELETE FROM lesson_parts WHERE id = %s", (part_id,))
+        vp = prow.get("video_path") or ""
+        if vp:
+            try:
+                (LESSON_VIDEO_DIR / secure_filename(vp)).unlink(missing_ok=True)  # type: ignore[arg-type]
+            except Exception:
+                pass
     db.commit()
     return jsonify({"ok": True})
 
@@ -1879,15 +2163,18 @@ def _resolve_video_token():
         return None
 
 
-@app.get("/api/lessons/<int:lesson_id>/video")
-def api_stream_lesson_video(lesson_id: int):
+@app.get("/api/lessons/<int:lesson_id>/parts/<int:part_id>/video")
+def api_stream_part_video(lesson_id: int, part_id: int):
     user = _resolve_video_token()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
     db = get_db()
     _ensure_training_tables(db)
     with db.cursor() as cur:
-        cur.execute("SELECT video_path FROM lessons WHERE id = %s", (lesson_id,))
+        cur.execute(
+            "SELECT video_path FROM lesson_parts WHERE id = %s AND lesson_id = %s",
+            (part_id, lesson_id),
+        )
         row = cur.fetchone()
     if not row or not row.get("video_path"):
         return jsonify({"error": "no video"}), 404
@@ -1899,7 +2186,7 @@ def api_stream_lesson_video(lesson_id: int):
     file_size = full.stat().st_size
     mime = mimetypes.guess_type(str(full))[0] or "video/mp4"
     range_header = request.headers.get("Range", "").strip()
-    chunk_size = 1024 * 1024  # 1MB
+    chunk_size = 1024 * 1024
 
     def _send(start: int, length: int):
         with open(full, "rb") as fh:
@@ -1955,13 +2242,24 @@ def api_stream_lesson_video(lesson_id: int):
 @login_required
 def api_quiz_submit():
     data = request.get_json(silent=True) or {}
+    part_id = data.get("partId")
     lesson_id = data.get("lessonId")
     answers = data.get("answers") or {}
-    if not lesson_id:
-        return jsonify({"error": "lessonId required"}), 400
+    if not part_id and not lesson_id:
+        return jsonify({"error": "partId required"}), 400
     db = get_db()
     _ensure_training_tables(db)
-    content_id = f"lesson_{lesson_id}"
+    if part_id:
+        content_id = f"part_{part_id}"
+        with db.cursor() as cur:
+            cur.execute("SELECT lesson_id FROM lesson_parts WHERE id = %s", (part_id,))
+            prow = cur.fetchone()
+        if not prow:
+            return jsonify({"error": "Part not found"}), 404
+        resolved_lesson_id = prow["lesson_id"]
+    else:
+        content_id = f"lesson_{lesson_id}"
+        resolved_lesson_id = lesson_id
     with db.cursor() as cur:
         cur.execute(
             "SELECT id, correct_answer, points FROM quiz_questions WHERE content_id = %s",
@@ -1998,7 +2296,8 @@ def api_quiz_submit():
     db.commit()
     return jsonify({
         "id": result_id,
-        "lessonId": str(lesson_id),
+        "partId": str(part_id) if part_id else None,
+        "lessonId": str(resolved_lesson_id),
         "score": score_text,
         "earned": earned,
         "total": total,
@@ -2016,34 +2315,120 @@ def api_quiz_results():
     _ensure_training_tables(db)
     user = _current_employee_info()
     lesson_id = request.args.get("lessonId")
+    part_id = request.args.get("partId")
     scope = (request.args.get("scope") or "self").lower()
-    sql = "SELECT id, submitted_at, employee_code, full_name, store_name, content_id, score, answers_json FROM quiz_results"
-    args = []
-    where = []
+    sql = (
+        "SELECT r.id, r.submitted_at, r.employee_code, r.full_name, r.store_name, r.content_id, r.score "
+        "FROM quiz_results r"
+    )
+    args: list = []
+    where: list = []
     if scope != "all" or not _is_admin_user():
-        where.append("employee_code = %s")
+        where.append("r.employee_code = %s")
         args.append(user["employee_code"])
-    if lesson_id:
-        where.append("content_id = %s")
-        args.append(f"lesson_{lesson_id}")
+    if part_id:
+        where.append("r.content_id = %s")
+        args.append(f"part_{part_id}")
+    elif lesson_id:
+        where.append(
+            "(r.content_id = %s OR r.content_id IN (SELECT 'part_' || p.id::text FROM lesson_parts p WHERE p.lesson_id = %s))"
+        )
+        args.extend([f"lesson_{lesson_id}", int(lesson_id)])
     if where:
         sql += " WHERE " + " AND ".join(where)
-    sql += " ORDER BY id DESC LIMIT 200"
+    sql += " ORDER BY r.id DESC LIMIT 500"
     with db.cursor() as cur:
         cur.execute(sql, tuple(args))
         rows = cur.fetchall()
-    return jsonify([
-        {
+    out = []
+    for r in rows:
+        cid = r.get("content_id") or ""
+        rec_lesson_id = ""
+        rec_part_id = ""
+        if cid.startswith("part_"):
+            rec_part_id = cid[5:]
+        elif cid.startswith("lesson_"):
+            rec_lesson_id = cid[7:]
+        out.append({
             "id": r["id"],
             "submittedAt": r.get("submitted_at"),
             "employeeCode": r.get("employee_code"),
             "fullName": r.get("full_name"),
             "storeName": r.get("store_name"),
-            "lessonId": (r.get("content_id") or "").replace("lesson_", ""),
+            "lessonId": rec_lesson_id,
+            "partId": rec_part_id,
             "score": r.get("score"),
-        }
-        for r in rows
-    ])
+        })
+    return jsonify(out)
+
+
+@app.get("/api/lessons/<int:lesson_id>/history")
+@login_required
+def api_lesson_history(lesson_id: int):
+    """List of users who have submitted at least one part of this lesson, with progress.
+    Admins see everyone. Non-admins see only their own row."""
+    db = get_db()
+    _ensure_training_tables(db)
+    is_admin = _is_admin_user()
+    me = _current_employee_info()
+    with db.cursor() as cur:
+        cur.execute("SELECT id FROM lesson_parts WHERE lesson_id = %s", (lesson_id,))
+        part_ids = [p["id"] for p in cur.fetchall()]
+        total_parts = len(part_ids)
+        sql = (
+            "SELECT r.id, r.submitted_at, r.employee_code, r.full_name, r.store_name, r.content_id, r.score "
+            "FROM quiz_results r WHERE r.content_id IN ("
+            "  SELECT 'part_' || p.id::text FROM lesson_parts p WHERE p.lesson_id = %s"
+            ") OR r.content_id = %s"
+        )
+        args: list = [lesson_id, f"lesson_{lesson_id}"]
+        if not is_admin:
+            sql += " AND r.employee_code = %s"
+            args.append(me["employee_code"])
+        sql += " ORDER BY r.submitted_at DESC, r.id DESC"
+        cur.execute(sql, tuple(args))
+        rows = cur.fetchall()
+    # Aggregate by employee_code
+    agg: dict = {}
+    for r in rows:
+        emp = r.get("employee_code") or ""
+        info = agg.setdefault(emp, {
+            "employeeCode": emp,
+            "fullName": r.get("full_name") or "",
+            "storeName": r.get("store_name") or "",
+            "completedPartIds": set(),
+            "submissions": [],
+            "lastSubmittedAt": r.get("submitted_at"),
+        })
+        cid = r.get("content_id") or ""
+        pid_str = cid[5:] if cid.startswith("part_") else ""
+        if pid_str:
+            try:
+                info["completedPartIds"].add(int(pid_str))
+            except Exception:
+                pass
+        info["submissions"].append({
+            "id": r["id"],
+            "submittedAt": r.get("submitted_at"),
+            "partId": pid_str,
+            "score": r.get("score"),
+        })
+    out = []
+    for emp, info in agg.items():
+        completed = len(info["completedPartIds"])
+        progress = (completed / total_parts) if total_parts else 0.0
+        out.append({
+            "employeeCode": info["employeeCode"],
+            "fullName": info["fullName"],
+            "storeName": info["storeName"],
+            "completedParts": completed,
+            "totalParts": total_parts,
+            "progress": round(progress, 4),
+            "lastSubmittedAt": info["lastSubmittedAt"],
+            "submissions": info["submissions"],
+        })
+    out.sort(key=lambda x: (x["lastSubmittedAt"] or ""), reverse=True)
+    return jsonify({"totalParts": total_parts, "users": out})
 
 
 @app.get("/api/events")

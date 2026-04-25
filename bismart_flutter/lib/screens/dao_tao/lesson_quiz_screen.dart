@@ -5,11 +5,13 @@ import '../../services/api_service.dart';
 
 class LessonQuizScreen extends StatefulWidget {
   final String lessonId;
+  final String? partId;
   final String lessonTitle;
   final List<Map<String, dynamic>> questions;
   const LessonQuizScreen({
     super.key,
     required this.lessonId,
+    this.partId,
     required this.lessonTitle,
     required this.questions,
   });
@@ -43,7 +45,8 @@ class _LessonQuizScreenState extends State<LessonQuizScreen> {
     setState(() => _submitting = true);
     try {
       final res = await ApiService().submitQuiz(
-        lessonId: widget.lessonId,
+        lessonId: widget.partId == null ? widget.lessonId : null,
+        partId: widget.partId,
         answers: _answers,
       );
       if (!mounted) return;
@@ -258,7 +261,7 @@ class _LessonQuizScreenState extends State<LessonQuizScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () => Navigator.pop(context, true),
                     child: const Text('Đóng'),
                   ),
                 ),

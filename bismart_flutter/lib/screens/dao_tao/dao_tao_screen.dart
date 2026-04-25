@@ -21,6 +21,7 @@ import '../../widgets/cards/social_post_card.dart';
 import 'package:bismart_flutter/models/community_post.dart';
 import '../../models/lesson.dart';
 import 'lesson_detail_screen.dart';
+import 'lesson_history_screen.dart';
 
 class DaoTaoScreen extends StatefulWidget {
   const DaoTaoScreen({super.key});
@@ -531,9 +532,19 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             )
           : Column(
               children: provider.lessons
-                  .map<Widget>((lesson) => LessonCard(
-                        lesson: lesson,
-                        onJoin: () => _showLessonDetail(lesson),
+                  .map<Widget>((lesson) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: LessonCard(
+                          lesson: lesson,
+                          onJoin: () => _showLessonDetail(lesson),
+                          onHistory: () => _openLessonHistory(lesson),
+                          onEdit: isAdmin
+                              ? () => _showLessonDetail(lesson)
+                              : null,
+                          onDelete: isAdmin
+                              ? () => _confirmDeleteLesson(provider, lesson)
+                              : null,
+                        ),
                       ))
                   .toList(),
             ),
@@ -541,8 +552,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   }
 
   bool _isAdmin() {
-    final pos = (context.read<AuthProvider>().currentUser?.position ?? '').toUpperCase();
-    return pos == 'ADM' || pos == 'ADMIN' || pos == 'HR' || pos == 'TLD';
+    final pos = (context.read<AuthProvider>().currentUser?.position ?? '')
+        .toUpperCase();
+    // Theo yêu cầu mới: TMK quản lý bài giảng. ADM/ADMIN là super-admin.
+    return pos == 'ADM' || pos == 'ADMIN' || pos == 'TMK';
   }
 
   Widget _buildSchedulePanel(TrainingProvider provider) {
@@ -1522,11 +1535,59 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             title: (lesson.title ?? '').toString(),
             thumbnailUrl: (lesson.thumbnailUrl ?? '').toString(),
             targetRole: (lesson.targetRole ?? 'ALL').toString(),
-            videoUrl: lesson.videoUrl as String?,
           );
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => LessonDetailScreen(lesson: l)),
+    ).then((_) {
+      // Reload to refresh progress after returning.
+      if (mounted) {
+        context.read<TrainingProvider>().loadTrainingData();
+      }
+    });
+  }
+
+  Future<void> _confirmDeleteLesson(
+      TrainingProvider provider, Lesson lesson) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Xoá bài giảng?'),
+        content: Text(
+            'Bạn có chắc chắn muốn xoá "${lesson.title}"? Mọi phần và bài kiểm tra sẽ bị xoá.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Huỷ')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Xoá'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await provider.deleteLesson(lesson.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã xoá bài giảng')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Xoá thất bại: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  void _openLessonHistory(Lesson lesson) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LessonHistoryScreen(lesson: lesson),
+      ),
     );
   }
 
@@ -1772,10 +1833,16 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                           await provider.createLesson({
                             'title': titleCtrl.text.trim(),
                             'description': descCtrl.text.trim(),
-                            'videoPath': videoPath,
                             'thumbnailUrl': thumbCtrl.text.trim(),
                             'targetRole': role,
-                            'questions': qs,
+                            'parts': [
+                              {
+                                'title': 'Phần 1',
+                                'description': '',
+                                'videoPath': videoPath,
+                                'questions': qs,
+                              }
+                            ],
                           });
                           if (ctx.mounted) Navigator.pop(ctx);
                           parentMessenger.showSnackBar(const SnackBar(
