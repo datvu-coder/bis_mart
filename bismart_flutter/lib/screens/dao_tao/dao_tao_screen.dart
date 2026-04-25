@@ -1534,6 +1534,9 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final thumbCtrl = TextEditingController();
     String role = 'ALL';
     final List<_QuizDraft> drafts = [_QuizDraft()];
+    String? errorMsg;
+    bool busy = false;
+    final parentMessenger = ScaffoldMessenger.of(context);
 
     showDialog(
       context: context,
@@ -1632,15 +1635,26 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   ),
                 ),
                 const Divider(height: 1),
+                if (errorMsg != null)
+                  Container(
+                    width: double.infinity,
+                    color: Colors.red.shade50,
+                    padding: const EdgeInsets.all(10),
+                    child: Text(
+                      errorMsg!,
+                      style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                    ),
+                  ),
                 Padding(
                   padding: const EdgeInsets.all(12),
                   child: SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: () async {
+                      onPressed: busy
+                          ? null
+                          : () async {
                         if (titleCtrl.text.trim().isEmpty || videoCtrl.text.trim().isEmpty) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
-                              content: Text('Nhập tên và URL video')));
+                          setS(() => errorMsg = 'Vui lòng nhập tên bài giảng và URL video');
                           return;
                         }
                         final qs = drafts
@@ -1655,6 +1669,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                                   'type': 'TN',
                                 })
                             .toList();
+                        setS(() {
+                          busy = true;
+                          errorMsg = null;
+                        });
                         try {
                           await provider.createLesson({
                             'title': titleCtrl.text.trim(),
@@ -1665,12 +1683,16 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                             'questions': qs,
                           });
                           if (ctx.mounted) Navigator.pop(ctx);
+                          parentMessenger.showSnackBar(const SnackBar(
+                              content: Text('Đã thêm bài giảng')));
                         } catch (e) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(content: Text('Lỗi: $e')));
+                          setS(() {
+                            busy = false;
+                            errorMsg = e.toString().replaceFirst('Exception: ', '');
+                          });
                         }
                       },
-                      child: const Text('Lưu bài giảng'),
+                      child: Text(busy ? 'Đang lưu...' : 'Lưu bài giảng'),
                     ),
                   ),
                 ),

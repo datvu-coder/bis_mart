@@ -274,8 +274,21 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> createLesson(Map<String, dynamic> data) async {
-    final response = await _dio.post('/api/lessons', data: data);
-    return response.data as Map<String, dynamic>;
+    try {
+      final response = await _dio.post('/api/lessons', data: data);
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      String msg;
+      if (body is Map && body['error'] != null) {
+        msg = body['error'].toString();
+      } else if (body is String && body.isNotEmpty) {
+        msg = body;
+      } else {
+        msg = e.message ?? 'Network error';
+      }
+      throw Exception('HTTP ${e.response?.statusCode ?? '?'}: $msg');
+    }
   }
 
   Future<void> deleteLesson(String lessonId) async {
