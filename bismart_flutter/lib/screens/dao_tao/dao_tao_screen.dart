@@ -1611,18 +1611,27 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                                     onPressed: busy
                                         ? null
                                         : () async {
-                                            final res = await FilePicker.platform.pickFiles(
-                                              type: FileType.video,
-                                              withData: true,
-                                            );
-                                            if (res != null && res.files.isNotEmpty) {
-                                              final f = res.files.first;
-                                              if (f.bytes != null) {
-                                                setS(() {
-                                                  videoBytes = f.bytes;
-                                                  videoFilename = f.name;
-                                                });
+                                            try {
+                                              final res = await FilePicker.platform.pickFiles(
+                                                type: FileType.custom,
+                                                allowedExtensions: const ['mp4', 'webm', 'mov', 'm4v'],
+                                                withData: true,
+                                                allowMultiple: false,
+                                              );
+                                              if (res != null && res.files.isNotEmpty) {
+                                                final f = res.files.first;
+                                                if (f.bytes != null) {
+                                                  setS(() {
+                                                    videoBytes = f.bytes;
+                                                    videoFilename = f.name;
+                                                    errorMsg = null;
+                                                  });
+                                                } else {
+                                                  setS(() => errorMsg = 'Không đọc được dữ liệu file. Hãy thử lại.');
+                                                }
                                               }
+                                            } catch (e) {
+                                              setS(() => errorMsg = 'Lỗi mở file picker: $e');
                                             }
                                           },
                                     icon: const Icon(
