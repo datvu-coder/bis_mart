@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 
-/// Desktop tab selector with weighted layout.
-/// For 3 tabs: flex [2, 1, 1] (1 main + 2 secondary).
-/// For 4 tabs: flex [2, 2, 1, 1] (2 main + 2 secondary).
+/// Desktop tab selector with equal-width layout.
+/// All tabs share the same width for visual symmetry. Custom flex weights
+/// can still be supplied via the `flexes` parameter when needed.
 class WeightedTabSelector extends StatelessWidget {
   final TabController controller;
   final List<String> labels;
@@ -17,14 +17,7 @@ class WeightedTabSelector extends StatelessWidget {
   });
 
   List<int> _defaultFlexes() {
-    switch (labels.length) {
-      case 3:
-        return [2, 1, 1];
-      case 4:
-        return [2, 2, 1, 1];
-      default:
-        return List<int>.filled(labels.length, 1);
-    }
+    return List<int>.filled(labels.length, 1);
   }
 
   @override
