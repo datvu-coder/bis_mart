@@ -71,11 +71,15 @@ class Store {
         'latitude': latitude,
         'longitude': longitude,
         'province': province,
+        'sup': sup,
         'status': status,
+        'openDate': openDate,
+        'closeDate': closeDate,
         'storeType': storeType,
         'address': address,
         'phone': phone,
         'owner': owner,
+        'taxCode': taxCode,
       };
 }
 

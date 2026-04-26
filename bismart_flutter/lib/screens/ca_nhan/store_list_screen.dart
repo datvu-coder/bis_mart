@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/store.dart';
 import '../../providers/store_provider.dart';
+import '../../providers/permission_provider.dart';
 
 class StoreListScreen extends StatefulWidget {
   const StoreListScreen({super.key});
@@ -24,6 +25,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canCrud = context.watch<PermissionProvider>().canCrud;
     return Consumer<StoreProvider>(
       builder: (context, provider, _) {
         final stores = provider.filteredStores;
@@ -54,11 +56,13 @@ class _StoreListScreenState extends State<StoreListScreen> {
               ),
             ],
           ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () => _showAddStoreDialog(),
-            backgroundColor: AppColors.primary,
-            child: const Icon(Icons.add_rounded, color: AppColors.white),
-          ),
+          floatingActionButton: canCrud
+              ? FloatingActionButton(
+                  onPressed: () => _showStoreFormDialog(),
+                  backgroundColor: AppColors.primary,
+                  child: const Icon(Icons.add_rounded, color: AppColors.white),
+                )
+              : null,
           body: Column(
         children: [
           // Search
@@ -168,6 +172,13 @@ class _StoreListScreenState extends State<StoreListScreen> {
                               onPressed: () => _openMap(store),
                               tooltip: 'Xem bản đồ',
                             ),
+                          if (canCrud)
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined, size: 20),
+                              color: AppColors.primary,
+                              onPressed: () => _showStoreFormDialog(initial: store),
+                              tooltip: 'Sửa',
+                            ),
                           const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 20),
                         ],
                       ),
@@ -246,13 +257,23 @@ class _StoreListScreenState extends State<StoreListScreen> {
                           ],
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _confirmDeleteStore(store);
-                        },
-                      ),
+                      if (context.read<PermissionProvider>().canCrud) ...[
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _showStoreFormDialog(initial: store);
+                          },
+                          tooltip: 'Sửa',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _confirmDeleteStore(store);
+                          },
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -334,42 +355,175 @@ class _StoreListScreenState extends State<StoreListScreen> {
     );
   }
 
-  void _showAddStoreDialog() {
-    final nameCtrl = TextEditingController();
-    final codeCtrl = TextEditingController();
-    final groupCtrl = TextEditingController();
+  void _showStoreFormDialog({Store? initial}) {
+    final isEdit = initial != null;
+    final nameCtrl = TextEditingController(text: initial?.name ?? '');
+    final codeCtrl = TextEditingController(text: initial?.storeCode ?? '');
+    final addressCtrl = TextEditingController(text: initial?.address ?? '');
+    final phoneCtrl = TextEditingController(text: initial?.phone ?? '');
+    final ownerCtrl = TextEditingController(text: initial?.owner ?? '');
+    final taxCtrl = TextEditingController(text: initial?.taxCode ?? '');
+    final provinceCtrl = TextEditingController(text: initial?.province ?? '');
+    final supCtrl = TextEditingController(text: initial?.sup ?? '');
+    final latCtrl = TextEditingController(
+        text: initial?.latitude != null ? initial!.latitude.toString() : '');
+    final lngCtrl = TextEditingController(
+        text: initial?.longitude != null ? initial!.longitude.toString() : '');
+    final openCtrl = TextEditingController(text: initial?.openDate ?? '');
+    final closeCtrl = TextEditingController(text: initial?.closeDate ?? '');
+    final typeCtrl = TextEditingController(text: initial?.storeType ?? '');
+    String group = initial?.group ?? 'I';
+    String status = initial?.status ?? 'Hoạt động';
+
+    const groups = ['CS', 'HO', 'I', 'II'];
+    const statuses = ['Hoạt động', 'Tạm ngưng', 'Đóng cửa'];
+
+    InputDecoration dec(String label) => InputDecoration(
+          labelText: label,
+          isDense: true,
+          border: const OutlineInputBorder(),
+        );
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Thêm cửa hàng'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên cửa hàng')),
-            const SizedBox(height: 8),
-            TextField(controller: codeCtrl, decoration: const InputDecoration(labelText: 'Mã cửa hàng')),
-            const SizedBox(height: 8),
-            TextField(controller: groupCtrl, decoration: const InputDecoration(labelText: 'Nhóm')),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(isEdit ? 'Sửa cửa hàng' : 'Thêm cửa hàng'),
+          content: SizedBox(
+            width: 480,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(controller: nameCtrl, decoration: dec('Tên cửa hàng *')),
+                  const SizedBox(height: 10),
+                  TextField(controller: codeCtrl, decoration: dec('Mã cửa hàng *')),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: groups.contains(group) ? group : 'I',
+                          decoration: dec('Nhóm'),
+                          items: groups
+                              .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                              .toList(),
+                          onChanged: (v) => setLocal(() => group = v ?? 'I'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          value: statuses.contains(status) ? status : 'Hoạt động',
+                          decoration: dec('Trạng thái'),
+                          items: statuses
+                              .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                              .toList(),
+                          onChanged: (v) => setLocal(() => status = v ?? 'Hoạt động'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(controller: addressCtrl, decoration: dec('Địa chỉ')),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: provinceCtrl, decoration: dec('Tỉnh/Thành'))),
+                      const SizedBox(width: 10),
+                      Expanded(child: TextField(controller: phoneCtrl, decoration: dec('SĐT'))),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: ownerCtrl, decoration: dec('Chủ sở hữu'))),
+                      const SizedBox(width: 10),
+                      Expanded(child: TextField(controller: taxCtrl, decoration: dec('Mã số thuế'))),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: typeCtrl, decoration: dec('Loại cửa hàng'))),
+                      const SizedBox(width: 10),
+                      Expanded(child: TextField(controller: supCtrl, decoration: dec('SUP'))),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: latCtrl,
+                          decoration: dec('Vĩ độ (latitude)'),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: lngCtrl,
+                          decoration: dec('Kinh độ (longitude)'),
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: TextField(controller: openCtrl, decoration: dec('Ngày mở (YYYY-MM-DD)'))),
+                      const SizedBox(width: 10),
+                      Expanded(child: TextField(controller: closeCtrl, decoration: dec('Ngày đóng (YYYY-MM-DD)'))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+            ElevatedButton(
+              onPressed: () {
+                if (nameCtrl.text.trim().isEmpty || codeCtrl.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Vui lòng nhập tên và mã cửa hàng')),
+                  );
+                  return;
+                }
+                String? nz(String s) => s.trim().isEmpty ? null : s.trim();
+                final updated = Store(
+                  id: initial?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                  name: nameCtrl.text.trim(),
+                  storeCode: codeCtrl.text.trim(),
+                  group: group,
+                  managers: initial?.managers ?? const [],
+                  latitude: double.tryParse(latCtrl.text.trim()),
+                  longitude: double.tryParse(lngCtrl.text.trim()),
+                  province: nz(provinceCtrl.text),
+                  sup: nz(supCtrl.text),
+                  status: status,
+                  openDate: nz(openCtrl.text),
+                  closeDate: nz(closeCtrl.text),
+                  storeType: nz(typeCtrl.text),
+                  address: nz(addressCtrl.text),
+                  phone: nz(phoneCtrl.text),
+                  owner: nz(ownerCtrl.text),
+                  taxCode: nz(taxCtrl.text),
+                );
+                final prov = context.read<StoreProvider>();
+                if (isEdit) {
+                  prov.updateStore(updated);
+                } else {
+                  prov.addStore(updated);
+                }
+                Navigator.pop(ctx);
+              },
+              child: Text(isEdit ? 'Lưu' : 'Thêm'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-          ElevatedButton(
-            onPressed: () {
-              if (nameCtrl.text.isEmpty || codeCtrl.text.isEmpty) return;
-              context.read<StoreProvider>().addStore(Store(
-                id: DateTime.now().millisecondsSinceEpoch.toString(),
-                name: nameCtrl.text,
-                storeCode: codeCtrl.text,
-                group: groupCtrl.text.isNotEmpty ? groupCtrl.text : 'A',
-                managers: [],
-              ));
-              Navigator.pop(ctx);
-            },
-            child: const Text('Thêm'),
-          ),
-        ],
       ),
     );
   }
