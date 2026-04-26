@@ -11,6 +11,8 @@ class SalesProvider extends ChangeNotifier {
   DateTime? _customStart;
   DateTime? _customEnd;
   String? _storeFilter; // null = tất cả cửa hàng
+  // Phạm vi cửa hàng được phép xem (theo phân quyền). Rỗng = không giới hạn.
+  Set<String> _allowedStoreCodes = const <String>{};
   String? _error;
 
   List<SalesReport> get reports => _reports;
@@ -19,16 +21,22 @@ class SalesProvider extends ChangeNotifier {
   DateTime? get customStart => _customStart;
   DateTime? get customEnd => _customEnd;
   String? get storeFilter => _storeFilter;
+  Set<String> get allowedStoreCodes => _allowedStoreCodes;
   String? get error => _error;
   void clearError() { _error = null; notifyListeners(); }
 
-  /// Distinct store codes/names appearing in the loaded reports.
+  /// Distinct store codes/names appearing in the loaded reports, intersected
+  /// with [allowedStoreCodes] when restriction is active.
   /// Returns list of (storeCode, storeName) tuples ordered by code.
   List<MapEntry<String, String>> get availableStores {
     final map = <String, String>{};
     for (final r in _reports) {
       final code = (r.storeCode ?? '').trim();
       if (code.isEmpty) continue;
+      if (_allowedStoreCodes.isNotEmpty &&
+          !_allowedStoreCodes.contains(code.toUpperCase())) {
+        continue;
+      }
       map[code] = (r.storeName ?? '').trim().isEmpty ? code : r.storeName!.trim();
     }
     final entries = map.entries.toList()
@@ -66,7 +74,14 @@ class SalesProvider extends ChangeNotifier {
       }
       if (!inRange) return false;
 
-      // Store scope
+      // Phạm vi quản lý: loại bỏ những cửa hàng không thuộc quyền xem.
+      if (_allowedStoreCodes.isNotEmpty) {
+        if (!_allowedStoreCodes.contains((r.storeCode ?? '').toUpperCase())) {
+          return false;
+        }
+      }
+
+      // Store scope (lựa chọn của người dùng)
       if (_storeFilter != null && _storeFilter!.isNotEmpty) {
         if ((r.storeCode ?? '').toUpperCase() != _storeFilter!.toUpperCase()) {
           return false;
@@ -97,6 +112,29 @@ class SalesProvider extends ChangeNotifier {
 
   void setStoreFilter(String? storeCode) {
     _storeFilter = (storeCode == null || storeCode.isEmpty) ? null : storeCode;
+    notifyListeners();
+  }
+
+  /// Giới hạn danh sách cửa hàng được phép xem theo phân quyền của người dùng.
+  /// Truyền `null` hoặc collection rỗng để bỏ giới hạn (admin/quản trị).
+  void setAllowedStoreCodes(Iterable<String>? codes) {
+    final next = (codes == null)
+        ? <String>{}
+        : codes
+            .map((c) => c.trim().toUpperCase())
+            .where((c) => c.isNotEmpty)
+            .toSet();
+    if (next.length == _allowedStoreCodes.length &&
+        next.containsAll(_allowedStoreCodes)) {
+      return; // không đổi
+    }
+    _allowedStoreCodes = next;
+    // Reset bộ lọc cửa hàng đang chọn nếu nó không còn nằm trong phạm vi.
+    if (_storeFilter != null &&
+        next.isNotEmpty &&
+        !next.contains(_storeFilter!.toUpperCase())) {
+      _storeFilter = null;
+    }
     notifyListeners();
   }
 

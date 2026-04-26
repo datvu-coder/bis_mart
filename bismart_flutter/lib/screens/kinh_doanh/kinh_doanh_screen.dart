@@ -8,6 +8,8 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../models/sales_report.dart';
 import '../../providers/sales_provider.dart';
+import '../../providers/permission_provider.dart';
+import '../../providers/store_provider.dart';
 import '../../services/export_service.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
@@ -32,6 +34,8 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SalesProvider>().loadReports();
+      final storeProv = context.read<StoreProvider>();
+      if (storeProv.stores.isEmpty) storeProv.loadStores();
     });
   }
 
@@ -39,6 +43,24 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  /// Tập mã cửa hàng người dùng được phép xem theo phân quyền.
+  /// Trả về set rỗng cho admin (= không giới hạn).
+  Set<String> _resolveAllowedStoreCodes(BuildContext context) {
+    final perm = context.watch<PermissionProvider>();
+    final storeProv = context.watch<StoreProvider>();
+    if (perm.isAdmin) return const <String>{};
+    final codes = <String>{};
+    final own = (perm.ownStoreCode ?? '').trim();
+    if (own.isNotEmpty) codes.add(own.toUpperCase());
+    for (final id in perm.managedStoreIds) {
+      final s = storeProv.getStoreById(id);
+      if (s != null && s.storeCode.trim().isNotEmpty) {
+        codes.add(s.storeCode.trim().toUpperCase());
+      }
+    }
+    return codes;
   }
 
   @override
@@ -49,6 +71,15 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
     final isCompactMobile = screenWidth < 430;
     final isWide = isDesktop || isTablet;
+
+    // Đồng bộ phạm vi cửa hàng theo phân quyền (đợi tới sau frame để tránh
+    // setState-during-build). Setter trong SalesProvider tự nhận biết
+    // không thay đổi để bỏ qua notify.
+    final allowedCodes = _resolveAllowedStoreCodes(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<SalesProvider>().setAllowedStoreCodes(allowedCodes);
+    });
 
     return Consumer<SalesProvider>(
       builder: (context, provider, _) {
@@ -453,15 +484,33 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       trailing: PopupMenuButton<String>(
         tooltip: 'Bộ lọc',
         position: PopupMenuPosition.under,
+        offset: const Offset(0, 8),
+        elevation: 14,
+        color: AppColors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.borderLight),
+        ),
         icon: Container(
-          width: 36,
-          height: 36,
+          width: 40,
+          height: 40,
           decoration: BoxDecoration(
-            color: AppColors.primaryLight,
-            borderRadius: BorderRadius.circular(10),
+            gradient: const LinearGradient(
+              colors: [AppColors.primary, AppColors.primaryDark],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.32),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: const Icon(Icons.filter_list_rounded,
-              size: 20, color: AppColors.primary),
+          child: const Icon(Icons.tune_rounded,
+              size: 20, color: AppColors.white),
         ),
         onSelected: (value) async {
           if (value == 'today' || value == 'week' || value == 'month') {
@@ -503,14 +552,8 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           }
         },
         itemBuilder: (ctx) => [
-          const PopupMenuItem(
-            enabled: false,
-            child: Text('Khoảng thời gian',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textGrey)),
-          ),
+          _menuSectionHeader(
+              'Khoảng thời gian', Icons.event_available_rounded),
           _filterMenuItem('today', AppStrings.homNay, Icons.today_rounded,
               provider.filterType),
           _filterMenuItem('week', AppStrings.tuanNay,
@@ -520,46 +563,48 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           _filterMenuItem('custom', 'Tuỳ chỉnh',
               Icons.date_range_rounded, provider.filterType),
           const PopupMenuDivider(),
-          const PopupMenuItem(
-            enabled: false,
-            child: Text('Cửa hàng',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textGrey)),
-          ),
+          _menuSectionHeader('Cửa hàng', Icons.storefront_rounded),
           _storeMenuItem('store_all', 'Tất cả cửa hàng',
               Icons.store_mall_directory_rounded, activeStoreCode == null),
-          ...stores.map((s) => _storeMenuItem(
-                'store:${s.key}',
-                '${s.key} · ${s.value}',
-                Icons.storefront_rounded,
-                activeStoreCode == s.key,
-              )),
+          if (stores.isEmpty)
+            PopupMenuItem<String>(
+              enabled: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  'Không có cửa hàng được phân quyền',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textHint),
+                ),
+              ),
+            )
+          else
+            ...stores.map((s) => _storeMenuItem(
+                  'store:${s.key}',
+                  '${s.key} · ${s.value}',
+                  Icons.storefront_rounded,
+                  activeStoreCode == s.key,
+                )),
           const PopupMenuDivider(),
-          const PopupMenuItem(
-            enabled: false,
-            child: Text('Xuất dữ liệu',
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textGrey)),
-          ),
-          const PopupMenuItem(
+          _menuSectionHeader('Xuất dữ liệu', Icons.ios_share_rounded),
+          PopupMenuItem<String>(
             value: 'pdf',
-            child: Row(children: [
+            child: Row(children: const [
               Icon(Icons.picture_as_pdf_rounded,
                   size: 18, color: AppColors.error),
               SizedBox(width: 10),
-              Text('Xuất PDF / HTML'),
+              Text('Xuất PDF / HTML',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
             ]),
           ),
-          const PopupMenuItem(
+          PopupMenuItem<String>(
             value: 'excel',
-            child: Row(children: [
-              Icon(Icons.table_chart_rounded, size: 18, color: AppColors.success),
+            child: Row(children: const [
+              Icon(Icons.table_chart_rounded,
+                  size: 18, color: AppColors.success),
               SizedBox(width: 10),
-              Text('Xuất Excel (CSV)'),
+              Text('Xuất Excel (CSV)',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
             ]),
           ),
         ],
@@ -592,83 +637,211 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           // Summary of filtered content
           Container(
-            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(14),
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppColors.borderLight),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.textPrimary.withValues(alpha: 0.04),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.fact_check_rounded,
-                        size: 18, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    Text('Nội dung đang lọc',
-                        style: AppTextStyles.bodyText
-                            .copyWith(fontWeight: FontWeight.w700)),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _summaryStat('Số báo cáo', '${filteredReports.length}',
-                        AppColors.info),
-                    _summaryStat(
-                        'Tổng NU', '$totalNu', AppColors.primary),
-                    _summaryStat(
-                        'Sale Out',
-                        CurrencyFormatter.formatVND(totalSaleOut),
-                        AppColors.warning),
-                    _summaryStat('Doanh thu',
-                        CurrencyFormatter.formatVND(totalRev), AppColors.success),
-                  ],
-                ),
-                if (filteredReports.isEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text('Không có báo cáo phù hợp với bộ lọc.',
-                      style: AppTextStyles.caption
-                          .copyWith(color: AppColors.textGrey)),
-                ] else ...[
-                  const SizedBox(height: 12),
-                  ...filteredReports.take(8).map((r) => Padding(
-                        padding: const EdgeInsets.only(bottom: 6),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.circle,
-                                size: 6, color: AppColors.textGrey),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                '${DateFormatter.formatDate(r.date)} · ${r.pgName}'
-                                '${r.storeCode != null ? " · ${r.storeCode}" : ""}',
-                                style: AppTextStyles.caption,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                // Header strip with subtle gradient
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.primaryLight, AppColors.white],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(18),
+                      topRight: Radius.circular(18),
+                    ),
+                    border: const Border(
+                        bottom:
+                            BorderSide(color: AppColors.borderLight)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: AppColors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(alpha: 0.18),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
                             ),
-                            Text(CurrencyFormatter.formatVND(r.revenue),
-                                style: AppTextStyles.caption.copyWith(
-                                    color: AppColors.success,
-                                    fontWeight: FontWeight.w700)),
                           ],
                         ),
-                      )),
-                  if (filteredReports.length > 8)
-                    Text(
-                      '... và ${filteredReports.length - 8} báo cáo khác',
-                      style: AppTextStyles.caption
-                          .copyWith(color: AppColors.textGrey),
-                    ),
-                ],
+                        child: const Icon(Icons.fact_check_rounded,
+                            size: 18, color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Nội dung đang lọc',
+                                style: AppTextStyles.bodyText.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: AppColors.textPrimary)),
+                            Text(
+                              activeStoreCode == null
+                                  ? '$rangeLabel · Tất cả cửa hàng'
+                                  : '$rangeLabel · $activeStoreCode',
+                              style: AppTextStyles.caption
+                                  .copyWith(color: AppColors.textGrey),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LayoutBuilder(builder: (ctx, c) {
+                        final twoCol = c.maxWidth < 460;
+                        final cardWidth = twoCol
+                            ? (c.maxWidth - 10) / 2
+                            : (c.maxWidth - 30) / 4;
+                        return Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            _summaryStat('Số báo cáo',
+                                '${filteredReports.length}',
+                                AppColors.info, cardWidth),
+                            _summaryStat('Tổng NU', '$totalNu',
+                                AppColors.primary, cardWidth),
+                            _summaryStat(
+                                'Sale Out',
+                                CurrencyFormatter.formatVND(totalSaleOut),
+                                AppColors.warning,
+                                cardWidth),
+                            _summaryStat(
+                                'Doanh thu',
+                                CurrencyFormatter.formatVND(totalRev),
+                                AppColors.success,
+                                cardWidth),
+                          ],
+                        );
+                      }),
+                      if (filteredReports.isEmpty) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.inbox_rounded,
+                                  size: 18, color: AppColors.textHint),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Không có báo cáo phù hợp với bộ lọc.',
+                                  style: AppTextStyles.caption.copyWith(
+                                      color: AppColors.textGrey,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 14),
+                        ...filteredReports.take(8).map((r) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      '${DateFormatter.formatDate(r.date)} · ${r.pgName}'
+                                      '${r.storeCode != null ? " · ${r.storeCode}" : ""}',
+                                      style: AppTextStyles.caption.copyWith(
+                                          color: AppColors.textPrimary,
+                                          fontWeight: FontWeight.w600),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    CurrencyFormatter.formatVND(r.revenue),
+                                    style: AppTextStyles.caption.copyWith(
+                                        color: AppColors.success,
+                                        fontWeight: FontWeight.w800),
+                                  ),
+                                ],
+                              ),
+                            )),
+                        if (filteredReports.length > 8)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '... và ${filteredReports.length - 8} báo cáo khác',
+                              style: AppTextStyles.caption.copyWith(
+                                  color: AppColors.textGrey,
+                                  fontStyle: FontStyle.italic),
+                            ),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _menuSectionHeader(String label, IconData icon) {
+    return PopupMenuItem<String>(
+      enabled: false,
+      height: 32,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Text(
+            label.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+              color: AppColors.primary,
             ),
           ),
         ],
@@ -683,11 +856,25 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     VoidCallback? onClear,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.16),
+            color.withValues(alpha: 0.06),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.10),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -696,13 +883,21 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           const SizedBox(width: 6),
           Text(label,
               style: AppTextStyles.caption
-                  .copyWith(color: color, fontWeight: FontWeight.w700)),
+                  .copyWith(color: color, fontWeight: FontWeight.w800)),
           if (onClear != null) ...[
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             InkWell(
               onTap: onClear,
-              borderRadius: BorderRadius.circular(12),
-              child: Icon(Icons.close_rounded, size: 14, color: color),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.close_rounded, size: 12, color: color),
+              ),
             ),
           ],
         ],
@@ -710,25 +905,47 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     );
   }
 
-  Widget _summaryStat(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label,
-              style: AppTextStyles.caption
-                  .copyWith(color: AppColors.textGrey, fontSize: 11)),
-          const SizedBox(height: 2),
-          Text(value,
-              style: TextStyle(
-                  color: color, fontWeight: FontWeight.w800, fontSize: 14)),
-        ],
+  Widget _summaryStat(
+      String label, String value, Color color, double? width) {
+    return SizedBox(
+      width: width,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border(
+            top: const BorderSide(color: AppColors.borderLight),
+            right: const BorderSide(color: AppColors.borderLight),
+            bottom: const BorderSide(color: AppColors.borderLight),
+            left: BorderSide(color: color, width: 3),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label,
+                style: AppTextStyles.caption.copyWith(
+                    color: AppColors.textGrey,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Text(value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 15)),
+          ],
+        ),
       ),
     );
   }
