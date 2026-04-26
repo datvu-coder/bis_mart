@@ -966,9 +966,15 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   }
 
   Widget _buildShiftPanel(EmployeeProvider provider) {
-    final stores = context.read<StoreProvider>().stores;
+    final permProv = context.read<PermissionProvider>();
+    final managedIds = permProv.managedStoreIds.toSet();
+    final stores = context
+        .read<StoreProvider>()
+        .stores
+        .where((s) => managedIds.contains(s.id))
+        .toList();
     final selectedStoreId = provider.selectedShiftStoreId;
-    final canManage = context.read<PermissionProvider>().canManageAttendance;
+    final canManage = permProv.canManageAttendance;
 
     return DataPanel(
       title: AppStrings.caLamViec,
@@ -1398,7 +1404,12 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     final nameCtrl = TextEditingController();
     TimeOfDay startTime = const TimeOfDay(hour: 8, minute: 0);
     TimeOfDay endTime = const TimeOfDay(hour: 17, minute: 0);
-    final stores = context.read<StoreProvider>().stores;
+    final managedIds = context.read<PermissionProvider>().managedStoreIds.toSet();
+    final stores = context
+        .read<StoreProvider>()
+        .stores
+        .where((s) => managedIds.contains(s.id))
+        .toList();
     String? selectedStoreId = provider.selectedShiftStoreId;
 
     showDialog(

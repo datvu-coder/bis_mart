@@ -232,7 +232,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
               ),
             ],
           ),
-          if (user != null) ...[            
+          if (user != null && context.watch<PermissionProvider>().managedStoreIds.length >= 2) ...[            
             const SizedBox(height: 14),
             OutlinedButton.icon(
               onPressed: () => _showTransferStoreDialog(context, user),
@@ -393,6 +393,8 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
   void _showTransferStoreDialog(BuildContext context, Employee user) {
     final storeProvider = context.read<StoreProvider>();
     if (storeProvider.stores.isEmpty) storeProvider.loadStores();
+    // Restrict choices to stores this user is currently a manager of.
+    final managedIds = context.read<PermissionProvider>().managedStoreIds.toSet();
 
     String? selectedStoreId;
     String storeQuery = '';
@@ -403,7 +405,11 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx2, setDialogState) {
-          final stores = context.read<StoreProvider>().stores;
+          final stores = context
+              .read<StoreProvider>()
+              .stores
+              .where((s) => managedIds.contains(s.id))
+              .toList();
           return AlertDialog(
             title: const Text('Chuyển cửa hàng'),
             content: SizedBox(
