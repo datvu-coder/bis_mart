@@ -10,6 +10,7 @@ import '../../models/sales_report.dart';
 import '../../providers/sales_provider.dart';
 import '../../providers/permission_provider.dart';
 import '../../providers/store_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../services/export_service.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
@@ -36,6 +37,13 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       context.read<SalesProvider>().loadReports();
       final storeProv = context.read<StoreProvider>();
       if (storeProv.stores.isEmpty) storeProv.loadStores();
+      // Đảm bảo quyền đã được giải quyết để bộ lọc cửa hàng theo quản lý
+      // hoạt động ngay cả khi người dùng vào thẳng tab Kinh doanh.
+      final permProv = context.read<PermissionProvider>();
+      final user = context.read<AuthProvider>().currentUser;
+      if (user != null && permProv.systemRole == null) {
+        permProv.resolveForUser(user);
+      }
     });
   }
 
@@ -45,20 +53,26 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     super.dispose();
   }
 
-  /// Tập mã cửa hàng người dùng được phép xem theo phân quyền.
-  /// Trả về set rỗng cho admin (= không giới hạn).
+  /// Tập mã cửa hàng người dùng được quản lý theo phân quyền.
+  /// - Admin: trả về set rỗng (= không giới hạn).
+  /// - Người dùng khác: chỉ những cửa hàng được phân làm quản lý (managedStoreIds).
   Set<String> _resolveAllowedStoreCodes(BuildContext context) {
     final perm = context.watch<PermissionProvider>();
     final storeProv = context.watch<StoreProvider>();
     if (perm.isAdmin) return const <String>{};
     final codes = <String>{};
-    final own = (perm.ownStoreCode ?? '').trim();
-    if (own.isNotEmpty) codes.add(own.toUpperCase());
     for (final id in perm.managedStoreIds) {
       final s = storeProv.getStoreById(id);
       if (s != null && s.storeCode.trim().isNotEmpty) {
         codes.add(s.storeCode.trim().toUpperCase());
       }
+    }
+    // Fallback: nếu danh sách trống (vd. chưa tải xong stores) và
+    // người dùng có ownStoreCode thì tạm thời cho xem cửa hàng đó để
+    // tránh đứng hình trước khi load xong.
+    if (codes.isEmpty && storeProv.stores.isEmpty) {
+      final own = (perm.ownStoreCode ?? '').trim();
+      if (own.isNotEmpty) codes.add(own.toUpperCase());
     }
     return codes;
   }
