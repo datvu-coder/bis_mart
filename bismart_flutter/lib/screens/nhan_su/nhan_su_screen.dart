@@ -176,9 +176,18 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   }
 
   Widget _buildScreenHeader(EmployeeProvider provider, bool canManage, bool emphasize) {
-    final checkedInCount = provider.attendances.where((a) => a.isCheckedIn).length;
+    final myStoreCode = context.read<AuthProvider>().currentUser?.storeCode;
+    final scopedEmployees = (myStoreCode == null || myStoreCode.isEmpty)
+        ? provider.employees
+        : provider.employees
+            .where((e) => (e.storeCode ?? '').toUpperCase() == myStoreCode.toUpperCase())
+            .toList();
+    final scopedEmployeeIds = scopedEmployees.map((e) => e.id).toSet();
+    final checkedInCount = provider.attendances
+        .where((a) => a.isCheckedIn && (scopedEmployeeIds.isEmpty || scopedEmployeeIds.contains(a.employeeId)))
+        .length;
     final activeShiftCount = provider.shifts.length;
-    final memberCount = provider.employees.length;
+    final memberCount = scopedEmployees.length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
 
     return Container(
@@ -225,21 +234,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                     ],
                   ),
                 ),
-                if (canManage)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.infoLight,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: Text(
-                      'Quản lý',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.info,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
               ],
             ),
             const SizedBox(height: 12),
