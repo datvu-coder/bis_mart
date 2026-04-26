@@ -79,12 +79,15 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isCompactMobile = MediaQuery.of(context).size.width < 430;
     final perm = context.watch<PermissionProvider>();
+    // Only system admins (or roles whose permissions include canCrud) may
+    // touch the role/permission catalog or manager assignments. PG/SM/etc.
+    // arrive here read-only.
     final canEditPermissions = perm.isAdmin || perm.canCrud;
-    final canManageAssignments = canEditPermissions || perm.canSwitchStore;
+    final canManageAssignments = canEditPermissions;
 
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Phân quyền hệ thống'),
         backgroundColor: AppColors.primary,
@@ -92,15 +95,16 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.white,
-          unselectedLabelColor: AppColors.white.withValues(alpha: 0.65),
+          unselectedLabelColor: AppColors.white.withValues(alpha: 0.7),
           indicatorColor: AppColors.white,
-          tabs: [
-            isCompactMobile
-                ? const Tab(icon: Icon(Icons.admin_panel_settings_rounded, size: 18))
-                : const Tab(text: 'Quyền theo chức vụ'),
-            isCompactMobile
-                ? const Tab(icon: Icon(Icons.store_mall_directory_rounded, size: 18))
-                : const Tab(text: 'Phân công cửa hàng'),
+          indicatorWeight: 2.5,
+          labelStyle:
+              const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          unselectedLabelStyle:
+              const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+          tabs: const [
+            Tab(text: 'Quyền chức vụ'),
+            Tab(text: 'Phân công cửa hàng'),
           ],
         ),
       ),
@@ -118,123 +122,199 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
 
   Widget _buildPermissionsTab(bool canEditPermissions) {
     if (_loadingPerms) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary));
     }
+    final isWide = MediaQuery.of(context).size.width >= 600;
+    final hPad = isWide ? 24.0 : 2.0;
+    final innerPad = isWide ? 24.0 : 10.0;
+
+    final systemKeys = Permission.systemRoleLabels.keys.toSet();
+    final systemPerms = _permissions
+        .where((p) => systemKeys.contains(p.position.toUpperCase()))
+        .toList();
+    final storePerms = _permissions
+        .where((p) => !systemKeys.contains(p.position.toUpperCase()))
+        .toList();
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Cấu hình quyền cho từng chức vụ hệ thống và chức vụ cửa hàng',
-                  style: AppTextStyles.caption,
-                ),
-              ),
-              if (!canEditPermissions)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: Text(
-                    'Chỉ xem',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.warning,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              TextButton.icon(
-                onPressed: canEditPermissions ? () => _showEditPermissionDialog(null) : null,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Thêm'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-              ),
-            ],
+          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 6),
+          child: _buildSummaryHeader(
+            icon: Icons.admin_panel_settings_rounded,
+            color: AppColors.primary,
+            title: 'Cấu hình quyền',
+            subtitle:
+                '${systemPerms.length} chức vụ hệ thống · ${storePerms.length} chức vụ tại cửa hàng',
+            actionLabel: 'Thêm',
+            actionEnabled: canEditPermissions,
+            onAction: () => _showEditPermissionDialog(null),
+            readOnly: !canEditPermissions,
           ),
         ),
-        _buildRoleLegend(),
         Expanded(
           child: _permissions.isEmpty
               ? Center(
-                  child: Text('Chưa có cấu hình quyền nào.\nNhấn "Thêm" để tạo.',
-                    textAlign: TextAlign.center, style: AppTextStyles.caption),
+                  child: Text(
+                      'Chưa có cấu hình quyền nào.\nNhấn "Thêm" để tạo.',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.caption),
                 )
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                  itemCount: _permissions.length,
-                  itemBuilder: (ctx, i) => _buildPermissionCard(_permissions[i], canEditPermissions),
+              : ListView(
+                  padding: EdgeInsets.fromLTRB(innerPad, 6, innerPad, 80),
+                  children: [
+                    if (systemPerms.isNotEmpty) ...[
+                      _sectionLabel('Chức vụ hệ thống', systemPerms.length),
+                      ...systemPerms.map((p) => _buildPermissionCard(p, canEditPermissions, isSystem: true)),
+                      const SizedBox(height: 14),
+                    ],
+                    if (storePerms.isNotEmpty) ...[
+                      _sectionLabel('Chức vụ tại cửa hàng', storePerms.length),
+                      ...storePerms.map((p) => _buildPermissionCard(p, canEditPermissions, isSystem: false)),
+                    ],
+                  ],
                 ),
         ),
       ],
     );
   }
 
-  Widget _buildRoleLegend() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _sectionLabel(String label, int count) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      child: Row(
         children: [
-          Text('Chức vụ hệ thống:', style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: Permission.systemRoleLabels.entries
-                .map((e) => _roleBadge(e.key, e.value, AppColors.primary))
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          Text('Chức vụ tại cửa hàng:', style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            children: Permission.storeRoleLabels.entries
-                .map((e) => _roleBadge(e.key, e.value, AppColors.info))
-                .toList(),
+          Text(label,
+              style: AppTextStyles.bodyText.copyWith(
+                  fontWeight: FontWeight.w800, color: AppColors.textGrey)),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text('$count',
+                style: AppTextStyles.caption
+                    .copyWith(fontWeight: FontWeight.w700, fontSize: 11)),
           ),
         ],
       ),
     );
   }
 
-  Widget _roleBadge(String code, String label, Color color) {
+  Widget _buildSummaryHeader({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required String actionLabel,
+    required bool actionEnabled,
+    required VoidCallback onAction,
+    Widget? extra,
+    bool readOnly = false,
+  }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
       ),
-      child: Text('$code — $label',
-          style: AppTextStyles.caption.copyWith(color: color, fontWeight: FontWeight.w600, fontSize: 11)),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(title,
+                        style: AppTextStyles.bodyText
+                            .copyWith(fontWeight: FontWeight.w700)),
+                    if (readOnly) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text('Chỉ xem',
+                            style: AppTextStyles.caption.copyWith(
+                                color: AppColors.warning,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 10)),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(subtitle,
+                    style: AppTextStyles.caption,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis),
+                if (extra != null) ...[
+                  const SizedBox(height: 6),
+                  extra,
+                ],
+              ],
+            ),
+          ),
+          ElevatedButton.icon(
+            onPressed: actionEnabled ? onAction : null,
+            icon: const Icon(Icons.add_rounded, size: 16),
+            label: Text(actionLabel),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: color,
+              foregroundColor: AppColors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildPermissionCard(Permission perm, bool canEditPermissions) {
+  Widget _buildPermissionCard(Permission perm, bool canEditPermissions, {required bool isSystem}) {
     final flags = [
-      ('Chấm công', perm.canAttendance),
-      ('Báo cáo', perm.canReport),
-      ('Quản lý CC', perm.canManageAttendance),
-      ('Nhân viên', perm.canEmployees),
-      ('Thêm/Sửa', perm.canCrud),
-      ('DS Cửa hàng', perm.canStoreList),
-      ('DS Sản phẩm', perm.canProductList),
-      ('Đổi cửa hàng', perm.canSwitchStore),
+      ('Chấm công', perm.canAttendance, Icons.fingerprint_rounded),
+      ('Báo cáo', perm.canReport, Icons.bar_chart_rounded),
+      ('Quản lý CC', perm.canManageAttendance, Icons.verified_user_rounded),
+      ('Nhân viên', perm.canEmployees, Icons.people_rounded),
+      ('Thêm/Sửa/Xoá', perm.canCrud, Icons.edit_rounded),
+      ('Cửa hàng', perm.canStoreList, Icons.store_rounded),
+      ('Sản phẩm', perm.canProductList, Icons.inventory_2_rounded),
+      ('Đổi cửa hàng', perm.canSwitchStore, Icons.swap_horiz_rounded),
     ];
+    final color = isSystem ? AppColors.primary : AppColors.info;
+    final label = perm.description ??
+        Permission.systemRoleLabels[perm.position] ??
+        Permission.storeRoleLabels[perm.position] ??
+        '';
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -242,67 +322,86 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(8),
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(perm.position,
-                  style: AppTextStyles.bodyText.copyWith(
-                    color: AppColors.primary, fontWeight: FontWeight.w800)),
+                    style: AppTextStyles.caption.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12)),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  perm.description ??
-                      Permission.systemRoleLabels[perm.position] ??
-                      Permission.storeRoleLabels[perm.position] ?? '',
-                  style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600),
-                ),
+                child: Text(label,
+                    style: AppTextStyles.bodyText
+                        .copyWith(fontWeight: FontWeight.w600, fontSize: 13),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
               ),
               IconButton(
-                icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.primary),
-                tooltip: 'Chỉnh sửa',
-                onPressed: canEditPermissions ? () => _showEditPermissionDialog(perm) : null,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.edit_outlined,
+                    size: 17, color: AppColors.primary),
+                tooltip: 'Sửa',
+                onPressed: canEditPermissions
+                    ? () => _showEditPermissionDialog(perm)
+                    : null,
               ),
               IconButton(
-                icon: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
-                tooltip: 'Xóa',
-                onPressed: canEditPermissions ? () => _deletePermission(perm.position) : null,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: const Icon(Icons.delete_outline_rounded,
+                    size: 17, color: AppColors.error),
+                tooltip: 'Xoá',
+                onPressed: canEditPermissions
+                    ? () => _deletePermission(perm.position)
+                    : null,
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: flags.map((f) => _flagChip(f.$1, f.$2)).toList(),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Wrap(
+              spacing: 5,
+              runSpacing: 5,
+              children: flags.map((f) => _flagChip(f.$1, f.$2, f.$3)).toList(),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _flagChip(String label, bool enabled) {
+  Widget _flagChip(String label, bool enabled, IconData icon) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
-        color: enabled ? AppColors.successLight : AppColors.surfaceVariant,
+        color: enabled
+            ? AppColors.successLight
+            : AppColors.surfaceVariant.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            enabled ? Icons.check_circle_rounded : Icons.cancel_rounded,
-            size: 13,
-            color: enabled ? AppColors.success : AppColors.textHint,
-          ),
+          Icon(icon,
+              size: 12,
+              color: enabled ? AppColors.success : AppColors.textHint),
           const SizedBox(width: 4),
           Text(label,
-            style: AppTextStyles.caption.copyWith(
-              color: enabled ? AppColors.success : AppColors.textHint,
-              fontWeight: FontWeight.w600, fontSize: 11)),
+              style: AppTextStyles.caption.copyWith(
+                color: enabled ? AppColors.success : AppColors.textHint,
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+              )),
         ],
       ),
     );
@@ -469,8 +568,13 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
 
   Widget _buildAssignmentsTab(bool canManageAssignments) {
     if (_loadingAssign) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+      return const Center(
+          child: CircularProgressIndicator(color: AppColors.primary));
     }
+    final isWide = MediaQuery.of(context).size.width >= 600;
+    final hPad = isWide ? 24.0 : 2.0;
+    final innerPad = isWide ? 24.0 : 10.0;
+
     final stores = context.watch<StoreProvider>().stores;
     final employees = context.watch<EmployeeProvider>().employees;
     final query = _assignmentSearch.trim().toLowerCase();
@@ -488,153 +592,238 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
           storeRole.contains(query);
     }).toList();
 
+    // Group by store for compact, scannable layout.
+    final byStore = <String, List<Map<String, dynamic>>>{};
+    for (final a in filtered) {
+      final key =
+          '${a['storeCode'] ?? ''}|${a['storeName'] ?? ''}|${a['storeId'] ?? ''}';
+      byStore.putIfAbsent(key, () => []).add(a);
+    }
+    final storeKeys = byStore.keys.toList()..sort();
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+          padding: EdgeInsets.fromLTRB(hPad, 12, hPad, 6),
+          child: _buildSummaryHeader(
+            icon: Icons.store_mall_directory_rounded,
+            color: AppColors.info,
+            title: 'Phân công cửa hàng',
+            subtitle:
+                '${_assignments.length} phân công · ${byStore.length} cửa hàng',
+            actionLabel: 'Phân công',
+            actionEnabled: canManageAssignments &&
+                stores.isNotEmpty &&
+                employees.isNotEmpty,
+            onAction: () => _showAssignDialog(stores, employees),
+            readOnly: !canManageAssignments,
+            extra: Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                _miniAction(
+                  Icons.upload_file_rounded,
+                  _importingAssign ? 'Đang import…' : 'Import CSV',
+                  AppColors.primary,
+                  enabled: canManageAssignments && !_importingAssign,
+                  onTap: () => _importAssignmentsFromCsv(stores, employees),
+                ),
+                _miniAction(
+                  Icons.download_rounded,
+                  'Mẫu CSV',
+                  AppColors.textGrey,
+                  enabled: true,
+                  onTap: _downloadSampleCsv,
+                ),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(innerPad, 6, innerPad, 6),
           child: TextField(
             onChanged: (v) => setState(() => _assignmentSearch = v),
             decoration: InputDecoration(
-              hintText: 'Tìm theo nhân viên, cửa hàng, mã, chức vụ...',
+              hintText: 'Tìm theo nhân viên / cửa hàng / chức vụ…',
               prefixIcon: const Icon(Icons.search_rounded, size: 18),
               isDense: true,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
+                borderSide:
+                    BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
               ),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Gán nhân viên vào cửa hàng với chức vụ tại cửa hàng đó',
-                  style: AppTextStyles.caption,
-                ),
-              ),
-              TextButton.icon(
-                onPressed: (!canManageAssignments || _importingAssign)
-                    ? null
-                    : () => _importAssignmentsFromCsv(stores, employees),
-                icon: _importingAssign
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.upload_file_rounded, size: 18),
-                label: Text(_importingAssign ? 'Đang import...' : 'Import CSV'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-              ),
-              TextButton.icon(
-                onPressed: () => _downloadSampleCsv(),
-                icon: const Icon(Icons.download_rounded, size: 18),
-                label: const Text('Mẫu CSV'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.textHint),
-              ),
-              TextButton.icon(
-                onPressed: !canManageAssignments || stores.isEmpty || employees.isEmpty
-                    ? null
-                    : () => _showAssignDialog(stores, employees),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Phân công'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.primary),
-              ),
-            ],
-          ),
-        ),
-        if (!canManageAssignments)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Bạn không có quyền phân công/chuyển cửa hàng.',
-                style: AppTextStyles.caption.copyWith(
-                  color: AppColors.warning,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
         Expanded(
           child: filtered.isEmpty
               ? Center(
-                  child: Text(_assignments.isEmpty
-                      ? 'Chưa có phân công nào.\nNhấn "Phân công" để thêm.'
-                      : 'Không có kết quả phù hợp từ khóa tìm kiếm.',
-                    textAlign: TextAlign.center, style: AppTextStyles.caption),
+                  child: Text(
+                    _assignments.isEmpty
+                        ? 'Chưa có phân công nào.\nNhấn "Phân công" để thêm.'
+                        : 'Không có kết quả phù hợp.',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.caption,
+                  ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                  itemCount: filtered.length,
-                  itemBuilder: (ctx, i) =>
-                      _buildAssignmentCard(filtered[i], stores, employees, canManageAssignments),
+                  padding: EdgeInsets.fromLTRB(innerPad, 4, innerPad, 80),
+                  itemCount: storeKeys.length,
+                  itemBuilder: (ctx, i) {
+                    final k = storeKeys[i];
+                    final parts = k.split('|');
+                    final code = parts.isNotEmpty ? parts[0] : '';
+                    final name = parts.length > 1 ? parts[1] : '';
+                    final list = byStore[k]!;
+                    return _buildStoreGroup(
+                        code, name, list, canManageAssignments);
+                  },
                 ),
         ),
       ],
     );
   }
 
-  Widget _buildAssignmentCard(Map<String, dynamic> a,
-      List<dynamic> stores, List<dynamic> employees, bool canManageAssignments) {
-    final roleLabel = Permission.storeRoleLabels[a['storeRole']] ??
-        Permission.systemRoleLabels[a['storeRole']] ??
-        (a['storeRole'] ?? '');
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+  Widget _miniAction(IconData icon, String label, Color color,
+      {required bool enabled, required VoidCallback onTap}) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: enabled ? 0.1 : 0.05),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: enabled ? color : AppColors.textHint),
+            const SizedBox(width: 4),
+            Text(label,
+                style: AppTextStyles.caption.copyWith(
+                    color: enabled ? color : AppColors.textHint,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 11)),
+          ],
+        ),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
+    );
+  }
+
+  Widget _buildStoreGroup(String storeCode, String storeName,
+      List<Map<String, dynamic>> entries, bool canManageAssignments) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+      ),
+      child: Theme(
+        data: Theme.of(context)
+            .copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: entries.length <= 6,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          childrenPadding:
+              const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          shape: const RoundedRectangleBorder(side: BorderSide.none),
+          collapsedShape:
+              const RoundedRectangleBorder(side: BorderSide.none),
+          leading: Container(
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
               color: AppColors.infoLight,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.store_rounded, size: 20, color: AppColors.info),
+            child: const Icon(Icons.store_rounded,
+                size: 18, color: AppColors.info),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(a['employeeName'] ?? '', style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    const Icon(Icons.store_rounded, size: 13, color: AppColors.textHint),
-                    const SizedBox(width: 4),
-                    Expanded(child: Text(a['storeName'] ?? '', style: AppTextStyles.caption)),
-                  ],
-                ),
-              ],
-            ),
+          title: Text(
+            storeName.isNotEmpty ? storeName : storeCode,
+            style: AppTextStyles.bodyText.copyWith(
+                fontWeight: FontWeight.w700, fontSize: 13),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
+          subtitle: Text(
+            'Mã $storeCode · ${entries.length} người quản lý',
+            style: AppTextStyles.caption.copyWith(fontSize: 11),
+          ),
+          children: entries
+              .map((a) =>
+                  _buildAssignmentRow(a, canManageAssignments))
+              .toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssignmentRow(
+      Map<String, dynamic> a, bool canManageAssignments) {
+    final roleCode = (a['storeRole'] ?? '').toString();
+    final roleLabel = Permission.storeRoleLabels[roleCode] ??
+        Permission.systemRoleLabels[roleCode] ??
+        roleCode;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      padding: const EdgeInsets.fromLTRB(10, 6, 4, 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            width: 28,
+            height: 28,
             decoration: BoxDecoration(
               color: AppColors.primaryLight,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Text(
-              '${a['storeRole']} — $roleLabel',
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 11),
-            ),
+            child: const Icon(Icons.person_rounded,
+                size: 14, color: AppColors.primary),
           ),
           const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(a['employeeName'] ?? '',
+                    style: AppTextStyles.bodyText.copyWith(
+                        fontWeight: FontWeight.w600, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+                Text('Mã ${a['employeeCode'] ?? ''}',
+                    style: AppTextStyles.caption
+                        .copyWith(fontSize: 10.5)),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '$roleCode · $roleLabel',
+              style: AppTextStyles.caption.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11),
+            ),
+          ),
           if (canManageAssignments)
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert_rounded, size: 18),
+              padding: EdgeInsets.zero,
+              icon: const Icon(Icons.more_vert_rounded,
+                  size: 16, color: AppColors.textGrey),
               onSelected: (v) async {
                 if (v == 'edit') {
                   _showEditRoleDialog(a);
@@ -642,13 +831,15 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                   try {
                     await _api.deleteStoreManager(a['id'] as int);
                     await _loadAssignments();
+                    await _refreshCurrentUserPermissions();
                   } catch (e) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Xóa phân công thất bại: $e'),
+                        content: Text('Xoá phân công thất bại: $e'),
                         behavior: SnackBarBehavior.floating,
                         backgroundColor: AppColors.error,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
                       ));
                     }
                   }
@@ -656,7 +847,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
               },
               itemBuilder: (ctx) => const [
                 PopupMenuItem(value: 'edit', child: Text('Đổi chức vụ')),
-                PopupMenuItem(value: 'delete', child: Text('Xóa phân công')),
+                PopupMenuItem(value: 'delete', child: Text('Xoá phân công')),
               ],
             ),
         ],
@@ -837,6 +1028,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                   if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                   await _loadAssignments();
+                  await _refreshCurrentUserPermissions();
                 } catch (e) {
                   if (ctx.mounted) {
                     ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
@@ -897,6 +1089,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                   if (!ctx.mounted) return;
                   Navigator.pop(ctx);
                   await _loadAssignments();
+                  await _refreshCurrentUserPermissions();
                 } catch (e) {
                   if (ctx.mounted) {
                     ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
@@ -1024,6 +1217,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
         }
 
         await _loadAssignments();
+        await _refreshCurrentUserPermissions();
         if (mounted) {
           setState(() => _importingAssign = false);
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
