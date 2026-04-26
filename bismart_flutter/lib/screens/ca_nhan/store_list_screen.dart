@@ -27,18 +27,22 @@ class _StoreListScreenState extends State<StoreListScreen> {
   @override
   Widget build(BuildContext context) {
     final permProv = context.watch<PermissionProvider>();
-    // Only true admins (system-level CRUD) can create brand-new stores.
+    // FAB "Thêm cửa hàng": only those with CRUD power (system admin or any
+    // store-manager whose store role grants canCrud).
     final canCreate = permProv.canCrud;
-    // Users without system-wide canStoreList only see stores where they are a manager.
+    // Restrict the visible list when the user has neither system canStoreList
+    // nor admin: they can only see stores where they are a manager, plus their
+    // own assigned store (storeCode on their employee record).
     final restrictToManaged =
         !(permProv.isAdmin || permProv.canStoreList);
     final managedIds = permProv.managedStoreIds.toSet();
+    final ownStoreCode = permProv.ownStoreCode;
     return Consumer<StoreProvider>(
       builder: (context, provider, _) {
         final stores = restrictToManaged
-            ? provider.filteredStores
-                .where((s) => managedIds.contains(s.id))
-                .toList()
+            ? provider.filteredStores.where((s) =>
+                managedIds.contains(s.id) ||
+                (ownStoreCode != null && s.storeCode == ownStoreCode)).toList()
             : provider.filteredStores;
 
         return Scaffold(

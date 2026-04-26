@@ -15,6 +15,7 @@ class PermissionProvider extends ChangeNotifier {
   Permission? _storePerm;
   String? _systemRole;
   String? _storeRole;
+  String? _ownStoreCode; // employee.storeCode — the store this user is assigned to
   bool _isLoading = false;
   // storeId -> store_role for every store this user is a manager of (Tier-2)
   final Map<String, String> _managedStoreRoles = {};
@@ -49,6 +50,7 @@ class PermissionProvider extends ChangeNotifier {
   bool isManagerOfStore(String storeId) =>
       _managedStoreRoles.containsKey(storeId);
   String? roleForStore(String storeId) => _managedStoreRoles[storeId];
+  String? get ownStoreCode => _ownStoreCode;
 
   /// Effective permission specifically for [storeId]: system perm OR'ed with
   /// the perm derived from the store-role this user holds for that store.
@@ -87,6 +89,7 @@ class PermissionProvider extends ChangeNotifier {
   /// Load effective permissions from the backend (resolves all 3 tiers).
   Future<void> resolveForUser(Employee user) async {
     _systemRole = user.position;
+    _ownStoreCode = user.storeCode;
     _isLoading = true;
     notifyListeners();
 
@@ -127,6 +130,7 @@ class PermissionProvider extends ChangeNotifier {
   void clear() {
     _effective = _systemPerm = _storePerm = null;
     _systemRole = _storeRole = null;
+    _ownStoreCode = null;
     _managedStoreRoles.clear();
     notifyListeners();
   }

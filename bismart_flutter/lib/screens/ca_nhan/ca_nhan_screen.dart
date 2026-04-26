@@ -318,7 +318,9 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
         _MenuItem(Icons.fingerprint_rounded, AppStrings.quanLyChamCong, 'Chấm công, ca làm & xếp hạng', AppRoutes.nhanSu, AppColors.success, AppColors.successLight),
       if (permProv.canReport)
         _MenuItem(Icons.bar_chart_rounded, AppStrings.quanLyBaoCao, 'Báo cáo doanh thu & thống kê', AppRoutes.kinhDoanh, AppColors.warning, AppColors.warningLight),
-      if (permProv.canStoreList || permProv.managedStoreIds.isNotEmpty)
+      if (permProv.canStoreList ||
+          permProv.managedStoreIds.isNotEmpty ||
+          (permProv.ownStoreCode != null && permProv.ownStoreCode!.isNotEmpty))
         _MenuItem(Icons.store_rounded, AppStrings.danhSachCuaHang, 'Danh sách cửa hàng trong hệ thống', AppRoutes.storeList, AppColors.primary, AppColors.primaryLight),
       if (permProv.canProductList)
         _MenuItem(Icons.inventory_2_rounded, AppStrings.danhSachSanPham, 'Quản lý sản phẩm & tồn kho', AppRoutes.productList, AppColors.error, AppColors.errorLight),
