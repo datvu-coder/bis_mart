@@ -146,6 +146,14 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> getAttendanceHoursReport({String? month, String? storeCode}) async {
+    final params = <String, dynamic>{};
+    if (month != null) params['month'] = month;
+    if (storeCode != null && storeCode.isNotEmpty) params['storeCode'] = storeCode;
+    final response = await _dio.get('/api/attendances/hours-report', queryParameters: params);
+    return response.data as Map<String, dynamic>;
+  }
+
   // ---- SHIFTS ----
   Future<List<dynamic>> getShifts({String? storeId}) async {
     final response = await _dio.get('/api/shifts',
@@ -163,10 +171,13 @@ class ApiService {
   }
 
   // ---- EMPLOYEE SCHEDULES ----
-  Future<List<dynamic>> getEmployeeSchedules({String? week}) async {
+  Future<List<dynamic>> getEmployeeSchedules({String? week, String? storeCode}) async {
+    final params = <String, dynamic>{};
+    if (week != null) params['week'] = week;
+    if (storeCode != null && storeCode.isNotEmpty) params['storeCode'] = storeCode;
     final response = await _dio.get(
       '/api/employee-schedules',
-      queryParameters: week != null ? {'week': week} : null,
+      queryParameters: params.isEmpty ? null : params,
     );
     return response.data as List<dynamic>;
   }

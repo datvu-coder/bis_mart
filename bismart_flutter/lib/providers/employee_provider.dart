@@ -21,6 +21,9 @@ class EmployeeProvider extends ChangeNotifier {
   // Monthly summary
   Map<String, dynamic> _monthlySummary = {};
 
+  // Per-employee monthly hours report
+  Map<String, dynamic> _hoursReport = {};
+
   List<Employee> get employees => _employees;
   List<Attendance> get attendances => _attendances;
   List<Attendance> get historyAttendances => _historyAttendances;
@@ -31,6 +34,14 @@ class EmployeeProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get error => _error;
   Map<String, dynamic> get monthlySummary => _monthlySummary;
+  Map<String, dynamic> get hoursReport => _hoursReport;
+  List<Map<String, dynamic>> get hoursReportRows {
+    final raw = _hoursReport['rows'];
+    if (raw is List) {
+      return raw.cast<Map<String, dynamic>>();
+    }
+    return const [];
+  }
   void clearError() { _error = null; notifyListeners(); }
 
   static DateTime _getMonday(DateTime d) {
@@ -172,6 +183,18 @@ class EmployeeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadHoursReport({String? month, String? storeCode}) async {
+    try {
+      _hoursReport = await _api.getAttendanceHoursReport(
+        month: month,
+        storeCode: storeCode,
+      );
+    } catch (_) {
+      _hoursReport = {};
+    }
+    notifyListeners();
+  }
+
   Future<void> addShift(WorkShift shift) async {
     await _api.createShift(shift.toJson());
     final shiftData = await _api.getShifts(storeId: _selectedShiftStoreId);
@@ -236,13 +259,20 @@ class EmployeeProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadSchedules({DateTime? weekStart}) async {
+  String? _scheduleStoreCode;
+  String? get scheduleStoreCode => _scheduleStoreCode;
+
+  Future<void> loadSchedules({DateTime? weekStart, String? storeCode}) async {
     final monday = weekStart ?? _scheduleWeekStart;
     _scheduleWeekStart = monday;
+    if (storeCode != null) _scheduleStoreCode = storeCode;
     final weekStr =
         '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
     try {
-      final data = await _api.getEmployeeSchedules(week: weekStr);
+      final data = await _api.getEmployeeSchedules(
+        week: weekStr,
+        storeCode: _scheduleStoreCode,
+      );
       _schedules = data
           .map((s) => WorkSchedule.fromJson(s as Map<String, dynamic>))
           .toList();

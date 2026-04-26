@@ -46,7 +46,8 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       provider.loadAttendances();
       // Load monthly summary for current user only
       provider.loadMonthlySummary(employeeId: currentUser?.id);
-      provider.loadSchedules();
+      provider.loadSchedules(storeCode: currentUser?.storeCode);
+      provider.loadHoursReport(storeCode: currentUser?.storeCode);
       context.read<StoreProvider>().loadStores().then((_) {
         // Auto-filter shifts to current user's store
         if (currentUser?.storeCode != null && mounted) {
@@ -383,6 +384,8 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           SizedBox(height: isMobile ? 10 : 16),
           // --- Today's Attendance List (managers only) ---
           if (canManage) _buildTodayAttendanceList(provider),
+          SizedBox(height: isMobile ? 10 : 16),
+          _buildHoursReportSection(provider, canManage),
         ],
       ),
     );
@@ -792,6 +795,152 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     );
   }
 
+  Widget _buildHoursReportSection(EmployeeProvider provider, bool canManage) {
+    final rows = provider.hoursReportRows;
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final now = DateTime.now();
+    final monthLabel = 'Tháng ${now.month}/${now.year}';
+    final title = canManage
+        ? 'Bảng giờ công nhân viên · $monthLabel'
+        : 'Giờ công của tôi · $monthLabel';
+
+    if (rows.isEmpty) {
+      return Container(
+        padding: EdgeInsets.all(isMobile ? 10 : 14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariant,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.access_time_filled_rounded, size: 18, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(title,
+                      style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700)),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text('Chưa có dữ liệu trong tháng', style: AppTextStyles.caption),
+          ],
+        ),
+      );
+    }
+
+    Widget headerCell(String text, {double? width, TextAlign align = TextAlign.left}) {
+      return SizedBox(
+        width: width,
+        child: Text(text,
+            textAlign: align,
+            style: AppTextStyles.caption.copyWith(
+                fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
+      );
+    }
+
+    Widget bodyCell(String text,
+        {double? width, TextAlign align = TextAlign.left, Color? color, FontWeight? fw}) {
+      return SizedBox(
+        width: width,
+        child: Text(text,
+            textAlign: align,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: AppTextStyles.caption.copyWith(
+                color: color ?? AppColors.textPrimary,
+                fontWeight: fw ?? FontWeight.w500)),
+      );
+    }
+
+    return Container(
+      padding: EdgeInsets.all(isMobile ? 10 : 14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.access_time_filled_rounded, size: 18, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(title,
+                    style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    children: [
+                      headerCell('Nhân viên', width: 150),
+                      headerCell('Ngày', width: 50, align: TextAlign.center),
+                      headerCell('Giờ', width: 60, align: TextAlign.center),
+                      headerCell('Muộn', width: 70, align: TextAlign.center),
+                      headerCell('Về sớm', width: 80, align: TextAlign.center),
+                      headerCell('OT', width: 60, align: TextAlign.center),
+                    ],
+                  ),
+                ),
+                ...rows.map((r) {
+                  final name = (r['fullName'] ?? '').toString();
+                  final daysWorked = (r['daysWorked'] ?? 0).toString();
+                  final totalHours = (r['totalHours'] ?? 0).toString();
+                  final lateCount = (r['lateCount'] ?? 0) as int;
+                  final lateMinutes = (r['lateMinutes'] ?? 0) as int;
+                  final earlyCount = (r['earlyLeaveCount'] ?? 0) as int;
+                  final earlyMinutes = (r['earlyLeaveMinutes'] ?? 0) as int;
+                  final overtimeMin = (r['overtimeMinutes'] ?? 0) as int;
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        bodyCell(name, width: 150, fw: FontWeight.w600),
+                        bodyCell(daysWorked, width: 50, align: TextAlign.center),
+                        bodyCell('${totalHours}h', width: 60, align: TextAlign.center,
+                            color: AppColors.info, fw: FontWeight.w700),
+                        bodyCell(lateCount > 0 ? '$lateCount/${lateMinutes}\'' : '0',
+                            width: 70,
+                            align: TextAlign.center,
+                            color: lateCount > 0 ? AppColors.error : AppColors.textGrey,
+                            fw: lateCount > 0 ? FontWeight.w700 : FontWeight.w500),
+                        bodyCell(earlyCount > 0 ? '$earlyCount/${earlyMinutes}\'' : '0',
+                            width: 80,
+                            align: TextAlign.center,
+                            color: earlyCount > 0 ? AppColors.error : AppColors.textGrey,
+                            fw: earlyCount > 0 ? FontWeight.w700 : FontWeight.w500),
+                        bodyCell(overtimeMin > 0 ? '${overtimeMin}\'' : '0',
+                            width: 60,
+                            align: TextAlign.center,
+                            color: overtimeMin > 0 ? AppColors.success : AppColors.textGrey,
+                            fw: overtimeMin > 0 ? FontWeight.w700 : FontWeight.w500),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   Widget _buildTodayAttendanceList(EmployeeProvider provider) {
     if (provider.attendances.isEmpty) {
       return Padding(
@@ -832,12 +981,20 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                     : AppColors.textHint,
             size: 20,
           );
+          final statusLabel = _attendanceStatusLabel(att);
+          final shiftLabel = (att.shiftName != null && att.shiftName!.isNotEmpty)
+              ? '${att.shiftName} ${att.shiftTimeRange ?? ''}'.trim()
+              : null;
           final nameBlock = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(employee.fullName, style: AppTextStyles.bodyText),
-              if (_isLateArrival(att, provider.shifts))
-                Text('Đi muộn', style: AppTextStyles.caption.copyWith(color: AppColors.error)),
+              if (shiftLabel != null)
+                Text(shiftLabel,
+                    style: AppTextStyles.caption.copyWith(fontSize: 11, color: AppColors.textSecondary)),
+              if (statusLabel != null)
+                Text(statusLabel,
+                    style: AppTextStyles.caption.copyWith(color: _attendanceStatusColor(att))),
               if (att.distanceIn != null)
                 Text('📍 ${_formatDistance(att.distanceIn!)}',
                   style: AppTextStyles.caption.copyWith(fontSize: 11)),
@@ -1206,12 +1363,36 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   }
 
   bool _isLateArrival(Attendance att, List<WorkShift> shifts) {
-    if (att.checkInTime == null || shifts.isEmpty) return false;
-    final firstShift = shifts.first;
-    final shiftStart = firstShift.startTime;
-    final checkIn = TimeOfDay(hour: att.checkInTime!.hour, minute: att.checkInTime!.minute);
-    return checkIn.hour > shiftStart.hour ||
-        (checkIn.hour == shiftStart.hour && checkIn.minute > shiftStart.minute);
+    // Prefer the backend-evaluated status which is based on the assigned shift
+    // for that day.
+    if ((att.checkInStatus ?? '').toLowerCase() == 'late') return true;
+    return false;
+  }
+
+  String? _attendanceStatusLabel(Attendance att) {
+    final ci = (att.checkInStatus ?? '').toLowerCase();
+    final co = (att.checkOutStatus ?? '').toLowerCase();
+    if (ci == 'late') {
+      final m = int.tryParse(att.checkInDiff ?? '');
+      return m != null ? 'Muộn $m\'' : 'Muộn';
+    }
+    if (co == 'early_leave') {
+      final m = int.tryParse(att.checkOutDiff ?? '');
+      return m != null ? 'Về sớm ${m.abs()}\'' : 'Về sớm';
+    }
+    if (co == 'overtime') {
+      final m = int.tryParse(att.checkOutDiff ?? '');
+      return m != null ? 'OT $m\'' : 'OT';
+    }
+    return null;
+  }
+
+  Color _attendanceStatusColor(Attendance att) {
+    final ci = (att.checkInStatus ?? '').toLowerCase();
+    final co = (att.checkOutStatus ?? '').toLowerCase();
+    if (ci == 'late' || co == 'early_leave') return AppColors.error;
+    if (co == 'overtime') return AppColors.info;
+    return AppColors.textGrey;
   }
 
   Widget _buildShiftPanel(EmployeeProvider provider) {
@@ -1488,14 +1669,15 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (_isLateArrival(att, prov.shifts))
+                                if (_attendanceStatusLabel(att) != null)
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: AppColors.errorLight,
+                                      color: _attendanceStatusColor(att).withValues(alpha: 0.12),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
-                                    child: Text('Muộn', style: AppTextStyles.caption.copyWith(color: AppColors.error)),
+                                    child: Text(_attendanceStatusLabel(att)!,
+                                        style: AppTextStyles.caption.copyWith(color: _attendanceStatusColor(att))),
                                   ),
                                 if (canManage)
                                   _buildAttendanceActions(att, prov, historyDate: selectedDate),
@@ -1857,6 +2039,16 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
   void _showAssignShiftDialog(EmployeeProvider provider, DateTime day) {
     String? selectedEmployeeId;
     String? selectedShiftId;
+    final currentUser = context.read<AuthProvider>().currentUser;
+    final storeCode = currentUser?.storeCode;
+    // Filter employees and shifts to current user's store so the schedule
+    // belongs strictly to that store.
+    final empsInStore = storeCode == null
+        ? provider.employees
+        : provider.employees
+            .where((e) => (e.storeCode ?? '').toUpperCase() == storeCode.toUpperCase())
+            .toList();
+    final shiftsInStore = provider.shifts; // already store-filtered via loadShifts
 
     showDialog(
       context: context,
@@ -1868,12 +2060,28 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (empsInStore.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Cửa hàng chưa có nhân viên nào',
+                      style: AppTextStyles.caption.copyWith(color: AppColors.error),
+                    ),
+                  ),
+                if (shiftsInStore.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Cửa hàng chưa có ca làm việc nào — hãy tạo ca trước',
+                      style: AppTextStyles.caption.copyWith(color: AppColors.error),
+                    ),
+                  ),
                 DropdownButtonFormField<String>(
                   decoration:
                       const InputDecoration(labelText: 'Nhân viên'),
                   value: selectedEmployeeId,
                   isExpanded: true,
-                  items: provider.employees
+                  items: empsInStore
                       .map((e) =>
                           DropdownMenuItem(value: e.id, child: Text(e.fullName)))
                       .toList(),
@@ -1886,7 +2094,7 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
                       const InputDecoration(labelText: 'Ca làm việc'),
                   value: selectedShiftId,
                   isExpanded: true,
-                  items: provider.shifts
+                  items: shiftsInStore
                       .map((s) => DropdownMenuItem(
                             value: s.id,
                             child: Text('${s.name} (${s.timeRange})'),

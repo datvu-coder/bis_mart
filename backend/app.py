@@ -1004,30 +1004,28 @@ def api_delete_shift(shift_id: int):
 @login_required
 def api_get_schedules():
     week = request.args.get("week")  # e.g. "2026-04-21" (Monday of the week)
+    store_code = (request.args.get("storeCode") or "").strip()
     db = get_db()
+    base_select = (
+        "SELECT es.id, es.employee_id, es.shift_id, es.work_date::text, es.note, "
+        "e.full_name as employee_name, ws.name as shift_name, "
+        "ws.start_hour, ws.start_minute, ws.end_hour, ws.end_minute "
+        "FROM employee_schedules es "
+        "JOIN employees e ON e.id = es.employee_id "
+        "JOIN work_shifts ws ON ws.id = es.shift_id "
+    )
+    where_parts: list[str] = []
+    params: list[Any] = []
+    if week:
+        where_parts.append("es.work_date >= %s::date AND es.work_date < (%s::date + INTERVAL '7 days')")
+        params.extend([week, week])
+    if store_code:
+        where_parts.append("UPPER(e.store_code) = UPPER(%s)")
+        params.append(store_code)
+    where_sql = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    order_sql = " ORDER BY es.work_date, es.employee_id" if week else " ORDER BY es.work_date DESC LIMIT 100"
     with db.cursor() as cur:
-        if week:
-            cur.execute(
-                "SELECT es.id, es.employee_id, es.shift_id, es.work_date::text, es.note, "
-                "e.full_name as employee_name, ws.name as shift_name, "
-                "ws.start_hour, ws.start_minute, ws.end_hour, ws.end_minute "
-                "FROM employee_schedules es "
-                "JOIN employees e ON e.id = es.employee_id "
-                "JOIN work_shifts ws ON ws.id = es.shift_id "
-                "WHERE es.work_date >= %s::date AND es.work_date < (%s::date + INTERVAL '7 days') "
-                "ORDER BY es.work_date, es.employee_id",
-                (week, week),
-            )
-        else:
-            cur.execute(
-                "SELECT es.id, es.employee_id, es.shift_id, es.work_date::text, es.note, "
-                "e.full_name as employee_name, ws.name as shift_name, "
-                "ws.start_hour, ws.start_minute, ws.end_hour, ws.end_minute "
-                "FROM employee_schedules es "
-                "JOIN employees e ON e.id = es.employee_id "
-                "JOIN work_shifts ws ON ws.id = es.shift_id "
-                "ORDER BY es.work_date DESC LIMIT 100"
-            )
+        cur.execute(base_select + where_sql + order_sql, tuple(params))
         rows = cur.fetchall()
     return jsonify([
         {
@@ -1410,6 +1408,74 @@ def api_get_reports():
     result = [_report_to_api_json(row, items_by_report.get(row["id"], [])) for row in report_rows]
     return jsonify(result)
 
+
+def _scheduled_shift_for(db, emp_id: Any, attend_date: str) -> dict | None:
+    """Return scheduled shift for (emp_id, attend_date) or None.
+
+    Result keys: name, start_hour, start_minute, end_hour, end_minute, time_range.
+    """
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT ws.name, ws.start_hour, ws.start_minute, ws.end_hour, ws.end_minute "
+                "FROM employee_schedules es "
+                "JOIN work_shifts ws ON ws.id = es.shift_id "
+                "WHERE es.employee_id = %s AND es.work_date = %s::date "
+                "LIMIT 1",
+                (int(emp_id), attend_date),
+            )
+            row = cur.fetchone()
+    except Exception:
+        return None
+    if not row:
+        return None
+    sh = int(row.get("start_hour") or 0)
+    sm = int(row.get("start_minute") or 0)
+    eh = int(row.get("end_hour") or 0)
+    em = int(row.get("end_minute") or 0)
+    return {
+        "name": row.get("name") or "",
+        "start_hour": sh,
+        "start_minute": sm,
+        "end_hour": eh,
+        "end_minute": em,
+        "time_range": f"{sh:02d}:{sm:02d}-{eh:02d}:{em:02d}",
+    }
+
+
+def _evaluate_check_in(shift: dict | None, now: datetime) -> tuple[int | None, str | None]:
+    """Return (diff_minutes, status). Positive diff = late. status: 'on_time'|'late'|'early'.
+
+    `early` means employee checked in before scheduled start (>=5 min ahead).
+    Threshold for late: any minute past scheduled start.
+    """
+    if not shift:
+        return None, None
+    sched = now.replace(hour=shift["start_hour"], minute=shift["start_minute"], second=0, microsecond=0)
+    diff_min = int(round((now - sched).total_seconds() / 60))
+    if diff_min > 0:
+        return diff_min, "late"
+    if diff_min < -5:
+        return diff_min, "early"
+    return diff_min, "on_time"
+
+
+def _evaluate_check_out(shift: dict | None, now: datetime) -> tuple[int | None, str | None]:
+    """Return (diff_minutes, status). Positive diff = stayed past scheduled end (overtime).
+
+    status: 'on_time' | 'overtime' | 'early_leave'.
+    """
+    if not shift:
+        return None, None
+    sched = now.replace(hour=shift["end_hour"], minute=shift["end_minute"], second=0, microsecond=0)
+    diff_min = int(round((now - sched).total_seconds() / 60))
+    if diff_min < -5:
+        return diff_min, "early_leave"
+    if diff_min > 5:
+        return diff_min, "overtime"
+    return diff_min, "on_time"
+
+
 @app.post("/api/attendances/checkin")
 @login_required
 def api_checkin():
@@ -1436,12 +1502,18 @@ def api_checkin():
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%Y-%m-%dT%H:%M:%S")
 
+    shift = _scheduled_shift_for(db, emp_id, date_str)
+    diff_min, status = _evaluate_check_in(shift, now)
+    shift_name = shift["name"] if shift else None
+    shift_range = shift["time_range"] if shift else None
+
     try:
         with db.cursor() as cur:
             cur.execute(
-                "INSERT INTO attendances (employee_id, attend_date, check_in_time, coordinates) "
-                "VALUES (%s, %s, %s, %s)",
-                (emp_id, date_str, time_str, coords),
+                "INSERT INTO attendances (employee_id, attend_date, check_in_time, coordinates, "
+                "                         shift_name, shift_time_range, check_in_diff, check_in_status) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (emp_id, date_str, time_str, coords, shift_name, shift_range, diff_min, status),
             )
         db.commit()
     except DBIntegrityError:
@@ -1453,13 +1525,17 @@ def api_checkin():
             cur.execute(
                 "UPDATE attendances "
                 "SET check_in_time = COALESCE(check_in_time, %s), "
-                "    coordinates = COALESCE(coordinates, %s) "
+                "    coordinates = COALESCE(coordinates, %s), "
+                "    shift_name = COALESCE(shift_name, %s), "
+                "    shift_time_range = COALESCE(shift_time_range, %s), "
+                "    check_in_diff = COALESCE(check_in_diff, %s), "
+                "    check_in_status = COALESCE(check_in_status, %s) "
                 "WHERE employee_id = %s AND attend_date = %s",
-                (time_str, coords, emp_id, date_str),
+                (time_str, coords, shift_name, shift_range, diff_min, status, emp_id, date_str),
             )
         db.commit()
 
-    return jsonify({"ok": True, "time": time_str})
+    return jsonify({"ok": True, "time": time_str, "checkInDiff": diff_min, "checkInStatus": status})
 
 
 @app.post("/api/attendances/checkout")
@@ -1482,12 +1558,20 @@ def api_checkout():
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%Y-%m-%dT%H:%M:%S")
 
+    shift = _scheduled_shift_for(db, emp_id, date_str)
+    diff_min, status = _evaluate_check_out(shift, now)
+    shift_name = shift["name"] if shift else None
+    shift_range = shift["time_range"] if shift else None
+
     with db.cursor() as cur:
         cur.execute(
-            "UPDATE attendances SET check_out_time = %s, coordinates = COALESCE(%s, coordinates) "
+            "UPDATE attendances SET check_out_time = %s, coordinates = COALESCE(%s, coordinates), "
+            "    shift_name = COALESCE(shift_name, %s), "
+            "    shift_time_range = COALESCE(shift_time_range, %s), "
+            "    check_out_diff = %s, check_out_status = %s "
             "WHERE employee_id = %s AND attend_date = %s "
             "RETURNING id",
-            (time_str, coords_out, emp_id, date_str),
+            (time_str, coords_out, shift_name, shift_range, diff_min, status, emp_id, date_str),
         )
         row = cur.fetchone()
         if not row:
@@ -1495,12 +1579,13 @@ def api_checkout():
             # the employee shows up in today's list. Most realistic flow is the
             # client preventing this, but be tolerant.
             cur.execute(
-                "INSERT INTO attendances (employee_id, attend_date, check_out_time, coordinates) "
-                "VALUES (%s, %s, %s, %s)",
-                (emp_id, date_str, time_str, coords_out),
+                "INSERT INTO attendances (employee_id, attend_date, check_out_time, coordinates, "
+                "                         shift_name, shift_time_range, check_out_diff, check_out_status) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (emp_id, date_str, time_str, coords_out, shift_name, shift_range, diff_min, status),
             )
     db.commit()
-    return jsonify({"ok": True, "time": time_str})
+    return jsonify({"ok": True, "time": time_str, "checkOutDiff": diff_min, "checkOutStatus": status})
 
 
 def _ensure_attendance_indexes(db):
@@ -1650,6 +1735,122 @@ def api_attendance_monthly_summary():
         "daysWorked": len(days),
         "totalHours": total_hours,
         "totalRecords": len(rows),
+    })
+
+
+@app.get("/api/attendances/hours-report")
+@login_required
+def api_attendance_hours_report():
+    """Per-employee hours report for a given month.
+
+    Permission rule:
+      - Users with `can_manage_attendance` (admin / manager) see all employees of the store.
+      - Otherwise they see only their own row.
+    Query params: month=YYYY-MM (default current), storeCode (optional, default user's store).
+    """
+    db = get_db()
+    _ensure_attendance_indexes(db)
+    month = (request.args.get("month") or "").strip() or datetime.now(tz=VN_TZ).strftime("%Y-%m")
+    store_code_param = (request.args.get("storeCode") or "").strip()
+
+    can_manage = _can_manage_attendance_user()
+    me = _current_employee_info()
+    my_store = me.get("store_code") or ""
+    store_code = store_code_param or my_store
+
+    user_id = (g.current_user or {}).get("user_id")
+    my_emp_id: int | None = None
+    if user_id:
+        with db.cursor() as cur:
+            cur.execute("SELECT employee_id FROM users WHERE id = %s", (user_id,))
+            r = cur.fetchone()
+            if r and r.get("employee_id"):
+                my_emp_id = int(r["employee_id"])
+
+    where_parts = ["a.attend_date LIKE %s"]
+    params: list[Any] = [f"{month}%"]
+    if can_manage:
+        if store_code:
+            where_parts.append("UPPER(e.store_code) = UPPER(%s)")
+            params.append(store_code)
+    else:
+        if my_emp_id is None:
+            return jsonify([])
+        where_parts.append("a.employee_id = %s")
+        params.append(my_emp_id)
+
+    sql = (
+        "SELECT a.employee_id, e.full_name, e.position, e.store_code, "
+        "       a.check_in_time, a.check_out_time, a.attend_date, "
+        "       a.check_in_status, a.check_in_diff, a.check_out_status, a.check_out_diff "
+        "FROM attendances a "
+        "LEFT JOIN employees e ON e.id = a.employee_id "
+        "WHERE " + " AND ".join(where_parts)
+    )
+    with db.cursor() as cur:
+        cur.execute(sql, tuple(params))
+        rows = cur.fetchall()
+
+    # Aggregate
+    summary: dict[int, dict[str, Any]] = {}
+    for r in rows:
+        emp_id = int(r["employee_id"])
+        s = summary.setdefault(emp_id, {
+            "employeeId": str(emp_id),
+            "fullName": r.get("full_name") or "",
+            "position": r.get("position") or "",
+            "storeCode": r.get("store_code") or "",
+            "daysWorked": 0,
+            "totalHours": 0.0,
+            "lateCount": 0,
+            "lateMinutes": 0,
+            "earlyLeaveCount": 0,
+            "earlyLeaveMinutes": 0,
+            "overtimeMinutes": 0,
+            "_dates": set(),
+        })
+        if r.get("attend_date") and (r.get("check_in_time") or r.get("check_out_time")):
+            s["_dates"].add(r["attend_date"])
+        ci = r.get("check_in_time")
+        co = r.get("check_out_time")
+        if ci and co:
+            try:
+                t_in = datetime.fromisoformat(ci)
+                t_out = datetime.fromisoformat(co)
+                delta = (t_out - t_in).total_seconds()
+                if delta > 0:
+                    s["totalHours"] += delta / 3600.0
+            except Exception:
+                pass
+        if (r.get("check_in_status") or "") == "late":
+            s["lateCount"] += 1
+            try:
+                s["lateMinutes"] += int(r.get("check_in_diff") or 0)
+            except Exception:
+                pass
+        if (r.get("check_out_status") or "") == "early_leave":
+            s["earlyLeaveCount"] += 1
+            try:
+                s["earlyLeaveMinutes"] += abs(int(r.get("check_out_diff") or 0))
+            except Exception:
+                pass
+        if (r.get("check_out_status") or "") == "overtime":
+            try:
+                s["overtimeMinutes"] += int(r.get("check_out_diff") or 0)
+            except Exception:
+                pass
+
+    out = []
+    for s in summary.values():
+        s["daysWorked"] = len(s.pop("_dates"))
+        s["totalHours"] = round(s["totalHours"], 1)
+        out.append(s)
+    out.sort(key=lambda x: x["fullName"].lower())
+    return jsonify({
+        "month": month,
+        "storeCode": store_code,
+        "canManage": can_manage,
+        "rows": out,
     })
 
 
