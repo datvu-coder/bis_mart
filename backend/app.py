@@ -1652,6 +1652,101 @@ def api_attendance_monthly_summary():
         "totalRecords": len(rows),
     })
 
+
+def _can_manage_attendance_user() -> bool:
+    """Admin/Manager (and anyone whose position has can_manage_attendance) can edit/delete attendance rows."""
+    user_id = (g.current_user or {}).get("user_id")
+    if not user_id:
+        return False
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT e.position, p.can_manage_attendance "
+            "FROM users u "
+            "LEFT JOIN employees e ON e.id = u.employee_id "
+            "LEFT JOIN permissions p ON UPPER(p.position) = UPPER(e.position) "
+            "WHERE u.id = %s",
+            (user_id,),
+        )
+        row = cur.fetchone() or {}
+    if row.get("can_manage_attendance"):
+        return True
+    pos = (row.get("position") or "").upper()
+    return pos in {"ADM", "ADMIN", "MNG", "CS", "TMK"}
+
+
+def _parse_attendance_time(value: Any, attend_date: str | None) -> str | None:
+    """Accepts 'HH:MM', 'HH:MM:SS' or full ISO. Returns 'YYYY-MM-DDTHH:MM:SS' or None."""
+    if value is None:
+        return None
+    s = str(value).strip()
+    if not s:
+        return None
+    # Full ISO already
+    if "T" in s and len(s) >= 16:
+        return s[:19]
+    if not attend_date:
+        return None
+    parts = s.split(":")
+    try:
+        hh = int(parts[0])
+        mm = int(parts[1]) if len(parts) > 1 else 0
+        ss = int(parts[2]) if len(parts) > 2 else 0
+    except Exception:
+        return None
+    return f"{attend_date}T{hh:02d}:{mm:02d}:{ss:02d}"
+
+
+@app.put("/api/attendances/<int:att_id>")
+@login_required
+def api_update_attendance(att_id: int):
+    if not _can_manage_attendance_user():
+        return jsonify({"error": "Forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, attend_date FROM attendances WHERE id = %s",
+            (att_id,),
+        )
+        existing = cur.fetchone()
+        if not existing:
+            return jsonify({"error": "Not found"}), 404
+        attend_date = existing.get("attend_date")
+        check_in_time = _parse_attendance_time(data.get("checkInTime"), attend_date) if "checkInTime" in data else None
+        check_out_time = _parse_attendance_time(data.get("checkOutTime"), attend_date) if "checkOutTime" in data else None
+
+        sets = []
+        params: list[Any] = []
+        if "checkInTime" in data:
+            sets.append("check_in_time = %s")
+            params.append(check_in_time)
+        if "checkOutTime" in data:
+            sets.append("check_out_time = %s")
+            params.append(check_out_time)
+        if not sets:
+            return jsonify({"ok": True, "id": att_id})
+        params.append(att_id)
+        cur.execute(
+            f"UPDATE attendances SET {', '.join(sets)} WHERE id = %s",
+            tuple(params),
+        )
+    db.commit()
+    return jsonify({"ok": True, "id": att_id})
+
+
+@app.delete("/api/attendances/<int:att_id>")
+@login_required
+def api_delete_attendance(att_id: int):
+    if not _can_manage_attendance_user():
+        return jsonify({"error": "Forbidden"}), 403
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM attendances WHERE id = %s", (att_id,))
+    db.commit()
+    return jsonify({"ok": True, "id": att_id})
+
+
 # ---- COMMUNITY POSTS ----
 
 def _ensure_posts_columns(db):

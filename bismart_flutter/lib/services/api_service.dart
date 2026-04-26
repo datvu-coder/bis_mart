@@ -129,6 +129,15 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> updateAttendance(int id, Map<String, dynamic> data) async {
+    final response = await _dio.put('/api/attendances/$id', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteAttendance(int id) async {
+    await _dio.delete('/api/attendances/$id');
+  }
+
   Future<Map<String, dynamic>> getMonthlyAttendanceSummary({String? month, int? employeeId}) async {
     final params = <String, dynamic>{};
     if (month != null) params['month'] = month;

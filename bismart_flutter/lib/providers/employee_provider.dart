@@ -110,6 +110,56 @@ class EmployeeProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateAttendance(
+    String id, {
+    DateTime? checkInTime,
+    DateTime? checkOutTime,
+    bool clearCheckIn = false,
+    bool clearCheckOut = false,
+    DateTime? historyDate,
+  }) async {
+    try {
+      final body = <String, dynamic>{};
+      if (clearCheckIn) {
+        body['checkInTime'] = null;
+      } else if (checkInTime != null) {
+        body['checkInTime'] =
+            '${checkInTime.hour.toString().padLeft(2, '0')}:${checkInTime.minute.toString().padLeft(2, '0')}:00';
+      }
+      if (clearCheckOut) {
+        body['checkOutTime'] = null;
+      } else if (checkOutTime != null) {
+        body['checkOutTime'] =
+            '${checkOutTime.hour.toString().padLeft(2, '0')}:${checkOutTime.minute.toString().padLeft(2, '0')}:00';
+      }
+      await _api.updateAttendance(int.parse(id), body);
+      await loadAttendances();
+      if (historyDate != null) {
+        await loadAttendancesByDate(historyDate);
+      }
+      return true;
+    } catch (e) {
+      _error = 'Cập nhật chấm công thất bại';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteAttendance(String id, {DateTime? historyDate}) async {
+    try {
+      await _api.deleteAttendance(int.parse(id));
+      await loadAttendances();
+      if (historyDate != null) {
+        await loadAttendancesByDate(historyDate);
+      }
+      return true;
+    } catch (e) {
+      _error = 'Xoá chấm công thất bại';
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> loadMonthlySummary({String? month, String? employeeId}) async {
     try {
       _monthlySummary = await _api.getMonthlyAttendanceSummary(

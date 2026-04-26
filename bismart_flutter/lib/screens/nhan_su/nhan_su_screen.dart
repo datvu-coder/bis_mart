@@ -367,7 +367,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           IconButton(
-            onPressed: () => _showAttendanceHistory(provider),
+            onPressed: () => _showAttendanceHistory(provider, canManage: canManage),
             icon: const Icon(Icons.history_rounded),
             tooltip: 'Lịch sử chấm công',
           ),
@@ -620,23 +620,28 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 ),
               if (hasCheckedOut)
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: null,
-                    icon: const Icon(Icons.check_circle_rounded, size: 20),
-                    label: Text(
-                      isMobile
-                          ? 'Đã hoàn thành'
-                          : 'Đã hoàn thành chấm công hôm nay',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(
-                          vertical: isMobile ? 12 : 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      disabledBackgroundColor: AppColors.success,
-                      disabledForegroundColor: AppColors.white,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: isMobile ? 14 : 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.check_circle_rounded,
+                            color: AppColors.success, size: 20),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            isMobile
+                                ? 'Đã hoàn thành'
+                                : 'Đã hoàn thành chấm công hôm nay',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyText.copyWith(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -891,11 +896,188 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                       style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600, color: AppColors.info),
                     ),
                   ),
+                const SizedBox(width: 4),
+                _buildAttendanceActions(att, provider),
               ],
             ),
           );
         }),
       ],
+    );
+  }
+
+  Widget _buildAttendanceActions(Attendance att, EmployeeProvider provider, {DateTime? historyDate}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: () => _showEditAttendanceDialog(att, provider, historyDate: historyDate),
+          borderRadius: BorderRadius.circular(20),
+          child: const Padding(
+            padding: EdgeInsets.all(6),
+            child: Icon(Icons.edit_outlined, size: 18, color: AppColors.info),
+          ),
+        ),
+        InkWell(
+          onTap: () => _confirmDeleteAttendance(att, provider, historyDate: historyDate),
+          borderRadius: BorderRadius.circular(20),
+          child: const Padding(
+            padding: EdgeInsets.all(6),
+            child: Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showEditAttendanceDialog(
+    Attendance att,
+    EmployeeProvider provider, {
+    DateTime? historyDate,
+  }) async {
+    TimeOfDay? checkIn = att.checkInTime != null
+        ? TimeOfDay(hour: att.checkInTime!.hour, minute: att.checkInTime!.minute)
+        : null;
+    TimeOfDay? checkOut = att.checkOutTime != null
+        ? TimeOfDay(hour: att.checkOutTime!.hour, minute: att.checkOutTime!.minute)
+        : null;
+    String fmt(TimeOfDay? t) => t == null
+        ? '--:--'
+        : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+          title: const Text('Sửa chấm công'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.login_rounded, color: AppColors.success),
+                title: const Text('Giờ vào'),
+                subtitle: Text(fmt(checkIn)),
+                trailing: Wrap(
+                  spacing: 4,
+                  children: [
+                    if (checkIn != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        tooltip: 'Xoá giờ vào',
+                        onPressed: () => setSt(() => checkIn = null),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.access_time_rounded),
+                      onPressed: () async {
+                        final picked = await showTimePicker(
+                          context: ctx,
+                          initialTime: checkIn ?? TimeOfDay.now(),
+                        );
+                        if (picked != null) setSt(() => checkIn = picked);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.logout_rounded, color: AppColors.info),
+                title: const Text('Giờ ra'),
+                subtitle: Text(fmt(checkOut)),
+                trailing: Wrap(
+                  spacing: 4,
+                  children: [
+                    if (checkOut != null)
+                      IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        tooltip: 'Xoá giờ ra',
+                        onPressed: () => setSt(() => checkOut = null),
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.access_time_rounded),
+                      onPressed: () async {
+                        final picked = await showTimePicker(
+                          context: ctx,
+                          initialTime: checkOut ?? TimeOfDay.now(),
+                        );
+                        if (picked != null) setSt(() => checkOut = picked);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
+            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Lưu')),
+          ],
+        ),
+      ),
+    );
+
+    if (saved != true) return;
+
+    final origIn = att.checkInTime;
+    final origOut = att.checkOutTime;
+    final newIn = checkIn == null
+        ? null
+        : DateTime(att.date.year, att.date.month, att.date.day,
+            checkIn!.hour, checkIn!.minute);
+    final newOut = checkOut == null
+        ? null
+        : DateTime(att.date.year, att.date.month, att.date.day,
+            checkOut!.hour, checkOut!.minute);
+
+    final inChanged = (origIn?.hour != newIn?.hour) ||
+        (origIn?.minute != newIn?.minute) ||
+        ((origIn == null) != (newIn == null));
+    final outChanged = (origOut?.hour != newOut?.hour) ||
+        (origOut?.minute != newOut?.minute) ||
+        ((origOut == null) != (newOut == null));
+
+    if (!inChanged && !outChanged) return;
+
+    final ok = await provider.updateAttendance(
+      att.id,
+      checkInTime: inChanged ? newIn : null,
+      checkOutTime: outChanged ? newOut : null,
+      clearCheckIn: inChanged && newIn == null,
+      clearCheckOut: outChanged && newOut == null,
+      historyDate: historyDate,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? 'Đã cập nhật chấm công' : 'Cập nhật thất bại')),
+    );
+  }
+
+  Future<void> _confirmDeleteAttendance(
+    Attendance att,
+    EmployeeProvider provider, {
+    DateTime? historyDate,
+  }) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Xoá chấm công'),
+        content: Text('Bạn có chắc muốn xoá bản ghi chấm công của ${att.employeeName ?? "nhân viên này"}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Xoá'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    final ok = await provider.deleteAttendance(att.id, historyDate: historyDate);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? 'Đã xoá bản ghi' : 'Xoá thất bại')),
     );
   }
 
@@ -1165,7 +1347,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     );
   }
 
-  void _showAttendanceHistory(EmployeeProvider provider) {
+  void _showAttendanceHistory(EmployeeProvider provider, {bool canManage = false}) {
     DateTime selectedDate = DateTime.now();
     // Load immediately so the dialog shows data on first open instead of
     // waiting for the user to change the date.
@@ -1271,16 +1453,22 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                               'Vào: ${att.checkInTime != null ? '${att.checkInTime!.hour.toString().padLeft(2, '0')}:${att.checkInTime!.minute.toString().padLeft(2, '0')}' : '--'}'
                               ' | Ra: ${att.checkOutTime != null ? '${att.checkOutTime!.hour.toString().padLeft(2, '0')}:${att.checkOutTime!.minute.toString().padLeft(2, '0')}' : '--'}',
                             ),
-                            trailing: _isLateArrival(att, prov.shifts)
-                                ? Container(
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (_isLateArrival(att, prov.shifts))
+                                  Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: AppColors.errorLight,
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text('Muộn', style: AppTextStyles.caption.copyWith(color: AppColors.error)),
-                                  )
-                                : null,
+                                  ),
+                                if (canManage)
+                                  _buildAttendanceActions(att, prov, historyDate: selectedDate),
+                              ],
+                            ),
                           );
                         },
                       );
