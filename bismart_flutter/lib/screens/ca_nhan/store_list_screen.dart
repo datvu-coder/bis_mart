@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/store.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/permission_provider.dart';
+import '../../services/location_service.dart';
 
 class StoreListScreen extends StatefulWidget {
   const StoreListScreen({super.key});
@@ -386,145 +387,249 @@ class _StoreListScreenState extends State<StoreListScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          title: Text(isEdit ? 'Sửa cửa hàng' : 'Thêm cửa hàng'),
-          content: SizedBox(
-            width: 480,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(controller: nameCtrl, decoration: dec('Tên cửa hàng *')),
-                  const SizedBox(height: 10),
-                  TextField(controller: codeCtrl, decoration: dec('Mã cửa hàng *')),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: groups.contains(group) ? group : 'I',
-                          decoration: dec('Nhóm'),
-                          items: groups
-                              .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                              .toList(),
-                          onChanged: (v) => setLocal(() => group = v ?? 'I'),
+      builder: (ctx) {
+        final mq = MediaQuery.of(ctx);
+        final isWide = mq.size.width >= 600;
+        final dialogWidth = isWide ? 480.0 : (mq.size.width - 4);
+
+        Future<void> useCurrentLocation(StateSetter setLocal) async {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(
+              content: Text('Đang lấy vị trí hiện tại...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          try {
+            final pos = await LocationService.getCurrentPosition();
+            setLocal(() {
+              latCtrl.text = pos.latitude.toStringAsFixed(7);
+              lngCtrl.text = pos.longitude.toStringAsFixed(7);
+            });
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(
+                  content: Text('Đã cập nhật vị trí'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            }
+          } catch (e) {
+            if (ctx.mounted) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(
+                  content: Text(e.toString()),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
+          }
+        }
+
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: isWide ? 40 : 2,
+              vertical: 24,
+            ),
+            contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(isEdit ? 'Sửa cửa hàng' : 'Thêm cửa hàng'),
+            content: SizedBox(
+              width: dialogWidth,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(controller: nameCtrl, decoration: dec('Tên cửa hàng *')),
+                    const SizedBox(height: 10),
+                    TextField(controller: codeCtrl, decoration: dec('Mã cửa hàng *')),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: groups.contains(group) ? group : 'I',
+                            decoration: dec('Nhóm'),
+                            items: groups
+                                .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                                .toList(),
+                            onChanged: (v) => setLocal(() => group = v ?? 'I'),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          value: statuses.contains(status) ? status : 'Hoạt động',
-                          decoration: dec('Trạng thái'),
-                          items: statuses
-                              .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                              .toList(),
-                          onChanged: (v) => setLocal(() => status = v ?? 'Hoạt động'),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: statuses.contains(status) ? status : 'Hoạt động',
+                            decoration: dec('Trạng thái'),
+                            items: statuses
+                                .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                                .toList(),
+                            onChanged: (v) => setLocal(() => status = v ?? 'Hoạt động'),
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(controller: addressCtrl, decoration: dec('Địa chỉ')),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: provinceCtrl, decoration: dec('Tỉnh/Thành'))),
+                        const SizedBox(width: 10),
+                        Expanded(child: TextField(controller: phoneCtrl, decoration: dec('SĐT'))),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: ownerCtrl, decoration: dec('Chủ sở hữu'))),
+                        const SizedBox(width: 10),
+                        Expanded(child: TextField(controller: taxCtrl, decoration: dec('Mã số thuế'))),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: typeCtrl, decoration: dec('Loại cửa hàng'))),
+                        const SizedBox(width: 10),
+                        Expanded(child: TextField(controller: supCtrl, decoration: dec('SUP'))),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    // Định vị cửa hàng
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(controller: addressCtrl, decoration: dec('Địa chỉ')),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: TextField(controller: provinceCtrl, decoration: dec('Tỉnh/Thành'))),
-                      const SizedBox(width: 10),
-                      Expanded(child: TextField(controller: phoneCtrl, decoration: dec('SĐT'))),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: TextField(controller: ownerCtrl, decoration: dec('Chủ sở hữu'))),
-                      const SizedBox(width: 10),
-                      Expanded(child: TextField(controller: taxCtrl, decoration: dec('Mã số thuế'))),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: TextField(controller: typeCtrl, decoration: dec('Loại cửa hàng'))),
-                      const SizedBox(width: 10),
-                      Expanded(child: TextField(controller: supCtrl, decoration: dec('SUP'))),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: latCtrl,
-                          decoration: dec('Vĩ độ (latitude)'),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                        ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on_rounded,
+                                  size: 18, color: AppColors.primary),
+                              const SizedBox(width: 6),
+                              Text('Định vị cửa hàng',
+                                  style: AppTextStyles.bodyText.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  )),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: latCtrl,
+                                  decoration: dec('Vĩ độ'),
+                                  keyboardType: const TextInputType.numberWithOptions(
+                                      decimal: true, signed: true),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: TextField(
+                                  controller: lngCtrl,
+                                  decoration: dec('Kinh độ'),
+                                  keyboardType: const TextInputType.numberWithOptions(
+                                      decimal: true, signed: true),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () => useCurrentLocation(setLocal),
+                                  icon: const Icon(Icons.my_location_rounded, size: 18),
+                                  label: const Text('Lấy vị trí hiện tại'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: AppColors.primary,
+                                    side: const BorderSide(color: AppColors.primary),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                  ),
+                                ),
+                              ),
+                              if (latCtrl.text.isNotEmpty && lngCtrl.text.isNotEmpty) ...[
+                                const SizedBox(width: 8),
+                                IconButton(
+                                  tooltip: 'Xoá vị trí',
+                                  onPressed: () => setLocal(() {
+                                    latCtrl.clear();
+                                    lngCtrl.clear();
+                                  }),
+                                  icon: const Icon(Icons.clear_rounded,
+                                      color: AppColors.error),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          controller: lngCtrl,
-                          decoration: dec('Kinh độ (longitude)'),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(child: TextField(controller: openCtrl, decoration: dec('Ngày mở (YYYY-MM-DD)'))),
-                      const SizedBox(width: 10),
-                      Expanded(child: TextField(controller: closeCtrl, decoration: dec('Ngày đóng (YYYY-MM-DD)'))),
-                    ],
-                  ),
-                ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(child: TextField(controller: openCtrl, decoration: dec('Ngày mở (YYYY-MM-DD)'))),
+                        const SizedBox(width: 10),
+                        Expanded(child: TextField(controller: closeCtrl, decoration: dec('Ngày đóng (YYYY-MM-DD)'))),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-            ElevatedButton(
-              onPressed: () {
-                if (nameCtrl.text.trim().isEmpty || codeCtrl.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(
-                    const SnackBar(content: Text('Vui lòng nhập tên và mã cửa hàng')),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+              ElevatedButton(
+                onPressed: () {
+                  if (nameCtrl.text.trim().isEmpty || codeCtrl.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Vui lòng nhập tên và mã cửa hàng')),
+                    );
+                    return;
+                  }
+                  String? nz(String s) => s.trim().isEmpty ? null : s.trim();
+                  final updated = Store(
+                    id: initial?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+                    name: nameCtrl.text.trim(),
+                    storeCode: codeCtrl.text.trim(),
+                    group: group,
+                    managers: initial?.managers ?? const [],
+                    latitude: double.tryParse(latCtrl.text.trim()),
+                    longitude: double.tryParse(lngCtrl.text.trim()),
+                    province: nz(provinceCtrl.text),
+                    sup: nz(supCtrl.text),
+                    status: status,
+                    openDate: nz(openCtrl.text),
+                    closeDate: nz(closeCtrl.text),
+                    storeType: nz(typeCtrl.text),
+                    address: nz(addressCtrl.text),
+                    phone: nz(phoneCtrl.text),
+                    owner: nz(ownerCtrl.text),
+                    taxCode: nz(taxCtrl.text),
                   );
-                  return;
-                }
-                String? nz(String s) => s.trim().isEmpty ? null : s.trim();
-                final updated = Store(
-                  id: initial?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-                  name: nameCtrl.text.trim(),
-                  storeCode: codeCtrl.text.trim(),
-                  group: group,
-                  managers: initial?.managers ?? const [],
-                  latitude: double.tryParse(latCtrl.text.trim()),
-                  longitude: double.tryParse(lngCtrl.text.trim()),
-                  province: nz(provinceCtrl.text),
-                  sup: nz(supCtrl.text),
-                  status: status,
-                  openDate: nz(openCtrl.text),
-                  closeDate: nz(closeCtrl.text),
-                  storeType: nz(typeCtrl.text),
-                  address: nz(addressCtrl.text),
-                  phone: nz(phoneCtrl.text),
-                  owner: nz(ownerCtrl.text),
-                  taxCode: nz(taxCtrl.text),
-                );
-                final prov = context.read<StoreProvider>();
-                if (isEdit) {
-                  prov.updateStore(updated);
-                } else {
-                  prov.addStore(updated);
-                }
-                Navigator.pop(ctx);
-              },
-              child: Text(isEdit ? 'Lưu' : 'Thêm'),
-            ),
-          ],
-        ),
-      ),
+                  final prov = context.read<StoreProvider>();
+                  if (isEdit) {
+                    prov.updateStore(updated);
+                  } else {
+                    prov.addStore(updated);
+                  }
+                  Navigator.pop(ctx);
+                },
+                child: Text(isEdit ? 'Lưu' : 'Thêm'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
