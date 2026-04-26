@@ -90,22 +90,60 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Phân quyền hệ thống'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.white,
-          unselectedLabelColor: AppColors.white.withValues(alpha: 0.7),
-          indicatorColor: AppColors.white,
-          indicatorWeight: 2.5,
-          labelStyle:
-              const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-          unselectedLabelStyle:
-              const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-          tabs: const [
-            Tab(text: 'Quyền chức vụ'),
-            Tab(text: 'Phân công cửa hàng'),
-          ],
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${_permissions.length} chức vụ · ${_assignments.length} phân công',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            color: AppColors.white,
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                labelColor: AppColors.white,
+                unselectedLabelColor: AppColors.textGrey,
+                indicator: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorPadding: const EdgeInsets.all(3),
+                dividerColor: Colors.transparent,
+                labelStyle: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w700),
+                unselectedLabelStyle: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600),
+                tabs: const [
+                  Tab(height: 34, text: 'Quyền chức vụ'),
+                  Tab(height: 34, text: 'Phân công cửa hàng'),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
       body: TabBarView(
