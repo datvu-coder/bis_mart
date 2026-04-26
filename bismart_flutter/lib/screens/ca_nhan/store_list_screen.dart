@@ -27,23 +27,16 @@ class _StoreListScreenState extends State<StoreListScreen> {
   @override
   Widget build(BuildContext context) {
     final permProv = context.watch<PermissionProvider>();
-    // FAB "Thêm cửa hàng": only those with CRUD power (system admin or any
-    // store-manager whose store role grants canCrud).
-    final canCreate = permProv.canCrud;
-    // Restrict the visible list when the user has neither system canStoreList
-    // nor admin: they can only see stores where they are a manager, plus their
-    // own assigned store (storeCode on their employee record).
-    final restrictToManaged =
-        !(permProv.isAdmin || permProv.canStoreList);
+    final canCreate = permProv.canCreateStore;
     final managedIds = permProv.managedStoreIds.toSet();
     final ownStoreCode = permProv.ownStoreCode;
     return Consumer<StoreProvider>(
       builder: (context, provider, _) {
-        final stores = restrictToManaged
-            ? provider.filteredStores.where((s) =>
-                managedIds.contains(s.id) ||
-                (ownStoreCode != null && s.storeCode == ownStoreCode)).toList()
-            : provider.filteredStores;
+        // Visible list = stores managed by this user (manager-list membership)
+        // PLUS the store they are assigned to via employee.storeCode.
+        final stores = provider.filteredStores.where((s) =>
+            managedIds.contains(s.id) ||
+            (ownStoreCode != null && s.storeCode == ownStoreCode)).toList();
 
         return Scaffold(
           backgroundColor: AppColors.background,

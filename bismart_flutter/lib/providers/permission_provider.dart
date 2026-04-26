@@ -73,13 +73,28 @@ class PermissionProvider extends ChangeNotifier {
     );
   }
 
-  /// Can the current user view this store? Admin / system canStoreList /
-  /// or being in the manager list of that store all grant view access.
-  bool canViewStore(String storeId) =>
-      isAdmin || canStoreList || _managedStoreRoles.containsKey(storeId);
+  /// Can the current user view this store?
+  /// Visibility is purely manager-list based: stores where the user is
+  /// in the managers list, OR the store explicitly assigned to them.
+  bool canViewStore(String storeId, {String? storeCode}) {
+    if (_managedStoreRoles.containsKey(storeId)) return true;
+    if (_ownStoreCode != null &&
+        storeCode != null &&
+        storeCode == _ownStoreCode) return true;
+    return false;
+  }
 
   /// Can the current user edit this store?
-  bool canEditStore(String storeId) => permissionForStore(storeId).canCrud;
+  /// Two conditions must hold:
+  ///   - the user is in the managers list of that store, AND
+  ///   - their system role has CRUD power (PG cannot edit even if listed).
+  bool canEditStore(String storeId) {
+    if (!_managedStoreRoles.containsKey(storeId)) return false;
+    return _systemPerm?.canCrud ?? false;
+  }
+
+  /// Can the user create brand new stores? Same as system-level CRUD power.
+  bool get canCreateStore => _systemPerm?.canCrud ?? false;
 
   String get systemRoleLabel =>
       Permission.systemRoleLabels[_systemRole ?? ''] ?? (_systemRole ?? '');
