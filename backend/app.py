@@ -1447,6 +1447,8 @@ def api_checkin():
     except DBIntegrityError:
         # Already has a row for today — keep original check_in_time, update coords
         # only if there is no existing check-in time yet.
+        # Must rollback the failed INSERT txn before issuing the UPDATE.
+        db.rollback()
         with db.cursor() as cur:
             cur.execute(
                 "UPDATE attendances "
