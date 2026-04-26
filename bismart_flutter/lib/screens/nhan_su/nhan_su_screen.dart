@@ -1281,6 +1281,9 @@ class _NhanSuScreenState extends State<NhanSuScreen>
 
   void _showAttendanceHistory(EmployeeProvider provider) {
     DateTime selectedDate = DateTime.now();
+    // Load immediately so the dialog shows data on first open instead of
+    // waiting for the user to change the date.
+    provider.loadAttendancesByDate(selectedDate);
 
     showDialog(
       context: context,

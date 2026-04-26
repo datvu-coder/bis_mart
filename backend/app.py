@@ -1415,37 +1415,203 @@ def api_get_reports():
 def api_checkin():
     """
     CRITICAL FIX: Atomic INSERT prevents concurrent race condition.
-    Each employee can only check in once per day - uses unique constraint.
+    Each employee can only check in once per day - uses unique index.
+    Re-calling check-in does NOT overwrite an existing check-in time;
+    the original time is preserved.
     """
     data = request.get_json(silent=True) or {}
     emp_id = data.get("employeeId")
     if not emp_id:
         return jsonify({"error": "Missing employeeId"}), 400
-    
+
+    lat = data.get("latitude")
+    lng = data.get("longitude")
+    coords = None
+    if lat is not None and lng is not None:
+        coords = f"{lat},{lng}"
+
     db = get_db()
+    _ensure_attendance_indexes(db)
     now = datetime.now(tz=VN_TZ)
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%Y-%m-%dT%H:%M:%S")
-    
+
     try:
         with db.cursor() as cur:
             cur.execute(
-                "INSERT INTO attendances (employee_id, attend_date, check_in_time) "
-                "VALUES (%s, %s, %s)",
-                (emp_id, date_str, time_str),
+                "INSERT INTO attendances (employee_id, attend_date, check_in_time, coordinates) "
+                "VALUES (%s, %s, %s, %s)",
+                (emp_id, date_str, time_str, coords),
             )
         db.commit()
     except DBIntegrityError:
-        # Already checked in today - update time
+        # Already has a row for today — keep original check_in_time, update coords
+        # only if there is no existing check-in time yet.
         with db.cursor() as cur:
             cur.execute(
-                "UPDATE attendances SET check_in_time = %s "
+                "UPDATE attendances "
+                "SET check_in_time = COALESCE(check_in_time, %s), "
+                "    coordinates = COALESCE(coordinates, %s) "
                 "WHERE employee_id = %s AND attend_date = %s",
-                (time_str, emp_id, date_str),
+                (time_str, coords, emp_id, date_str),
             )
         db.commit()
-    
+
     return jsonify({"ok": True, "time": time_str})
+
+
+@app.post("/api/attendances/checkout")
+@login_required
+def api_checkout():
+    data = request.get_json(silent=True) or {}
+    emp_id = data.get("employeeId")
+    if not emp_id:
+        return jsonify({"error": "Missing employeeId"}), 400
+
+    lat = data.get("latitude")
+    lng = data.get("longitude")
+    coords_out = None
+    if lat is not None and lng is not None:
+        coords_out = f"{lat},{lng}"
+
+    db = get_db()
+    _ensure_attendance_indexes(db)
+    now = datetime.now(tz=VN_TZ)
+    date_str = now.strftime("%Y-%m-%d")
+    time_str = now.strftime("%Y-%m-%dT%H:%M:%S")
+
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE attendances SET check_out_time = %s, coordinates = COALESCE(%s, coordinates) "
+            "WHERE employee_id = %s AND attend_date = %s "
+            "RETURNING id",
+            (time_str, coords_out, emp_id, date_str),
+        )
+        row = cur.fetchone()
+        if not row:
+            # No check-in yet today — create a row with only check-out time so
+            # the employee shows up in today's list. Most realistic flow is the
+            # client preventing this, but be tolerant.
+            cur.execute(
+                "INSERT INTO attendances (employee_id, attend_date, check_out_time, coordinates) "
+                "VALUES (%s, %s, %s, %s)",
+                (emp_id, date_str, time_str, coords_out),
+            )
+    db.commit()
+    return jsonify({"ok": True, "time": time_str})
+
+
+def _ensure_attendance_indexes(db):
+    """Make sure (employee_id, attend_date) is unique so check-in is idempotent."""
+    with db.cursor() as cur:
+        cur.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_attendances_emp_date "
+            "ON attendances(employee_id, attend_date)"
+        )
+    db.commit()
+
+
+def _attendance_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
+    has_in = bool(row.get("check_in_time"))
+    has_out = bool(row.get("check_out_time"))
+    return {
+        "id": str(row["id"]),
+        "date": row.get("attend_date") or "",
+        "employeeId": str(row["employee_id"]),
+        "employeeName": row.get("employee_name"),
+        "isCheckedIn": has_in and not has_out,
+        "checkInTime": row.get("check_in_time"),
+        "checkOutTime": row.get("check_out_time"),
+        "shiftName": row.get("shift_name"),
+        "shiftTimeRange": row.get("shift_time_range"),
+        "coordinates": row.get("coordinates"),
+        "distanceIn": row.get("distance_in"),
+        "checkInDiff": (
+            str(row["check_in_diff"]) if row.get("check_in_diff") is not None else None
+        ),
+        "checkInStatus": row.get("check_in_status"),
+        "distanceOut": row.get("distance_out"),
+        "checkOutDiff": (
+            str(row["check_out_diff"]) if row.get("check_out_diff") is not None else None
+        ),
+        "checkOutStatus": row.get("check_out_status"),
+    }
+
+
+@app.get("/api/attendances")
+@login_required
+def api_get_attendances():
+    db = get_db()
+    _ensure_attendance_indexes(db)
+    date_param = (request.args.get("date") or "").strip()
+    if not date_param:
+        date_param = datetime.now(tz=VN_TZ).strftime("%Y-%m-%d")
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT a.id, a.employee_id, a.attend_date, a.check_in_time, a.check_out_time, "
+            "       a.shift_name, a.shift_time_range, a.coordinates, "
+            "       a.distance_in, a.check_in_diff, a.check_in_status, "
+            "       a.distance_out, a.check_out_diff, a.check_out_status, "
+            "       e.full_name AS employee_name "
+            "FROM attendances a "
+            "LEFT JOIN employees e ON e.id = a.employee_id "
+            "WHERE a.attend_date = %s "
+            "ORDER BY a.check_in_time DESC NULLS LAST, a.id DESC",
+            (date_param,),
+        )
+        rows = cur.fetchall()
+    return jsonify([_attendance_to_api_json(r) for r in rows])
+
+
+@app.get("/api/attendances/monthly-summary")
+@login_required
+def api_attendance_monthly_summary():
+    db = get_db()
+    _ensure_attendance_indexes(db)
+    month = (request.args.get("month") or "").strip()
+    if not month:
+        month = datetime.now(tz=VN_TZ).strftime("%Y-%m")
+    employee_id = (request.args.get("employeeId") or "").strip()
+
+    where = "WHERE attend_date LIKE %s"
+    params: list[Any] = [f"{month}%"]
+    if employee_id:
+        where += " AND employee_id = %s"
+        params.append(employee_id)
+
+    with db.cursor() as cur:
+        cur.execute(
+            f"SELECT attend_date, check_in_time, check_out_time "
+            f"FROM attendances {where}",
+            tuple(params),
+        )
+        rows = cur.fetchall()
+
+    days = set()
+    total_seconds = 0
+    for r in rows:
+        d = r.get("attend_date")
+        if d:
+            days.add(d)
+        ci = r.get("check_in_time")
+        co = r.get("check_out_time")
+        if ci and co:
+            try:
+                t_in = datetime.fromisoformat(ci)
+                t_out = datetime.fromisoformat(co)
+                delta = (t_out - t_in).total_seconds()
+                if delta > 0:
+                    total_seconds += delta
+            except Exception:
+                pass
+
+    total_hours = round(total_seconds / 3600.0, 1)
+    return jsonify({
+        "month": month,
+        "daysWorked": len(days),
+        "totalHours": total_hours,
+        "totalRecords": len(rows),
+    })
 
 # ---- COMMUNITY POSTS ----
 
