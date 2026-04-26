@@ -1502,13 +1502,50 @@ def api_checkout():
 
 
 def _ensure_attendance_indexes(db):
-    """Make sure (employee_id, attend_date) is unique so check-in is idempotent."""
-    with db.cursor() as cur:
-        cur.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS uq_attendances_emp_date "
-            "ON attendances(employee_id, attend_date)"
-        )
-    db.commit()
+    """Make sure (employee_id, attend_date) is unique so check-in is idempotent.
+
+    Old data may contain duplicate rows for the same (employee_id, attend_date).
+    We keep the row with the smallest id (earliest) and merge any check-in /
+    check-out times from the others into it before deleting them, then create
+    the unique index. We swallow errors so the index step never breaks reads.
+    """
+    try:
+        with db.cursor() as cur:
+            # Find duplicates and merge them.
+            cur.execute(
+                "SELECT employee_id, attend_date, "
+                "       array_agg(id ORDER BY id) AS ids "
+                "FROM attendances "
+                "GROUP BY employee_id, attend_date "
+                "HAVING COUNT(*) > 1"
+            )
+            dupes = cur.fetchall()
+            for row in dupes:
+                ids = row["ids"]
+                keeper = ids[0]
+                drops = ids[1:]
+                cur.execute(
+                    "SELECT MIN(check_in_time) AS min_in, MAX(check_out_time) AS max_out "
+                    "FROM attendances WHERE id = ANY(%s::int[])",
+                    (ids,),
+                )
+                merged = cur.fetchone() or {}
+                cur.execute(
+                    "UPDATE attendances SET check_in_time = %s, check_out_time = %s "
+                    "WHERE id = %s",
+                    (merged.get("min_in"), merged.get("max_out"), keeper),
+                )
+                cur.execute(
+                    "DELETE FROM attendances WHERE id = ANY(%s::int[])",
+                    (drops,),
+                )
+            cur.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_attendances_emp_date "
+                "ON attendances(employee_id, attend_date)"
+            )
+        db.commit()
+    except Exception:
+        db.rollback()
 
 
 def _attendance_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
