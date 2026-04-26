@@ -462,44 +462,76 @@ class _NhanSuScreenState extends State<NhanSuScreen>
 
           // Check-in/out times
           if (hasCheckedIn && todayAtt.isNotEmpty) ...[
-            Row(
-              children: [
-                _buildTimeChip(
-                  'Giờ vào',
-                  todayAtt.first.checkInTime,
-                  AppColors.success,
-                  Icons.login_rounded,
-                ),
-                const SizedBox(width: 12),
-                _buildTimeChip(
-                  'Giờ ra',
-                  todayAtt.first.checkOutTime,
-                  hasCheckedOut ? AppColors.primary : AppColors.textHint,
-                  Icons.logout_rounded,
-                ),
-                if (hasCheckedIn && hasCheckedOut) ...[
-                  const SizedBox(width: 12),
-                  _buildWorkingHoursChip(todayAtt.first),
-                ],
-              ],
-            ),
+            isMobile
+                ? Column(
+                    children: [
+                      Row(
+                        children: [
+                          _buildTimeChip(
+                            'Giờ vào',
+                            todayAtt.first.checkInTime,
+                            AppColors.success,
+                            Icons.login_rounded,
+                          ),
+                          const SizedBox(width: 8),
+                          _buildTimeChip(
+                            'Giờ ra',
+                            todayAtt.first.checkOutTime,
+                            hasCheckedOut ? AppColors.primary : AppColors.textHint,
+                            Icons.logout_rounded,
+                          ),
+                        ],
+                      ),
+                      if (hasCheckedIn && hasCheckedOut) ...[
+                        const SizedBox(height: 8),
+                        Row(children: [_buildWorkingHoursChip(todayAtt.first)]),
+                      ],
+                    ],
+                  )
+                : Row(
+                    children: [
+                      _buildTimeChip(
+                        'Giờ vào',
+                        todayAtt.first.checkInTime,
+                        AppColors.success,
+                        Icons.login_rounded,
+                      ),
+                      const SizedBox(width: 12),
+                      _buildTimeChip(
+                        'Giờ ra',
+                        todayAtt.first.checkOutTime,
+                        hasCheckedOut ? AppColors.primary : AppColors.textHint,
+                        Icons.logout_rounded,
+                      ),
+                      if (hasCheckedIn && hasCheckedOut) ...[
+                        const SizedBox(width: 12),
+                        _buildWorkingHoursChip(todayAtt.first),
+                      ],
+                    ],
+                  ),
             if (todayAtt.first.distanceIn != null) ...[
               const SizedBox(height: 8),
-              Row(
+              Wrap(
+                spacing: 12,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Icon(Icons.location_on_rounded, size: 14, color: AppColors.textGrey),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Khoảng cách vào: ${_formatDistance(todayAtt.first.distanceIn!)}',
-                    style: AppTextStyles.caption,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.location_on_rounded, size: 14, color: AppColors.textGrey),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Vào: ${_formatDistance(todayAtt.first.distanceIn!)}',
+                        style: AppTextStyles.caption,
+                      ),
+                    ],
                   ),
-                  if (todayAtt.first.distanceOut != null) ...[
-                    const SizedBox(width: 12),
+                  if (todayAtt.first.distanceOut != null)
                     Text(
                       'Ra: ${_formatDistance(todayAtt.first.distanceOut!)}',
                       style: AppTextStyles.caption,
                     ),
-                  ],
                 ],
               ),
             ],
@@ -566,9 +598,12 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                     icon: _isCheckingIn
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white))
                         : const Icon(Icons.fingerprint_rounded, size: 20),
-                    label: Text(_isCheckingIn ? 'Đang xác định vị trí...' : 'Chấm công vào'),
+                    label: Text(
+                      _isCheckingIn ? 'Đang xác định...' : 'Chấm công vào',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: EdgeInsets.symmetric(vertical: isMobile ? 12 : 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
@@ -580,9 +615,12 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                     icon: _isCheckingIn
                         ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                         : const Icon(Icons.logout_rounded, size: 20),
-                    label: Text(_isCheckingIn ? 'Đang xác định vị trí...' : 'Chấm công ra'),
+                    label: Text(
+                      _isCheckingIn ? 'Đang xác định...' : 'Chấm công ra',
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: EdgeInsets.symmetric(vertical: isMobile ? 12 : 14),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
@@ -590,34 +628,51 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               if (hasCheckedOut)
                 Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    alignment: Alignment.center,
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 12, vertical: isMobile ? 10 : 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.white.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: AppColors.success.withValues(alpha: 0.4)),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Đã hoàn thành chấm công hôm nay',
-                          style: AppTextStyles.bodyText.copyWith(color: AppColors.success, fontWeight: FontWeight.w600)),
+                        const Icon(Icons.check_circle_rounded,
+                            color: AppColors.success, size: 18),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            isMobile ? 'Đã hoàn thành' : 'Đã hoàn thành chấm công hôm nay',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.bodyText.copyWith(
+                                color: AppColors.success,
+                                fontWeight: FontWeight.w700,
+                                fontSize: isMobile ? 13 : 14),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
-              const SizedBox(width: 8),
               // Admin quick check-in button (only for managers)
-              if (canManage)
+              if (canManage) ...[
+                const SizedBox(width: 6),
                 PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert_rounded),
-                tooltip: 'Chấm công nhân viên',
-                onSelected: (value) {
-                  if (value == 'checkin') _showCheckInDialog(provider);
-                  if (value == 'checkout') _showCheckOutDialog(provider);
-                },
-                itemBuilder: (ctx) => [
-                  const PopupMenuItem(value: 'checkin', child: Text('Check-in nhân viên')),
-                  const PopupMenuItem(value: 'checkout', child: Text('Check-out nhân viên')),
-                ],
-              ),
+                  icon: const Icon(Icons.more_vert_rounded),
+                  tooltip: 'Chấm công nhân viên',
+                  onSelected: (value) {
+                    if (value == 'checkin') _showCheckInDialog(provider);
+                    if (value == 'checkout') _showCheckOutDialog(provider);
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(value: 'checkin', child: Text('Check-in nhân viên')),
+                    const PopupMenuItem(value: 'checkout', child: Text('Check-out nhân viên')),
+                  ],
+                ),
+              ],
             ],
           ),
         ],
@@ -637,17 +692,24 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           children: [
             Icon(icon, size: 16, color: color),
             const SizedBox(width: 6),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: AppTextStyles.caption.copyWith(fontSize: 10)),
-                Text(
-                  time != null
-                      ? '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}'
-                      : '--:--',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: color),
-                ),
-              ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.caption.copyWith(fontSize: 10)),
+                  Text(
+                    time != null
+                        ? '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}'
+                        : '--:--',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: color),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -666,15 +728,17 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         borderRadius: BorderRadius.circular(10),
       ),
       child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
           const Icon(Icons.timer_rounded, size: 16, color: AppColors.info),
           const SizedBox(width: 6),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text('Làm việc', style: AppTextStyles.caption.copyWith(fontSize: 10)),
               Text('${hours}h${minutes.toString().padLeft(2, '0')}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.info)),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.info)),
             ],
           ),
         ],
