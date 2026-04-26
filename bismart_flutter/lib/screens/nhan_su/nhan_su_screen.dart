@@ -818,9 +818,72 @@ class _NhanSuScreenState extends State<NhanSuScreen>
             final diff = att.checkOutTime!.difference(att.checkInTime!);
             workingTime = '${diff.inHours}h${(diff.inMinutes % 60).toString().padLeft(2, '0')}';
           }
+          final isMobile = MediaQuery.of(context).size.width < 600;
+          final statusIcon = Icon(
+            hasCheckOut
+                ? Icons.check_circle_outline_rounded
+                : att.isCheckedIn
+                    ? Icons.check_circle_rounded
+                    : Icons.circle_outlined,
+            color: hasCheckOut
+                ? AppColors.textGrey
+                : att.isCheckedIn
+                    ? AppColors.success
+                    : AppColors.textHint,
+            size: 20,
+          );
+          final nameBlock = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(employee.fullName, style: AppTextStyles.bodyText),
+              if (_isLateArrival(att, provider.shifts))
+                Text('Đi muộn', style: AppTextStyles.caption.copyWith(color: AppColors.error)),
+              if (att.distanceIn != null)
+                Text('📍 ${_formatDistance(att.distanceIn!)}',
+                  style: AppTextStyles.caption.copyWith(fontSize: 11)),
+            ],
+          );
+          final chips = <Widget>[
+            if (att.checkInTime != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Vào ${att.checkInTime!.hour.toString().padLeft(2, '0')}:${att.checkInTime!.minute.toString().padLeft(2, '0')}',
+                  style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+            if (hasCheckOut)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Ra ${att.checkOutTime!.hour.toString().padLeft(2, '0')}:${att.checkOutTime!.minute.toString().padLeft(2, '0')}',
+                  style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+            if (workingTime != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.infoLight,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  workingTime,
+                  style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600, color: AppColors.info),
+                ),
+              ),
+          ];
           return Container(
             margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: EdgeInsets.symmetric(horizontal: isMobile ? 10 : 14, vertical: isMobile ? 10 : 12),
             decoration: BoxDecoration(
               color: hasCheckOut
                   ? AppColors.surfaceVariant
@@ -829,77 +892,46 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                       : AppColors.surfaceVariant,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Row(
-              children: [
-                Icon(
-                  hasCheckOut
-                      ? Icons.check_circle_outline_rounded
-                      : att.isCheckedIn
-                          ? Icons.check_circle_rounded
-                          : Icons.circle_outlined,
-                  color: hasCheckOut
-                      ? AppColors.textGrey
-                      : att.isCheckedIn
-                          ? AppColors.success
-                          : AppColors.textHint,
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
+            child: isMobile
+                ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(employee.fullName, style: AppTextStyles.bodyText),
-                      if (_isLateArrival(att, provider.shifts))
-                        Text('Đi muộn', style: AppTextStyles.caption.copyWith(color: AppColors.error)),
-                      if (att.distanceIn != null)
-                        Text('📍 ${_formatDistance(att.distanceIn!)}',
-                          style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                      Row(
+                        children: [
+                          statusIcon,
+                          const SizedBox(width: 10),
+                          Expanded(child: nameBlock),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: chips,
+                            ),
+                          ),
+                          _buildAttendanceActions(att, provider),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      statusIcon,
+                      const SizedBox(width: 10),
+                      Expanded(child: nameBlock),
+                      ...chips.map((c) => Padding(
+                            padding: const EdgeInsets.only(left: 4),
+                            child: c,
+                          )),
+                      const SizedBox(width: 4),
+                      _buildAttendanceActions(att, provider),
                     ],
                   ),
-                ),
-                if (att.checkInTime != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    margin: const EdgeInsets.only(right: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.cardBg,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Vào ${att.checkInTime!.hour.toString().padLeft(2, '0')}:${att.checkInTime!.minute.toString().padLeft(2, '0')}',
-                      style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                if (hasCheckOut)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    margin: const EdgeInsets.only(right: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.cardBg,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      'Ra ${att.checkOutTime!.hour.toString().padLeft(2, '0')}:${att.checkOutTime!.minute.toString().padLeft(2, '0')}',
-                      style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                if (workingTime != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppColors.infoLight,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      workingTime,
-                      style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600, color: AppColors.info),
-                    ),
-                  ),
-                const SizedBox(width: 4),
-                _buildAttendanceActions(att, provider),
-              ],
-            ),
           );
         }),
       ],
