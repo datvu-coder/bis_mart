@@ -503,39 +503,34 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     );
   }
 
+  // ── Bộ lọc (thiết kế lại — tối giản, sang trọng) ───────────────────────
+  //
+  // Quy tắc thiết kế:
+  // • Một khung trắng phẳng, đường viền 1px màu borderLight, không gradient.
+  // • Hệ phân cấp rõ: header (tiêu đề + mô tả + nút điều chỉnh) → KPI →
+  //   danh sách báo cáo gần đây.
+  // • Nhấn cam (primary) chỉ ở 1-2 điểm (KPI doanh thu, nút điều chỉnh).
+  // • Mọi trạng thái lọc đều đi qua bottom-sheet chuyên dụng — body khung
+  //   chỉ phục vụ HIỂN THỊ kết quả.
   Widget _buildFilterPanel(SalesProvider provider) {
-    // Danh sách cửa hàng dựa trên PHÂN QUYỀN (không liên quan tới báo cáo).
     final stores = _resolvePermittedStores(context);
     final activeStoreCode = provider.storeFilter;
     final activeStoreName = activeStoreCode == null
         ? null
         : stores
             .firstWhere(
-              (e) => e.key.toUpperCase() ==
-                  activeStoreCode.toUpperCase(),
+              (e) =>
+                  e.key.toUpperCase() == activeStoreCode.toUpperCase(),
               orElse: () => MapEntry(activeStoreCode, activeStoreCode),
             )
             .value;
 
-    String rangeLabel;
-    switch (provider.filterType) {
-      case 'today':
-        rangeLabel = AppStrings.homNay;
-        break;
-      case 'week':
-        rangeLabel = AppStrings.tuanNay;
-        break;
-      case 'month':
-        rangeLabel = AppStrings.thangNay;
-        break;
-      case 'custom':
-        rangeLabel = (provider.customStart != null && provider.customEnd != null)
-            ? '${DateFormatter.formatDate(provider.customStart!)} → ${DateFormatter.formatDate(provider.customEnd!)}'
-            : 'Tuỳ chỉnh';
-        break;
-      default:
-        rangeLabel = 'Tất cả';
-    }
+    final rangeLabel = _formatRangeLabel(provider);
+    final scopeLabel = activeStoreCode == null
+        ? 'Tất cả cửa hàng'
+        : (activeStoreName != null && activeStoreName != activeStoreCode
+            ? '$activeStoreCode · $activeStoreName'
+            : activeStoreCode);
 
     final filteredReports = provider.filteredReports;
     final totalRev =
@@ -544,393 +539,297 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         filteredReports.fold<double>(0, (s, r) => s + r.saleOut);
     final totalNu = filteredReports.fold<int>(0, (s, r) => s + r.nu);
 
-    return DataPanel(
-      title: AppStrings.boLoc,
-      trailing: IconButton(
-        tooltip: 'Mở bộ lọc',
-        onPressed: () => _openFilterSheet(provider),
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-        icon: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppColors.primary, AppColors.primaryDark],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.28),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: const Icon(Icons.tune_rounded,
-              size: 18, color: AppColors.white),
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Active filter chips — bấm để mở bộ lọc.
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              _activeFilterChip(
-                icon: Icons.event_rounded,
-                label: 'Thời gian: $rangeLabel',
-                color: AppColors.primary,
-                onClear: provider.filterType == 'today'
-                    ? null
-                    : () => provider.setFilter('today'),
-              ),
-              _activeFilterChip(
-                icon: Icons.store_rounded,
-                label: activeStoreCode == null
-                    ? 'Cửa hàng: Tất cả'
-                    : 'Cửa hàng: $activeStoreCode · $activeStoreName',
-                color: AppColors.info,
-                onClear: activeStoreCode == null
-                    ? null
-                    : () => provider.setStoreFilter(null),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          // Summary of filtered content
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.borderLight),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.textPrimary.withValues(alpha: 0.04),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
+          // ── Header: tiêu đề + scope + nút "Điều chỉnh" ──────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(AppStrings.boLoc,
+                          style: AppTextStyles.sectionHeader),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          _scopePill(Icons.event_outlined, rangeLabel),
+                          const SizedBox(width: 6),
+                          Flexible(
+                              child: _scopePill(
+                                  Icons.storefront_outlined, scopeLabel,
+                                  truncate: true)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: () => _openFilterSheet(provider),
+                  icon: const Icon(Icons.tune_rounded, size: 16),
+                  label: const Text('Điều chỉnh'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 8),
+                    textStyle: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w700),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header strip with subtle gradient
-                Container(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primaryLight, AppColors.white],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(18),
-                      topRight: Radius.circular(18),
-                    ),
-                    border: const Border(
-                        bottom:
-                            BorderSide(color: AppColors.borderLight)),
-                  ),
-                  child: Row(
+          ),
+          const Divider(height: 1, color: AppColors.borderLight),
+
+          // ── KPI lưới 4 ô ───────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+            child: LayoutBuilder(builder: (ctx, c) {
+              final twoCol = c.maxWidth < 500;
+              final cardWidth = twoCol
+                  ? (c.maxWidth - 12) / 2
+                  : (c.maxWidth - 36) / 4;
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  _kpiTile('Số báo cáo', '${filteredReports.length}',
+                      cardWidth),
+                  _kpiTile('Tổng NU', '$totalNu', cardWidth),
+                  _kpiTile(
+                      'Sale Out',
+                      CurrencyFormatter.formatVND(totalSaleOut),
+                      cardWidth),
+                  _kpiTile(
+                      'Doanh thu',
+                      CurrencyFormatter.formatVND(totalRev),
+                      cardWidth,
+                      accent: true),
+                ],
+              );
+            }),
+          ),
+
+          // ── Báo cáo gần đây ────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: filteredReports.isEmpty
+                ? _emptyState()
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(10),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.18),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.fact_check_rounded,
-                            size: 18, color: AppColors.primary),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
                           children: [
-                            Text('Nội dung đang lọc',
+                            Text('Báo cáo gần đây',
                                 style: AppTextStyles.bodyText.copyWith(
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.textPrimary)),
-                            Text(
-                              activeStoreCode == null
-                                  ? '$rangeLabel · Tất cả cửa hàng'
-                                  : '$rangeLabel · $activeStoreCode',
-                              style: AppTextStyles.caption
-                                  .copyWith(color: AppColors.textGrey),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 7, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceVariant,
+                                borderRadius:
+                                    BorderRadius.circular(8),
+                              ),
+                              child: Text('${filteredReports.length}',
+                                  style: AppTextStyles.caption.copyWith(
+                                      color: AppColors.textGrey,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 11)),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      LayoutBuilder(builder: (ctx, c) {
-                        final twoCol = c.maxWidth < 460;
-                        final cardWidth = twoCol
-                            ? (c.maxWidth - 10) / 2
-                            : (c.maxWidth - 30) / 4;
-                        return Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: [
-                            _summaryStat('Số báo cáo',
-                                '${filteredReports.length}',
-                                AppColors.info, cardWidth),
-                            _summaryStat('Tổng NU', '$totalNu',
-                                AppColors.primary, cardWidth),
-                            _summaryStat(
-                                'Sale Out',
-                                CurrencyFormatter.formatVND(totalSaleOut),
-                                AppColors.warning,
-                                cardWidth),
-                            _summaryStat(
-                                'Doanh thu',
-                                CurrencyFormatter.formatVND(totalRev),
-                                AppColors.success,
-                                cardWidth),
-                          ],
-                        );
-                      }),
-                      if (filteredReports.isEmpty) ...[
-                        const SizedBox(height: 14),
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.surfaceVariant,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.inbox_rounded,
-                                  size: 18, color: AppColors.textHint),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Không có báo cáo phù hợp với bộ lọc.',
-                                  style: AppTextStyles.caption.copyWith(
-                                      color: AppColors.textGrey,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ] else ...[
-                        const SizedBox(height: 14),
-                        ...filteredReports.take(8).map((r) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                      color: AppColors.primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Text(
-                                      '${DateFormatter.formatDate(r.date)} · ${r.pgName}'
-                                      '${r.storeCode != null ? " · ${r.storeCode}" : ""}',
-                                      style: AppTextStyles.caption.copyWith(
-                                          color: AppColors.textPrimary,
-                                          fontWeight: FontWeight.w600),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Text(
-                                    CurrencyFormatter.formatVND(r.revenue),
-                                    style: AppTextStyles.caption.copyWith(
-                                        color: AppColors.success,
-                                        fontWeight: FontWeight.w800),
-                                  ),
-                                ],
-                              ),
-                            )),
-                        if (filteredReports.length > 8)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              '... và ${filteredReports.length - 8} báo cáo khác',
+                      ...List.generate(
+                        filteredReports.take(8).length,
+                        (i) {
+                          final r = filteredReports[i];
+                          final isLast = i ==
+                              (filteredReports.take(8).length - 1);
+                          return _recentRow(r, isLast: isLast);
+                        },
+                      ),
+                      if (filteredReports.length > 8)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                              '… và ${filteredReports.length - 8} báo cáo khác',
                               style: AppTextStyles.caption.copyWith(
-                                  color: AppColors.textGrey,
-                                  fontStyle: FontStyle.italic),
-                            ),
-                          ),
-                      ],
+                                  color: AppColors.textHint,
+                                  fontStyle: FontStyle.italic)),
+                        ),
                     ],
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _activeFilterChip({
-    required IconData icon,
-    required String label,
-    required Color color,
-    VoidCallback? onClear,
-  }) {
+  // ── Helper: nhãn khoảng thời gian (cho header & sheet) ────────────────
+  String _formatRangeLabel(SalesProvider p) {
+    switch (p.filterType) {
+      case 'today':
+        return AppStrings.homNay;
+      case 'week':
+        return AppStrings.tuanNay;
+      case 'month':
+        return AppStrings.thangNay;
+      case 'custom':
+        return (p.customStart != null && p.customEnd != null)
+            ? '${DateFormatter.formatDate(p.customStart!)} → ${DateFormatter.formatDate(p.customEnd!)}'
+            : 'Tuỳ chỉnh';
+      default:
+        return 'Tất cả';
+    }
+  }
+
+  // ── Helper: pill nhỏ hiển thị scope hiện tại trên header ──────────────
+  Widget _scopePill(IconData icon, String label, {bool truncate = false}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            color.withValues(alpha: 0.16),
-            color.withValues(alpha: 0.06),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: color.withValues(alpha: 0.30)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.10),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: color),
-          const SizedBox(width: 6),
-          Text(label,
-              style: AppTextStyles.caption
-                  .copyWith(color: color, fontWeight: FontWeight.w800)),
-          if (onClear != null) ...[
-            const SizedBox(width: 8),
-            InkWell(
-              onTap: onClear,
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.close_rounded, size: 12, color: color),
+          Icon(icon, size: 12, color: AppColors.textGrey),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow:
+                  truncate ? TextOverflow.ellipsis : TextOverflow.clip,
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textGrey,
+                fontWeight: FontWeight.w700,
+                fontSize: 11.5,
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _summaryStat(
-      String label, String value, Color color, double? width) {
+  // ── Helper: ô KPI ─────────────────────────────────────────────────────
+  Widget _kpiTile(String label, String value, double width,
+      {bool accent = false}) {
     return SizedBox(
       width: width,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
-          color: AppColors.white,
+          color:
+              accent ? AppColors.primaryLight : AppColors.surfaceVariant,
           borderRadius: BorderRadius.circular(12),
-          border: Border(
-            top: const BorderSide(color: AppColors.borderLight),
-            right: const BorderSide(color: AppColors.borderLight),
-            bottom: const BorderSide(color: AppColors.borderLight),
-            left: BorderSide(color: color, width: 3),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.06),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label,
-                style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textGrey,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Text(value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15)),
+            Text(
+              label.toUpperCase(),
+              style: TextStyle(
+                fontSize: 10.5,
+                letterSpacing: 0.6,
+                fontWeight: FontWeight.w800,
+                color:
+                    accent ? AppColors.primary : AppColors.textGrey,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: accent
+                    ? AppColors.primary
+                    : AppColors.textPrimary,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// Trường chọn cửa hàng hiển thị thường trực (dropdown thật) — chỉ liệt
-  /// kê những cửa hàng tài khoản hiện tại được phân quyền quản lý
-  /// (đã lọc qua [SalesProvider.availableStores] dựa trên
-  /// `_allowedStoreCodes`).
-  Widget _buildStoreDropdownField(
-    SalesProvider provider,
-    List<MapEntry<String, String>> stores,
-    String? activeStoreCode,
-  ) {
-    final isEmpty = stores.isEmpty;
-    final perm = context.watch<PermissionProvider>();
-    final scopeLabel = perm.isAdmin
-        ? 'Tất cả cửa hàng (Admin)'
-        : 'Cửa hàng được phân quyền quản lý';
-
+  // ── Helper: trạng thái rỗng ───────────────────────────────────────────
+  Widget _emptyState() {
     return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderLight),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.textPrimary.withValues(alpha: 0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+        color: AppColors.surfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.inbox_outlined,
+              size: 28, color: AppColors.textHint),
+          const SizedBox(height: 10),
+          Text('Không có báo cáo phù hợp với bộ lọc.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.caption.copyWith(
+                  color: AppColors.textGrey,
+                  fontWeight: FontWeight.w700)),
         ],
       ),
-      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+    );
+  }
+
+  // ── Helper: 1 dòng báo cáo gần đây ────────────────────────────────────
+  Widget _recentRow(SalesReport r, {required bool isLast}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        border: isLast
+            ? null
+            : const Border(
+                bottom: BorderSide(color: AppColors.borderLight),
+              ),
+      ),
       child: Row(
         children: [
           Container(
-            width: 34,
-            height: 34,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(10),
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.storefront_rounded,
-                size: 18, color: AppColors.primary),
+            child: Text(
+              DateFormatter.formatDate(r.date),
+              style: AppTextStyles.caption.copyWith(
+                color: AppColors.textGrey,
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+              ),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -939,97 +838,159 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  scopeLabel,
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
-                    color: AppColors.primary,
+                  r.pgName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyText.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13.5,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 2),
-                if (isEmpty)
-                  Text(
-                    'Không có cửa hàng được phân quyền',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.textHint,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  )
-                else
-                  DropdownButtonHideUnderline(
-                    child: DropdownButton<String?>(
-                      value: activeStoreCode,
-                      isExpanded: true,
-                      isDense: true,
-                      icon: const Icon(Icons.expand_more_rounded,
-                          color: AppColors.textGrey),
-                      borderRadius: BorderRadius.circular(12),
-                      style: AppTextStyles.bodyText.copyWith(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w700,
+                if ((r.storeCode ?? '').isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Text(
+                      r.storeCode!,
+                      style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textHint,
+                        fontSize: 11,
                       ),
-                      hint: Text(
-                        'Tất cả cửa hàng (${stores.length})',
-                        style: AppTextStyles.bodyText.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      items: [
-                        DropdownMenuItem<String?>(
-                          value: null,
-                          child: Row(
-                            children: [
-                              const Icon(Icons.store_mall_directory_rounded,
-                                  size: 16, color: AppColors.info),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  'Tất cả cửa hàng (${stores.length})',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        ...stores.map(
-                          (s) => DropdownMenuItem<String?>(
-                            value: s.key,
-                            child: Row(
-                              children: [
-                                const Icon(Icons.storefront_rounded,
-                                    size: 16, color: AppColors.primary),
-                                const SizedBox(width: 8),
-                                Flexible(
-                                  child: Text(
-                                    '${s.key} · ${s.value}',
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                      onChanged: (val) => provider.setStoreFilter(val),
                     ),
                   ),
               ],
             ),
           ),
-          if (activeStoreCode != null)
-            IconButton(
-              tooltip: 'Bỏ lọc cửa hàng',
-              icon: const Icon(Icons.close_rounded,
-                  size: 18, color: AppColors.textGrey),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(
-                  minWidth: 32, minHeight: 32),
-              onPressed: () => provider.setStoreFilter(null),
+          const SizedBox(width: 8),
+          Text(
+            CurrencyFormatter.formatVND(r.revenue),
+            style: AppTextStyles.bodyText.copyWith(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: 13.5,
             ),
+          ),
         ],
       ),
+    );
+  }
+
+  /// Trường chọn cửa hàng hiển thị bên trong bottom-sheet — danh sách lấy
+  /// trực tiếp từ phân quyền của tài khoản (`_resolvePermittedStores`).
+  ///
+  /// Thiết kế: form-field tối giản, đường viền hairline, không gradient.
+  Widget _buildStoreDropdownField(
+    SalesProvider provider,
+    List<MapEntry<String, String>> stores,
+    String? activeStoreCode,
+  ) {
+    final isEmpty = stores.isEmpty;
+    final perm = context.watch<PermissionProvider>();
+    final scopeLabel = perm.isAdmin
+        ? 'Admin · tất cả cửa hàng'
+        : 'Phạm vi phân quyền · ${stores.length} cửa hàng';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 6, left: 2),
+          child: Text(
+            scopeLabel,
+            style: AppTextStyles.caption.copyWith(
+              fontSize: 11,
+              color: AppColors.textGrey,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Container(
+          height: 52,
+          padding: const EdgeInsets.fromLTRB(14, 0, 6, 0),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: isEmpty
+              ? Row(
+                  children: [
+                    const Icon(Icons.info_outline,
+                        size: 16, color: AppColors.textHint),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Không có cửa hàng được phân quyền',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textHint,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String?>(
+                          value: activeStoreCode,
+                          isExpanded: true,
+                          isDense: true,
+                          icon: const Icon(Icons.expand_more_rounded,
+                              size: 20, color: AppColors.textGrey),
+                          borderRadius: BorderRadius.circular(12),
+                          style: AppTextStyles.bodyText.copyWith(
+                            color: AppColors.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                          ),
+                          hint: Text(
+                            'Tất cả cửa hàng (${stores.length})',
+                            style: AppTextStyles.bodyText.copyWith(
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          items: [
+                            DropdownMenuItem<String?>(
+                              value: null,
+                              child: Text(
+                                'Tất cả cửa hàng (${stores.length})',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            ...stores.map(
+                              (s) => DropdownMenuItem<String?>(
+                                value: s.key,
+                                child: Text(
+                                  '${s.key} · ${s.value}',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                          ],
+                          onChanged: (val) =>
+                              provider.setStoreFilter(val),
+                        ),
+                      ),
+                    ),
+                    if (activeStoreCode != null)
+                      IconButton(
+                        tooltip: 'Bỏ lọc cửa hàng',
+                        icon: const Icon(Icons.close_rounded,
+                            size: 18, color: AppColors.textGrey),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                            minWidth: 32, minHeight: 32),
+                        onPressed: () => provider.setStoreFilter(null),
+                      ),
+                  ],
+                ),
+        ),
+      ],
     );
   }
 
@@ -1062,55 +1023,41 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       isScrollControlled: true,
       backgroundColor: AppColors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetCtx) {
-        // Lắng nghe SalesProvider để dropdown / chip cập nhật theo thời gian thực.
         return Consumer<SalesProvider>(
           builder: (ctx, prov, _) {
-            // Nguồn dropdown: PHÂN QUYỀN của tài khoản (không lấy từ báo cáo).
             final stores = _resolvePermittedStores(ctx);
             final activeStore = prov.storeFilter;
             return SafeArea(
               top: false,
               child: Padding(
                 padding: EdgeInsets.only(
-                  bottom:
-                      MediaQuery.of(ctx).viewInsets.bottom + 12,
-                  left: 16,
-                  right: 16,
-                  top: 8,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+                  left: 20,
+                  right: 20,
+                  top: 10,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Drag handle
+                    // Drag handle — thanh xám mảnh
                     Center(
                       child: Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 12),
+                        width: 36,
+                        height: 3,
+                        margin: const EdgeInsets.only(bottom: 14),
                         decoration: BoxDecoration(
-                          color: AppColors.border,
+                          color: AppColors.borderLight,
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
+                    // Tiêu đề + nút đóng
                     Row(
                       children: [
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryLight,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.tune_rounded,
-                              size: 18, color: AppColors.primary),
-                        ),
-                        const SizedBox(width: 10),
                         Expanded(
                           child: Text('Bộ lọc',
                               style: AppTextStyles.sectionHeader),
@@ -1119,149 +1066,139 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                           tooltip: 'Đóng',
                           onPressed: () => Navigator.pop(sheetCtx),
                           icon: const Icon(Icons.close_rounded,
+                              size: 22,
                               color: AppColors.textGrey),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    // ── Khoảng thời gian ─────────────────────────
-                    _sheetSectionTitle(
-                        'Khoảng thời gian', Icons.event_available_rounded),
                     const SizedBox(height: 8),
+
+                    // ── Khoảng thời gian ─────────────────────────
+                    _sheetSectionTitle('Khoảng thời gian'),
+                    const SizedBox(height: 10),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        _rangeChoiceChip('today', AppStrings.homNay,
-                            Icons.today_rounded, prov),
-                        _rangeChoiceChip('week', AppStrings.tuanNay,
-                            Icons.calendar_view_week_rounded, prov),
-                        _rangeChoiceChip('month', AppStrings.thangNay,
-                            Icons.calendar_month_rounded, prov),
-                        _rangeChoiceChip('custom', 'Tuỳ chỉnh',
-                            Icons.date_range_rounded, prov),
+                        _rangeChoiceChip(
+                            'today', AppStrings.homNay, prov),
+                        _rangeChoiceChip(
+                            'week', AppStrings.tuanNay, prov),
+                        _rangeChoiceChip(
+                            'month', AppStrings.thangNay, prov),
+                        _rangeChoiceChip(
+                            'custom', 'Tuỳ chỉnh', prov),
                       ],
                     ),
                     if (prov.filterType == 'custom' &&
                         prov.customStart != null &&
                         prov.customEnd != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        '${DateFormatter.formatDate(prov.customStart!)} → ${DateFormatter.formatDate(prov.customEnd!)}',
-                        style: AppTextStyles.caption.copyWith(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.date_range_outlined,
+                                size: 14, color: AppColors.primary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${DateFormatter.formatDate(prov.customStart!)} → ${DateFormatter.formatDate(prov.customEnd!)}',
+                                style: AppTextStyles.caption.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 18),
-                    // ── Cửa hàng (dropdown) ──────────────────────
-                    _sheetSectionTitle(
-                        'Cửa hàng', Icons.storefront_rounded),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 22),
+
+                    // ── Cửa hàng ─────────────────────────────────
+                    _sheetSectionTitle('Cửa hàng'),
+                    const SizedBox(height: 10),
                     _buildStoreDropdownField(prov, stores, activeStore),
-                    const SizedBox(height: 18),
+                    const SizedBox(height: 22),
+
                     // ── Xuất dữ liệu ─────────────────────────────
-                    _sheetSectionTitle(
-                        'Xuất dữ liệu', Icons.ios_share_rounded),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              ExportService.exportToHtmlTable(
-                                prov.filteredReports,
-                                filterType: prov.filterType,
-                                from: prov.customStart,
-                                to: prov.customEnd,
-                              );
-                              Navigator.pop(sheetCtx);
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(SnackBar(
-                                content:
-                                    const Text('Đang xuất PDF...'),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(10)),
-                              ));
-                            },
-                            icon: const Icon(
-                                Icons.picture_as_pdf_rounded,
-                                size: 18,
-                                color: AppColors.error),
-                            label: const Text('PDF / HTML'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.textPrimary,
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12),
-                              side: const BorderSide(
-                                  color: AppColors.borderLight),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12)),
+                    _sheetSectionTitle('Xuất dữ liệu'),
+                    const SizedBox(height: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border:
+                            Border.all(color: AppColors.borderLight),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _exportTextButton(
+                              icon: Icons.picture_as_pdf_outlined,
+                              label: 'PDF',
+                              onTap: () {
+                                ExportService.exportToHtmlTable(
+                                  prov.filteredReports,
+                                  filterType: prov.filterType,
+                                  from: prov.customStart,
+                                  to: prov.customEnd,
+                                );
+                                Navigator.pop(sheetCtx);
+                                _showExportSnack('Đang xuất PDF…');
+                              },
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              ExportService.exportToCsv(
-                                prov.filteredReports,
-                                filterType: prov.filterType,
-                                from: prov.customStart,
-                                to: prov.customEnd,
-                              );
-                              Navigator.pop(sheetCtx);
-                              if (!mounted) return;
-                              ScaffoldMessenger.of(context)
-                                  .showSnackBar(SnackBar(
-                                content: const Text(
-                                    'Đang xuất Excel...'),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius:
-                                        BorderRadius.circular(10)),
-                              ));
-                            },
-                            icon: const Icon(
-                                Icons.table_chart_rounded,
-                                size: 18,
-                                color: AppColors.success),
-                            label: const Text('Excel (CSV)'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.textPrimary,
-                              padding: const EdgeInsets.symmetric(
-                                  vertical: 12),
-                              side: const BorderSide(
-                                  color: AppColors.borderLight),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.circular(12)),
+                          Container(
+                            width: 1,
+                            height: 28,
+                            color: AppColors.borderLight,
+                          ),
+                          Expanded(
+                            child: _exportTextButton(
+                              icon: Icons.table_chart_outlined,
+                              label: 'Excel',
+                              onTap: () {
+                                ExportService.exportToCsv(
+                                  prov.filteredReports,
+                                  filterType: prov.filterType,
+                                  from: prov.customStart,
+                                  to: prov.customEnd,
+                                );
+                                Navigator.pop(sheetCtx);
+                                _showExportSnack('Đang xuất Excel…');
+                              },
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 20),
+
+                    // ── Xong ────────────────────────────────────
                     SizedBox(
                       width: double.infinity,
+                      height: 50,
                       child: ElevatedButton(
                         onPressed: () => Navigator.pop(sheetCtx),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.primary,
                           foregroundColor: AppColors.white,
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 14),
+                          elevation: 0,
                           shape: RoundedRectangleBorder(
                               borderRadius:
                                   BorderRadius.circular(12)),
                           textStyle: const TextStyle(
-                              fontWeight: FontWeight.w800),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 15,
+                              letterSpacing: 0.3),
                         ),
-                        child: const Text('Xong'),
+                        child: const Text('Áp dụng'),
                       ),
                     ),
                   ],
@@ -1274,53 +1211,89 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     );
   }
 
-  Widget _sheetSectionTitle(String label, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: AppColors.primary),
-        const SizedBox(width: 6),
-        Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.6,
-            color: AppColors.primary,
-          ),
+  // ── Helper: nút xuất dữ liệu trong sheet ──────────────────────────────
+  Widget _exportTextButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: AppColors.textPrimary),
+            const SizedBox(width: 8),
+            Text(label,
+                style: AppTextStyles.bodyText.copyWith(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14)),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  void _showExportSnack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10)),
+    ));
+  }
+
+  Widget _sheetSectionTitle(String label) {
+    return Text(
+      label.toUpperCase(),
+      style: TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 0.8,
+        color: AppColors.textGrey,
+      ),
     );
   }
 
   Widget _rangeChoiceChip(
-      String value, String label, IconData icon, SalesProvider prov) {
+      String value, String label, SalesProvider prov) {
     final selected = prov.filterType == value;
-    return ChoiceChip(
-      avatar: Icon(icon,
-          size: 16,
-          color: selected ? AppColors.white : AppColors.textGrey),
-      label: Text(label),
-      selected: selected,
-      labelStyle: TextStyle(
-        color: selected ? AppColors.white : AppColors.textPrimary,
-        fontWeight: FontWeight.w700,
-        fontSize: 12.5,
-      ),
-      selectedColor: AppColors.primary,
-      backgroundColor: AppColors.surfaceVariant,
-      side: BorderSide(
-        color: selected ? AppColors.primary : AppColors.borderLight,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(22),
-      ),
-      onSelected: (_) async {
+    return GestureDetector(
+      onTap: () async {
         if (value == 'custom') {
           await _pickCustomRange(prov);
         } else {
           prov.setFilter(value);
         }
       },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: selected
+                ? AppColors.primary
+                : AppColors.borderLight,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color:
+                selected ? AppColors.white : AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 13,
+          ),
+        ),
+      ),
     );
   }
 
