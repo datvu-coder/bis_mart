@@ -26,10 +26,20 @@ class _StoreListScreenState extends State<StoreListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canCrud = context.watch<PermissionProvider>().canCrud;
+    final permProv = context.watch<PermissionProvider>();
+    // Only true admins (system-level CRUD) can create brand-new stores.
+    final canCreate = permProv.canCrud;
+    // Users without system-wide canStoreList only see stores where they are a manager.
+    final restrictToManaged =
+        !(permProv.isAdmin || permProv.canStoreList);
+    final managedIds = permProv.managedStoreIds.toSet();
     return Consumer<StoreProvider>(
       builder: (context, provider, _) {
-        final stores = provider.filteredStores;
+        final stores = restrictToManaged
+            ? provider.filteredStores
+                .where((s) => managedIds.contains(s.id))
+                .toList()
+            : provider.filteredStores;
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -57,7 +67,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
               ),
             ],
           ),
-          floatingActionButton: canCrud
+          floatingActionButton: canCreate
               ? FloatingActionButton(
                   onPressed: () => _showStoreFormDialog(),
                   backgroundColor: AppColors.primary,
@@ -173,7 +183,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
                               onPressed: () => _openMap(store),
                               tooltip: 'Xem bản đồ',
                             ),
-                          if (canCrud)
+                          if (permProv.canEditStore(store.id))
                             IconButton(
                               icon: const Icon(Icons.edit_outlined, size: 20),
                               color: AppColors.primary,
@@ -258,7 +268,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
                           ],
                         ),
                       ),
-                      if (context.read<PermissionProvider>().canCrud) ...[
+                      if (context.read<PermissionProvider>().canEditStore(store.id)) ...[
                         IconButton(
                           icon: const Icon(Icons.edit_outlined, color: AppColors.primary),
                           onPressed: () {

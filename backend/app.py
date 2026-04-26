@@ -781,12 +781,32 @@ def api_me_permissions():
         for k in bool_keys:
             effective[k] = sys_perm.get(k, False) or store_perm.get(k, False)
 
+    # All stores where this employee appears as a manager (Tier-2 access).
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT sm.store_role, s.id, s.store_code, s.name "
+            "FROM store_managers sm JOIN stores s ON s.id = sm.store_id "
+            "WHERE sm.employee_id = %s ORDER BY s.id",
+            (employee_id,),
+        )
+        managed_rows = cur.fetchall()
+    managed_stores = [
+        {
+            "storeId": str(r["id"]),
+            "storeCode": r.get("store_code"),
+            "storeName": r.get("name"),
+            "storeRole": r.get("store_role") or "PG",
+        }
+        for r in managed_rows
+    ]
+
     return jsonify({
         "systemRole": system_role,
         "storeRole": store_role,
         "systemPerm": sys_perm,
         "storePerm": store_perm,
         "effective": effective,
+        "managedStores": managed_stores,
     })
 
 
