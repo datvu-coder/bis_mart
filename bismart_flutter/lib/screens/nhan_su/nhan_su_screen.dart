@@ -620,33 +620,23 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 ),
               if (hasCheckedOut)
                 Expanded(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 12, vertical: isMobile ? 10 : 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.white.withValues(alpha: 0.7),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: AppColors.success.withValues(alpha: 0.4)),
+                  child: ElevatedButton.icon(
+                    onPressed: null,
+                    icon: const Icon(Icons.check_circle_rounded, size: 20),
+                    label: Text(
+                      isMobile
+                          ? 'Đã hoàn thành'
+                          : 'Đã hoàn thành chấm công hôm nay',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.check_circle_rounded,
-                            color: AppColors.success, size: 18),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            isMobile ? 'Đã hoàn thành' : 'Đã hoàn thành chấm công hôm nay',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.bodyText.copyWith(
-                                color: AppColors.success,
-                                fontWeight: FontWeight.w700,
-                                fontSize: isMobile ? 13 : 14),
-                          ),
-                        ),
-                      ],
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(
+                          vertical: isMobile ? 12 : 14),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      disabledBackgroundColor: AppColors.success,
+                      disabledForegroundColor: AppColors.white,
                     ),
                   ),
                 ),
