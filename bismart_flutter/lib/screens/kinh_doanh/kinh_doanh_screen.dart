@@ -411,53 +411,217 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   }
 
   Widget _buildFilterPanel(SalesProvider provider) {
+    final isCustom = provider.filterType == 'custom';
     return DataPanel(
       title: AppStrings.boLoc,
+      trailing: PopupMenuButton<String>(
+        tooltip: 'Chức năng',
+        position: PopupMenuPosition.under,
+        icon: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.more_horiz_rounded, size: 18, color: AppColors.primary),
+              SizedBox(width: 4),
+              Text('Chức năng',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary)),
+            ],
+          ),
+        ),
+        onSelected: (value) async {
+          switch (value) {
+            case 'today':
+            case 'week':
+            case 'month':
+              provider.setFilter(value);
+              break;
+            case 'custom':
+              await _pickCustomRange(provider);
+              break;
+            case 'pdf':
+              ExportService.exportToHtmlTable(
+                provider.filteredReports,
+                filterType: provider.filterType,
+                from: provider.customStart,
+                to: provider.customEnd,
+              );
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: const Text('Đang xuất PDF...'),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ));
+              break;
+            case 'excel':
+              ExportService.exportToCsv(
+                provider.filteredReports,
+                filterType: provider.filterType,
+                from: provider.customStart,
+                to: provider.customEnd,
+              );
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: const Text('Đang xuất Excel...'),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ));
+              break;
+          }
+        },
+        itemBuilder: (ctx) => [
+          const PopupMenuItem(
+            enabled: false,
+            child: Text('Khoảng thời gian',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textGrey)),
+          ),
+          _filterMenuItem('today', AppStrings.homNay, Icons.today_rounded,
+              provider.filterType),
+          _filterMenuItem('week', AppStrings.tuanNay,
+              Icons.calendar_view_week_rounded, provider.filterType),
+          _filterMenuItem('month', AppStrings.thangNay,
+              Icons.calendar_month_rounded, provider.filterType),
+          _filterMenuItem('custom', 'Tuỳ chỉnh',
+              Icons.date_range_rounded, provider.filterType),
+          const PopupMenuDivider(),
+          const PopupMenuItem(
+            enabled: false,
+            child: Text('Xuất dữ liệu',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textGrey)),
+          ),
+          const PopupMenuItem(
+            value: 'pdf',
+            child: Row(children: [
+              Icon(Icons.picture_as_pdf_rounded,
+                  size: 18, color: AppColors.error),
+              SizedBox(width: 10),
+              Text('Xuất PDF / HTML'),
+            ]),
+          ),
+          const PopupMenuItem(
+            value: 'excel',
+            child: Row(children: [
+              Icon(Icons.table_chart_rounded, size: 18, color: AppColors.success),
+              SizedBox(width: 10),
+              Text('Xuất Excel (CSV)'),
+            ]),
+          ),
+        ],
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           FilterDropdown(
             value: provider.filterType,
-            onChanged: provider.setFilter,
+            onChanged: (v) async {
+              if (v == 'custom') {
+                await _pickCustomRange(provider);
+              } else {
+                provider.setFilter(v);
+              }
+            },
           ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    ExportService.exportToHtmlTable(provider.reports);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: const Text('Đang xuất PDF...'),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ));
-                  },
-                  icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
-                  label: const Text(AppStrings.exportPDF),
-                ),
+          if (isCustom) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.borderLight),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    ExportService.exportToCsv(provider.reports);
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: const Text('Đang xuất Excel...'),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ));
-                  },
-                  icon: const Icon(Icons.table_chart_rounded, size: 18),
-                  label: const Text(AppStrings.exportExcel),
-                ),
+              child: Row(
+                children: [
+                  const Icon(Icons.date_range_rounded,
+                      size: 18, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      provider.customStart != null && provider.customEnd != null
+                          ? 'Từ ${DateFormatter.formatDate(provider.customStart!)} đến ${DateFormatter.formatDate(provider.customEnd!)}'
+                          : 'Chưa chọn khoảng ngày',
+                      style: AppTextStyles.bodyText
+                          .copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _pickCustomRange(provider),
+                    icon: const Icon(Icons.edit_calendar_rounded, size: 16),
+                    label: const Text('Đổi'),
+                  ),
+                ],
               ),
-            ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            'Đang lọc · ${provider.filteredReports.length} báo cáo',
+            style: AppTextStyles.caption,
           ),
         ],
       ),
     );
+  }
+
+  PopupMenuItem<String> _filterMenuItem(
+      String value, String label, IconData icon, String current) {
+    final selected = current == value;
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon,
+              size: 18,
+              color: selected ? AppColors.primary : AppColors.textGrey),
+          const SizedBox(width: 10),
+          Text(label,
+              style: TextStyle(
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  color:
+                      selected ? AppColors.primary : AppColors.textPrimary)),
+          if (selected) ...[
+            const Spacer(),
+            const Icon(Icons.check_rounded, size: 16, color: AppColors.primary),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickCustomRange(SalesProvider provider) async {
+    final now = DateTime.now();
+    final initial = DateTimeRange(
+      start: provider.customStart ?? now.subtract(const Duration(days: 7)),
+      end: provider.customEnd ?? now,
+    );
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 2),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      initialDateRange: initial,
+      helpText: 'Chọn khoảng thời gian',
+      cancelText: 'Huỷ',
+      confirmText: 'Áp dụng',
+      saveText: 'Lưu',
+    );
+    if (picked != null) {
+      provider.setCustomRange(picked.start, picked.end);
+    }
   }
 
   Widget _buildTopPgPanel(SalesProvider provider) {

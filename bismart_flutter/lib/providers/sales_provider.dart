@@ -8,11 +8,15 @@ class SalesProvider extends ChangeNotifier {
   List<SalesReport> _reports = [];
   bool _isLoading = false;
   String _filterType = 'today';
+  DateTime? _customStart;
+  DateTime? _customEnd;
   String? _error;
 
   List<SalesReport> get reports => _reports;
   bool get isLoading => _isLoading;
   String get filterType => _filterType;
+  DateTime? get customStart => _customStart;
+  DateTime? get customEnd => _customEnd;
   String? get error => _error;
   void clearError() { _error = null; notifyListeners(); }
 
@@ -27,6 +31,11 @@ class SalesProvider extends ChangeNotifier {
           return r.date.isAfter(weekAgo);
         case 'month':
           return r.date.year == now.year && r.date.month == now.month;
+        case 'custom':
+          if (_customStart == null || _customEnd == null) return true;
+          final s = DateTime(_customStart!.year, _customStart!.month, _customStart!.day);
+          final e = DateTime(_customEnd!.year, _customEnd!.month, _customEnd!.day, 23, 59, 59);
+          return !r.date.isBefore(s) && !r.date.isAfter(e);
         default:
           return true;
       }
@@ -44,12 +53,22 @@ class SalesProvider extends ChangeNotifier {
     loadReports();
   }
 
+  void setCustomRange(DateTime start, DateTime end) {
+    _filterType = 'custom';
+    _customStart = start;
+    _customEnd = end;
+    notifyListeners();
+    loadReports();
+  }
+
   Future<void> loadReports() async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final data = await _api.getReports(filter: _filterType);
+      // For custom range, fetch the full dataset and filter on the client.
+      final apiFilter = _filterType == 'custom' ? 'all' : _filterType;
+      final data = await _api.getReports(filter: apiFilter);
       _reports = data.map((r) => SalesReport.fromJson(r as Map<String, dynamic>)).toList();
     } catch (e) {
       _error = 'Không thể tải báo cáo';
