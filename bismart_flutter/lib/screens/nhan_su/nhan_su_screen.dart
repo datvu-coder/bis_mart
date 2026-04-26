@@ -359,8 +359,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   }
 
   Widget _buildAttendancePanel(EmployeeProvider provider, bool canManage) {
+    final isMobile = MediaQuery.of(context).size.width < 900;
     return DataPanel(
       title: AppStrings.chamCong,
+      padding: isMobile ? const EdgeInsets.all(10) : const EdgeInsets.all(22),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -375,10 +377,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         children: [
           // --- GPS Check-in/out Section ---
           _buildGpsCheckInSection(provider, canManage),
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 10 : 16),
           // --- Monthly Summary ---
           _buildMonthlySummary(provider),
-          const SizedBox(height: 16),
+          SizedBox(height: isMobile ? 10 : 16),
           // --- Today's Attendance List (managers only) ---
           if (canManage) _buildTodayAttendanceList(provider),
         ],
@@ -404,9 +406,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         a.date.day == DateTime.now().day).toList();
     final hasCheckedIn = todayAtt.isNotEmpty && todayAtt.first.isCheckedIn;
     final hasCheckedOut = todayAtt.isNotEmpty && todayAtt.first.checkOutTime != null;
+    final isMobile = MediaQuery.of(context).size.width < 900;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isMobile ? 10 : 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: hasCheckedOut
@@ -683,9 +686,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     final summary = provider.monthlySummary;
     final now = DateTime.now();
     final monthLabel = 'Tháng ${now.month}/${now.year}';
+    final isMobile = MediaQuery.of(context).size.width < 900;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(isMobile ? 10 : 14),
       decoration: BoxDecoration(
         color: AppColors.surfaceVariant,
         borderRadius: BorderRadius.circular(14),
@@ -1153,52 +1157,65 @@ class _NhanSuScreenState extends State<NhanSuScreen>
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Chấm công nhân viên'),
-        content: SizedBox(
-          width: 400,
-          height: 300,
-          child: ListView.builder(
-            itemCount: unchecked.length,
-            itemBuilder: (context, index) {
-              final emp = unchecked[index];
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.primaryLight,
-                  child: Text(
-                    emp.fullName[0].toUpperCase(),
-                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+      builder: (ctx) {
+        final mq = MediaQuery.of(ctx);
+        final isMobile = mq.size.width < 600;
+        final dialogWidth = isMobile ? mq.size.width - 4 : 400.0;
+        final dialogHeight = isMobile ? mq.size.height * 0.7 : 300.0;
+        return AlertDialog(
+          insetPadding: const EdgeInsets.all(2),
+          contentPadding: EdgeInsets.fromLTRB(
+              isMobile ? 8 : 24, 16, isMobile ? 8 : 24, 12),
+          titlePadding: EdgeInsets.fromLTRB(
+              isMobile ? 12 : 24, 16, isMobile ? 12 : 24, 0),
+          title: const Text('Chấm công nhân viên'),
+          content: SizedBox(
+            width: dialogWidth,
+            height: dialogHeight,
+            child: ListView.builder(
+              itemCount: unchecked.length,
+              itemBuilder: (context, index) {
+                final emp = unchecked[index];
+                return ListTile(
+                  contentPadding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 4 : 16),
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.primaryLight,
+                    child: Text(
+                      emp.fullName[0].toUpperCase(),
+                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700),
+                    ),
                   ),
-                ),
-                title: Text(emp.fullName),
-                subtitle: Text('${emp.employeeCode} · ${emp.positionLabel}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.check_circle_rounded, color: AppColors.success),
-                  onPressed: () async {
-                    await provider.checkIn(emp.id);
-                    if (!ctx.mounted) return;
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Đã chấm công cho ${emp.fullName}!'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: AppColors.success,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    );
-                  },
-                ),
-              );
-            },
+                  title: Text(emp.fullName),
+                  subtitle: Text('${emp.employeeCode} · ${emp.positionLabel}'),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.check_circle_rounded, color: AppColors.success),
+                    onPressed: () async {
+                      await provider.checkIn(emp.id);
+                      if (!ctx.mounted) return;
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Đã chấm công cho ${emp.fullName}!'),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: AppColors.success,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Đóng'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đóng'),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -1224,57 +1241,70 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Check-out nhân viên'),
-          content: SizedBox(
-            width: 400,
-            height: 300,
-            child: ListView.builder(
-              itemCount: checkedIn.length,
-              itemBuilder: (context, index) {
-                final att = checkedIn[index];
-                Employee? emp;
-                try {
-                  emp = provider.employees.firstWhere((e) => e.id == att.employeeId);
-                } catch (_) {}
-                if (emp == null) return const SizedBox.shrink();
-                return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: AppColors.successLight,
-                  child: Text(
-                    emp.fullName[0].toUpperCase(),
-                    style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w700),
-                  ),
-                ),
-                title: Text(emp.fullName),
-                subtitle: Text('Vào lúc ${att.checkInTime!.hour.toString().padLeft(2, '0')}:${att.checkInTime!.minute.toString().padLeft(2, '0')}'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.logout_rounded, color: AppColors.warning),
-                  onPressed: () async {
-                    await provider.checkOut(att.employeeId);
-                    if (!ctx.mounted) return;
-                    setDialogState(() => checkedIn.removeAt(index));
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(
-                        content: Text('Đã check-out cho ${emp!.fullName}!'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: AppColors.success,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        builder: (ctx, setDialogState) {
+          final mq = MediaQuery.of(ctx);
+          final isMobile = mq.size.width < 600;
+          final dialogWidth = isMobile ? mq.size.width - 4 : 400.0;
+          final dialogHeight = isMobile ? mq.size.height * 0.7 : 300.0;
+          return AlertDialog(
+            insetPadding: const EdgeInsets.all(2),
+            contentPadding: EdgeInsets.fromLTRB(
+                isMobile ? 8 : 24, 16, isMobile ? 8 : 24, 12),
+            titlePadding: EdgeInsets.fromLTRB(
+                isMobile ? 12 : 24, 16, isMobile ? 12 : 24, 0),
+            title: const Text('Check-out nhân viên'),
+            content: SizedBox(
+              width: dialogWidth,
+              height: dialogHeight,
+              child: ListView.builder(
+                itemCount: checkedIn.length,
+                itemBuilder: (context, index) {
+                  final att = checkedIn[index];
+                  Employee? emp;
+                  try {
+                    emp = provider.employees.firstWhere((e) => e.id == att.employeeId);
+                  } catch (_) {}
+                  if (emp == null) return const SizedBox.shrink();
+                  return ListTile(
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal: isMobile ? 4 : 16),
+                    leading: CircleAvatar(
+                      backgroundColor: AppColors.successLight,
+                      child: Text(
+                        emp.fullName[0].toUpperCase(),
+                        style: const TextStyle(color: AppColors.success, fontWeight: FontWeight.w700),
                       ),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Đóng'),
-          ),
-        ],
-      ),
+                    ),
+                    title: Text(emp.fullName),
+                    subtitle: Text('Vào lúc ${att.checkInTime!.hour.toString().padLeft(2, '0')}:${att.checkInTime!.minute.toString().padLeft(2, '0')}'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.logout_rounded, color: AppColors.warning),
+                      onPressed: () async {
+                        await provider.checkOut(att.employeeId);
+                        if (!ctx.mounted) return;
+                        setDialogState(() => checkedIn.removeAt(index));
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(
+                            content: Text('Đã check-out cho ${emp!.fullName}!'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppColors.success,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Đóng'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1288,12 +1318,22 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Lịch sử chấm công'),
-          content: SizedBox(
-            width: 500,
-            height: 400,
-            child: Column(
+        builder: (context, setDialogState) {
+          final mq = MediaQuery.of(context);
+          final isMobile = mq.size.width < 600;
+          final dialogWidth = isMobile ? mq.size.width - 4 : 500.0;
+          final dialogHeight = isMobile ? mq.size.height * 0.75 : 400.0;
+          return AlertDialog(
+            insetPadding: const EdgeInsets.all(2),
+            contentPadding: EdgeInsets.fromLTRB(
+                isMobile ? 8 : 24, 12, isMobile ? 8 : 24, 8),
+            titlePadding: EdgeInsets.fromLTRB(
+                isMobile ? 12 : 24, 14, isMobile ? 12 : 24, 0),
+            title: const Text('Lịch sử chấm công'),
+            content: SizedBox(
+              width: dialogWidth,
+              height: dialogHeight,
+              child: Column(
               children: [
                 Row(
                   children: [
@@ -1361,6 +1401,8 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                           );
                           return ListTile(
                             dense: true,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 4 : 16),
                             leading: Icon(
                               att.checkOutTime != null
                                   ? Icons.check_circle_outline_rounded
@@ -1398,7 +1440,8 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               child: const Text('Đóng'),
             ),
           ],
-        ),
+        );
+        },
       ),
     );
   }
