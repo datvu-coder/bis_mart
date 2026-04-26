@@ -420,14 +420,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: hasCheckedOut
-              ? AppColors.border
-              : hasCheckedIn
-                  ? AppColors.success.withValues(alpha: 0.3)
-                  : AppColors.primary.withValues(alpha: 0.3),
-        ),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
