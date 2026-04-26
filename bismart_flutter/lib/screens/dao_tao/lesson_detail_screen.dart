@@ -148,7 +148,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 900),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+                padding: EdgeInsets.fromLTRB(MediaQuery.of(context).size.width > 800 ? 12 : 2, 12, MediaQuery.of(context).size.width > 800 ? 12 : 2, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [

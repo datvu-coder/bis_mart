@@ -89,7 +89,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     final width = MediaQuery.of(context).size.width;
     final isDesktop = width >= 1100;
     final isTablet = width >= 700 && width < 1100;
-    final outerPad = isDesktop ? 32.0 : (isTablet ? 24.0 : 12.0);
+    final outerPad = isDesktop ? 32.0 : (isTablet ? 24.0 : 2.0);
     final innerPad = isDesktop ? 28.0 : (isTablet ? 22.0 : 16.0);
 
     return Scaffold(

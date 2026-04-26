@@ -457,14 +457,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   Widget _buildFilterPanel(SalesProvider provider) {
     final stores = provider.availableStores;
     final activeStoreCode = provider.storeFilter;
-    final activeStoreName = activeStoreCode == null
-        ? null
-        : stores
-            .firstWhere(
-              (e) => e.key == activeStoreCode,
-              orElse: () => MapEntry(activeStoreCode, activeStoreCode),
-            )
-            .value;
 
     String rangeLabel;
     switch (provider.filterType) {
@@ -496,45 +488,41 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     return DataPanel(
       title: AppStrings.boLoc,
       trailing: PopupMenuButton<String>(
-        tooltip: 'Bộ lọc',
+        tooltip: 'Tuỳ chọn lọc',
         position: PopupMenuPosition.under,
         offset: const Offset(0, 8),
         elevation: 14,
         color: AppColors.white,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           side: const BorderSide(color: AppColors.borderLight),
         ),
         icon: Container(
-          width: 40,
-          height: 40,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [AppColors.primary, AppColors.primaryDark],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.32),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: AppColors.primary.withValues(alpha: 0.28),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
             ],
           ),
           child: const Icon(Icons.tune_rounded,
-              size: 20, color: AppColors.white),
+              size: 18, color: AppColors.white),
         ),
         onSelected: (value) async {
           if (value == 'today' || value == 'week' || value == 'month') {
             provider.setFilter(value);
           } else if (value == 'custom') {
             await _pickCustomRange(provider);
-          } else if (value == 'store_all') {
-            provider.setStoreFilter(null);
-          } else if (value.startsWith('store:')) {
-            provider.setStoreFilter(value.substring('store:'.length));
           } else if (value == 'pdf') {
             ExportService.exportToHtmlTable(
               provider.filteredReports,
@@ -577,29 +565,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           _filterMenuItem('custom', 'Tuỳ chỉnh',
               Icons.date_range_rounded, provider.filterType),
           const PopupMenuDivider(),
-          _menuSectionHeader('Cửa hàng', Icons.storefront_rounded),
-          _storeMenuItem('store_all', 'Tất cả cửa hàng',
-              Icons.store_mall_directory_rounded, activeStoreCode == null),
-          if (stores.isEmpty)
-            PopupMenuItem<String>(
-              enabled: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  'Không có cửa hàng được phân quyền',
-                  style: AppTextStyles.caption
-                      .copyWith(color: AppColors.textHint),
-                ),
-              ),
-            )
-          else
-            ...stores.map((s) => _storeMenuItem(
-                  'store:${s.key}',
-                  '${s.key} · ${s.value}',
-                  Icons.storefront_rounded,
-                  activeStoreCode == s.key,
-                )),
-          const PopupMenuDivider(),
           _menuSectionHeader('Xuất dữ liệu', Icons.ios_share_rounded),
           PopupMenuItem<String>(
             value: 'pdf',
@@ -626,7 +591,10 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Active filter chips
+          // Dedicated managed-store dropdown (visible select field).
+          _buildStoreDropdownField(provider, stores, activeStoreCode),
+          const SizedBox(height: 12),
+          // Active filter chip (time range only — store is shown in dropdown).
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -639,19 +607,9 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     ? null
                     : () => provider.setFilter('today'),
               ),
-              _activeFilterChip(
-                icon: Icons.store_rounded,
-                label: activeStoreCode == null
-                    ? 'Cửa hàng: Tất cả'
-                    : 'Cửa hàng: $activeStoreCode · $activeStoreName',
-                color: AppColors.info,
-                onClear: activeStoreCode == null
-                    ? null
-                    : () => provider.setStoreFilter(null),
-              ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           // Summary of filtered content
           Container(
             decoration: BoxDecoration(
@@ -991,6 +949,8 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
 
   PopupMenuItem<String> _storeMenuItem(
       String value, String label, IconData icon, bool selected) {
+    // Kept for potential future reuse; not used by current panel which
+    // exposes a dedicated dropdown for stores.
     return PopupMenuItem<String>(
       value: value,
       child: Row(
@@ -1011,6 +971,148 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           ),
           if (selected)
             const Icon(Icons.check_rounded, size: 16, color: AppColors.info),
+        ],
+      ),
+    );
+  }
+
+  /// Trường chọn cửa hàng hiển thị thường trực (dropdown thật) — chỉ liệt
+  /// kê những cửa hàng tài khoản hiện tại được phân quyền quản lý
+  /// (đã lọc qua [SalesProvider.availableStores] dựa trên
+  /// `_allowedStoreCodes`).
+  Widget _buildStoreDropdownField(
+    SalesProvider provider,
+    List<MapEntry<String, String>> stores,
+    String? activeStoreCode,
+  ) {
+    final isEmpty = stores.isEmpty;
+    final perm = context.watch<PermissionProvider>();
+    final scopeLabel = perm.isAdmin
+        ? 'Tất cả cửa hàng (Admin)'
+        : 'Cửa hàng được phân quyền quản lý';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderLight),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.textPrimary.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.primaryLight,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.storefront_rounded,
+                size: 18, color: AppColors.primary),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  scopeLabel,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.4,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                if (isEmpty)
+                  Text(
+                    'Không có cửa hàng được phân quyền',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.textHint,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  )
+                else
+                  DropdownButtonHideUnderline(
+                    child: DropdownButton<String?>(
+                      value: activeStoreCode,
+                      isExpanded: true,
+                      isDense: true,
+                      icon: const Icon(Icons.expand_more_rounded,
+                          color: AppColors.textGrey),
+                      borderRadius: BorderRadius.circular(12),
+                      style: AppTextStyles.bodyText.copyWith(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      hint: Text(
+                        'Tất cả cửa hàng (${stores.length})',
+                        style: AppTextStyles.bodyText.copyWith(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      items: [
+                        DropdownMenuItem<String?>(
+                          value: null,
+                          child: Row(
+                            children: [
+                              const Icon(Icons.store_mall_directory_rounded,
+                                  size: 16, color: AppColors.info),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  'Tất cả cửa hàng (${stores.length})',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ...stores.map(
+                          (s) => DropdownMenuItem<String?>(
+                            value: s.key,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.storefront_rounded,
+                                    size: 16, color: AppColors.primary),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    '${s.key} · ${s.value}',
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) => provider.setStoreFilter(val),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (activeStoreCode != null)
+            IconButton(
+              tooltip: 'Bỏ lọc cửa hàng',
+              icon: const Icon(Icons.close_rounded,
+                  size: 18, color: AppColors.textGrey),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(
+                  minWidth: 32, minHeight: 32),
+              onPressed: () => provider.setStoreFilter(null),
+            ),
         ],
       ),
     );

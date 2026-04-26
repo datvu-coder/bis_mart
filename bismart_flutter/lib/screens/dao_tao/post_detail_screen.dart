@@ -105,7 +105,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   Widget _buildBody(CommunityPost post, TrainingProvider provider) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      padding: EdgeInsets.fromLTRB(MediaQuery.of(context).size.width > 800 ? 12 : 2, 12, MediaQuery.of(context).size.width > 800 ? 12 : 2, 8),
       children: [
         _postCard(post, provider),
         const SizedBox(height: 14),

@@ -79,7 +79,7 @@ class _LessonQuizScreenState extends State<LessonQuizScreen> {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 800),
         child: ListView.separated(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(MediaQuery.of(context).size.width > 800 ? 16 : 2, 16, MediaQuery.of(context).size.width > 800 ? 16 : 2, 16),
           itemCount: widget.questions.length + 1,
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (ctx, i) {

@@ -86,7 +86,7 @@ class _LessonHistoryScreenState extends State<LessonHistoryScreen> {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      padding: EdgeInsets.fromLTRB(MediaQuery.of(context).size.width > 800 ? 12 : 2, 12, MediaQuery.of(context).size.width > 800 ? 12 : 2, 24),
       itemCount: _users.length + 1,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (_, i) {

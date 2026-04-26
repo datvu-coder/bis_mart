@@ -62,7 +62,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
           body: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                padding: EdgeInsets.fromLTRB(MediaQuery.of(context).size.width > 800 ? 16 : 2, 12, MediaQuery.of(context).size.width > 800 ? 16 : 2, 0),
                 child: TextField(
                   decoration: const InputDecoration(
                     hintText: 'Tìm sản phẩm...',
@@ -73,7 +73,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
               ),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.all(12),
+                padding: EdgeInsets.fromLTRB(MediaQuery.of(context).size.width > 800 ? 12 : 2, 12, MediaQuery.of(context).size.width > 800 ? 12 : 2, 12),
                 child: Row(
                   children: ['Tất cả', 'DELI', 'DELIMIL', 'AUMIL', 'GOODLIFE', 'TP']
                       .map((group) {
@@ -96,7 +96,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                     : ListView.builder(
                         itemCount: products.length,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width > 800 ? 10 : 2),
                         itemBuilder: (context, index) {
                           final product = products[index];
                           return Container(
