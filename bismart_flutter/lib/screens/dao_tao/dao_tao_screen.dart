@@ -83,7 +83,8 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         }
 
         final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 2.0;
-        final contentPad = isWide ? hPad : 10.0;
+        // Trên mobile: nội dung sát viền 2 px để tận dụng tối đa diện tích.
+        final contentPad = isWide ? hPad : 2.0;
 
         // Tab layout for all screen sizes
         final body = Column(
@@ -552,8 +553,15 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
 
   Widget _buildLessonPanel(TrainingProvider provider) {
     final isAdmin = _isAdmin();
+    final isMobile = MediaQuery.of(context).size.width < 900;
+    // Trên mobile: bỏ padding ngang của DataPanel để LessonCard cách viền
+    // khung lớn đúng 2 px (chỉ còn padding của SingleChildScrollView = 2 px).
+    final panelPadding = isMobile
+        ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
+        : null;
     return DataPanel(
       title: 'Bài giảng',
+      padding: panelPadding,
       trailing: isAdmin
           ? TextButton.icon(
               onPressed: () => _showCreateLessonDialog(provider),
