@@ -53,27 +53,28 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     super.dispose();
   }
 
-  /// Tập mã cửa hàng người dùng được quản lý theo phân quyền.
+  /// Tập mã cửa hàng người dùng được phân quyền truy cập — đồng bộ với
+  /// logic ở tab Cá nhân (`store_list_screen.dart`):
   /// - Admin: trả về set rỗng (= không giới hạn).
-  /// - Người dùng khác: chỉ những cửa hàng được phân làm quản lý (managedStoreIds).
+  /// - Người dùng khác: hợp của
+  ///     • những cửa hàng được phân làm quản lý (managedStoreIds), VÀ
+  ///     • cửa hàng được gán trực tiếp qua `employee.storeCode`
+  ///       (`PermissionProvider.ownStoreCode`).
   Set<String> _resolveAllowedStoreCodes(BuildContext context) {
     final perm = context.watch<PermissionProvider>();
     final storeProv = context.watch<StoreProvider>();
     if (perm.isAdmin) return const <String>{};
     final codes = <String>{};
+    // (1) Cửa hàng được phân làm quản lý (Tier-2).
     for (final id in perm.managedStoreIds) {
       final s = storeProv.getStoreById(id);
       if (s != null && s.storeCode.trim().isNotEmpty) {
         codes.add(s.storeCode.trim().toUpperCase());
       }
     }
-    // Fallback: nếu danh sách trống (vd. chưa tải xong stores) và
-    // người dùng có ownStoreCode thì tạm thời cho xem cửa hàng đó để
-    // tránh đứng hình trước khi load xong.
-    if (codes.isEmpty && storeProv.stores.isEmpty) {
-      final own = (perm.ownStoreCode ?? '').trim();
-      if (own.isNotEmpty) codes.add(own.toUpperCase());
-    }
+    // (2) Cửa hàng được gán trực tiếp cho tài khoản (employee.storeCode).
+    final own = (perm.ownStoreCode ?? '').trim();
+    if (own.isNotEmpty) codes.add(own.toUpperCase());
     return codes;
   }
 
@@ -457,6 +458,14 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   Widget _buildFilterPanel(SalesProvider provider) {
     final stores = provider.availableStores;
     final activeStoreCode = provider.storeFilter;
+    final activeStoreName = activeStoreCode == null
+        ? null
+        : stores
+            .firstWhere(
+              (e) => e.key == activeStoreCode,
+              orElse: () => MapEntry(activeStoreCode, activeStoreCode),
+            )
+            .value;
 
     String rangeLabel;
     switch (provider.filterType) {
@@ -487,16 +496,11 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
 
     return DataPanel(
       title: AppStrings.boLoc,
-      trailing: PopupMenuButton<String>(
-        tooltip: 'Tuỳ chọn lọc',
-        position: PopupMenuPosition.under,
-        offset: const Offset(0, 8),
-        elevation: 14,
-        color: AppColors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: AppColors.borderLight),
-        ),
+      trailing: IconButton(
+        tooltip: 'Mở bộ lọc',
+        onPressed: () => _openFilterSheet(provider),
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
         icon: Container(
           width: 36,
           height: 36,
@@ -518,83 +522,11 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           child: const Icon(Icons.tune_rounded,
               size: 18, color: AppColors.white),
         ),
-        onSelected: (value) async {
-          if (value == 'today' || value == 'week' || value == 'month') {
-            provider.setFilter(value);
-          } else if (value == 'custom') {
-            await _pickCustomRange(provider);
-          } else if (value == 'pdf') {
-            ExportService.exportToHtmlTable(
-              provider.filteredReports,
-              filterType: provider.filterType,
-              from: provider.customStart,
-              to: provider.customEnd,
-            );
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: const Text('Đang xuất PDF...'),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ));
-          } else if (value == 'excel') {
-            ExportService.exportToCsv(
-              provider.filteredReports,
-              filterType: provider.filterType,
-              from: provider.customStart,
-              to: provider.customEnd,
-            );
-            if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: const Text('Đang xuất Excel...'),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ));
-          }
-        },
-        itemBuilder: (ctx) => [
-          _menuSectionHeader(
-              'Khoảng thời gian', Icons.event_available_rounded),
-          _filterMenuItem('today', AppStrings.homNay, Icons.today_rounded,
-              provider.filterType),
-          _filterMenuItem('week', AppStrings.tuanNay,
-              Icons.calendar_view_week_rounded, provider.filterType),
-          _filterMenuItem('month', AppStrings.thangNay,
-              Icons.calendar_month_rounded, provider.filterType),
-          _filterMenuItem('custom', 'Tuỳ chỉnh',
-              Icons.date_range_rounded, provider.filterType),
-          const PopupMenuDivider(),
-          _menuSectionHeader('Xuất dữ liệu', Icons.ios_share_rounded),
-          PopupMenuItem<String>(
-            value: 'pdf',
-            child: Row(children: const [
-              Icon(Icons.picture_as_pdf_rounded,
-                  size: 18, color: AppColors.error),
-              SizedBox(width: 10),
-              Text('Xuất PDF / HTML',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-            ]),
-          ),
-          PopupMenuItem<String>(
-            value: 'excel',
-            child: Row(children: const [
-              Icon(Icons.table_chart_rounded,
-                  size: 18, color: AppColors.success),
-              SizedBox(width: 10),
-              Text('Xuất Excel (CSV)',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
-            ]),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Dedicated managed-store dropdown (visible select field).
-          _buildStoreDropdownField(provider, stores, activeStoreCode),
-          const SizedBox(height: 12),
-          // Active filter chip (time range only — store is shown in dropdown).
+          // Active filter chips — bấm để mở bộ lọc.
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -606,6 +538,16 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 onClear: provider.filterType == 'today'
                     ? null
                     : () => provider.setFilter('today'),
+              ),
+              _activeFilterChip(
+                icon: Icons.store_rounded,
+                label: activeStoreCode == null
+                    ? 'Cửa hàng: Tất cả'
+                    : 'Cửa hàng: $activeStoreCode · $activeStoreName',
+                color: AppColors.info,
+                onClear: activeStoreCode == null
+                    ? null
+                    : () => provider.setStoreFilter(null),
               ),
             ],
           ),
@@ -798,29 +740,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     );
   }
 
-  PopupMenuItem<String> _menuSectionHeader(String label, IconData icon) {
-    return PopupMenuItem<String>(
-      enabled: false,
-      height: 32,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          Icon(icon, size: 13, color: AppColors.primary),
-          const SizedBox(width: 6),
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-              color: AppColors.primary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _activeFilterChip({
     required IconData icon,
     required String label,
@@ -918,60 +837,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     fontSize: 15)),
           ],
         ),
-      ),
-    );
-  }
-
-  PopupMenuItem<String> _filterMenuItem(
-      String value, String label, IconData icon, String current) {
-    final selected = current == value;
-    return PopupMenuItem<String>(
-      value: value,
-      child: Row(
-        children: [
-          Icon(icon,
-              size: 18,
-              color: selected ? AppColors.primary : AppColors.textGrey),
-          const SizedBox(width: 10),
-          Text(label,
-              style: TextStyle(
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color:
-                      selected ? AppColors.primary : AppColors.textPrimary)),
-          if (selected) ...[
-            const Spacer(),
-            const Icon(Icons.check_rounded, size: 16, color: AppColors.primary),
-          ],
-        ],
-      ),
-    );
-  }
-
-  PopupMenuItem<String> _storeMenuItem(
-      String value, String label, IconData icon, bool selected) {
-    // Kept for potential future reuse; not used by current panel which
-    // exposes a dedicated dropdown for stores.
-    return PopupMenuItem<String>(
-      value: value,
-      child: Row(
-        children: [
-          Icon(icon,
-              size: 18,
-              color: selected ? AppColors.info : AppColors.textGrey),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                    fontWeight:
-                        selected ? FontWeight.w700 : FontWeight.w500,
-                    color:
-                        selected ? AppColors.info : AppColors.textPrimary)),
-          ),
-          if (selected)
-            const Icon(Icons.check_rounded, size: 16, color: AppColors.info),
-        ],
       ),
     );
   }
@@ -1137,6 +1002,275 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     if (picked != null) {
       provider.setCustomRange(picked.start, picked.end);
     }
+  }
+
+  /// Mở bộ lọc dạng bottom-sheet — gom toàn bộ tuỳ chọn (Khoảng thời gian,
+  /// Cửa hàng, Xuất dữ liệu) vào trong một khung lọc duy nhất.
+  Future<void> _openFilterSheet(SalesProvider provider) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetCtx) {
+        // Lắng nghe SalesProvider để dropdown / chip cập nhật theo thời gian thực.
+        return Consumer<SalesProvider>(
+          builder: (ctx, prov, _) {
+            final stores = prov.availableStores;
+            final activeStore = prov.storeFilter;
+            return SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  bottom:
+                      MediaQuery.of(ctx).viewInsets.bottom + 12,
+                  left: 16,
+                  right: 16,
+                  top: 8,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Drag handle
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: AppColors.border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryLight,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.tune_rounded,
+                              size: 18, color: AppColors.primary),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text('Bộ lọc',
+                              style: AppTextStyles.sectionHeader),
+                        ),
+                        IconButton(
+                          tooltip: 'Đóng',
+                          onPressed: () => Navigator.pop(sheetCtx),
+                          icon: const Icon(Icons.close_rounded,
+                              color: AppColors.textGrey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // ── Khoảng thời gian ─────────────────────────
+                    _sheetSectionTitle(
+                        'Khoảng thời gian', Icons.event_available_rounded),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _rangeChoiceChip('today', AppStrings.homNay,
+                            Icons.today_rounded, prov),
+                        _rangeChoiceChip('week', AppStrings.tuanNay,
+                            Icons.calendar_view_week_rounded, prov),
+                        _rangeChoiceChip('month', AppStrings.thangNay,
+                            Icons.calendar_month_rounded, prov),
+                        _rangeChoiceChip('custom', 'Tuỳ chỉnh',
+                            Icons.date_range_rounded, prov),
+                      ],
+                    ),
+                    if (prov.filterType == 'custom' &&
+                        prov.customStart != null &&
+                        prov.customEnd != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        '${DateFormatter.formatDate(prov.customStart!)} → ${DateFormatter.formatDate(prov.customEnd!)}',
+                        style: AppTextStyles.caption.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    // ── Cửa hàng (dropdown) ──────────────────────
+                    _sheetSectionTitle(
+                        'Cửa hàng', Icons.storefront_rounded),
+                    const SizedBox(height: 8),
+                    _buildStoreDropdownField(prov, stores, activeStore),
+                    const SizedBox(height: 18),
+                    // ── Xuất dữ liệu ─────────────────────────────
+                    _sheetSectionTitle(
+                        'Xuất dữ liệu', Icons.ios_share_rounded),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              ExportService.exportToHtmlTable(
+                                prov.filteredReports,
+                                filterType: prov.filterType,
+                                from: prov.customStart,
+                                to: prov.customEnd,
+                              );
+                              Navigator.pop(sheetCtx);
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                content:
+                                    const Text('Đang xuất PDF...'),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(10)),
+                              ));
+                            },
+                            icon: const Icon(
+                                Icons.picture_as_pdf_rounded,
+                                size: 18,
+                                color: AppColors.error),
+                            label: const Text('PDF / HTML'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.textPrimary,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 12),
+                              side: const BorderSide(
+                                  color: AppColors.borderLight),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              ExportService.exportToCsv(
+                                prov.filteredReports,
+                                filterType: prov.filterType,
+                                from: prov.customStart,
+                                to: prov.customEnd,
+                              );
+                              Navigator.pop(sheetCtx);
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context)
+                                  .showSnackBar(SnackBar(
+                                content: const Text(
+                                    'Đang xuất Excel...'),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.circular(10)),
+                              ));
+                            },
+                            icon: const Icon(
+                                Icons.table_chart_rounded,
+                                size: 18,
+                                color: AppColors.success),
+                            label: const Text('Excel (CSV)'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.textPrimary,
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 12),
+                              side: const BorderSide(
+                                  color: AppColors.borderLight),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius:
+                                      BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(sheetCtx),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.white,
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(12)),
+                          textStyle: const TextStyle(
+                              fontWeight: FontWeight.w800),
+                        ),
+                        child: const Text('Xong'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _sheetSectionTitle(String label, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: AppColors.primary),
+        const SizedBox(width: 6),
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+            color: AppColors.primary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _rangeChoiceChip(
+      String value, String label, IconData icon, SalesProvider prov) {
+    final selected = prov.filterType == value;
+    return ChoiceChip(
+      avatar: Icon(icon,
+          size: 16,
+          color: selected ? AppColors.white : AppColors.textGrey),
+      label: Text(label),
+      selected: selected,
+      labelStyle: TextStyle(
+        color: selected ? AppColors.white : AppColors.textPrimary,
+        fontWeight: FontWeight.w700,
+        fontSize: 12.5,
+      ),
+      selectedColor: AppColors.primary,
+      backgroundColor: AppColors.surfaceVariant,
+      side: BorderSide(
+        color: selected ? AppColors.primary : AppColors.borderLight,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+      ),
+      onSelected: (_) async {
+        if (value == 'custom') {
+          await _pickCustomRange(prov);
+        } else {
+          prov.setFilter(value);
+        }
+      },
+    );
   }
 
   Widget _buildTopPgPanel(SalesProvider provider) {
