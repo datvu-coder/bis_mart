@@ -38,7 +38,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<EmployeeProvider>();
       final currentUser = context.read<AuthProvider>().currentUser;
@@ -115,7 +115,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               child: isDesktop
                   ? WeightedTabSelector(
                       controller: _tabController,
-                      labels: const ['Chấm công', 'Ca làm', 'Xếp hạng', 'Lịch'],
+                      labels: const ['Chấm công', 'Ca làm', 'Xếp hạng', 'Lịch', 'Giờ công'],
                     )
                   : TabBar(
                       controller: _tabController,
@@ -137,6 +137,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                         Tab(text: 'Ca làm'),
                         Tab(text: 'Xếp hạng'),
                         Tab(text: 'Lịch'),
+                        Tab(text: 'Giờ công'),
                       ],
                     ),
             ),
@@ -159,6 +160,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   SingleChildScrollView(
                     padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
                     child: _buildSchedulePanel(provider, canManage),
+                  ),
+                  SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
+                    child: _buildHoursReportPanel(provider, canManage),
                   ),
                 ],
               ),
@@ -384,8 +389,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           SizedBox(height: isMobile ? 10 : 16),
           // --- Today's Attendance List (managers only) ---
           if (canManage) _buildTodayAttendanceList(provider),
-          SizedBox(height: isMobile ? 10 : 16),
-          _buildHoursReportSection(provider, canManage),
         ],
       ),
     );
@@ -792,6 +795,15 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHoursReportPanel(EmployeeProvider provider, bool canManage) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _buildHoursReportSection(provider, canManage),
+      ],
     );
   }
 
