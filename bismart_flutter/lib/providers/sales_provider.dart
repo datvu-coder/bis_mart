@@ -10,6 +10,7 @@ class SalesProvider extends ChangeNotifier {
   String _filterType = 'today';
   DateTime? _customStart;
   DateTime? _customEnd;
+  String? _storeFilter; // null = tất cả cửa hàng
   String? _error;
 
   List<SalesReport> get reports => _reports;
@@ -17,28 +18,61 @@ class SalesProvider extends ChangeNotifier {
   String get filterType => _filterType;
   DateTime? get customStart => _customStart;
   DateTime? get customEnd => _customEnd;
+  String? get storeFilter => _storeFilter;
   String? get error => _error;
   void clearError() { _error = null; notifyListeners(); }
+
+  /// Distinct store codes/names appearing in the loaded reports.
+  /// Returns list of (storeCode, storeName) tuples ordered by code.
+  List<MapEntry<String, String>> get availableStores {
+    final map = <String, String>{};
+    for (final r in _reports) {
+      final code = (r.storeCode ?? '').trim();
+      if (code.isEmpty) continue;
+      map[code] = (r.storeName ?? '').trim().isEmpty ? code : r.storeName!.trim();
+    }
+    final entries = map.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return entries;
+  }
 
   List<SalesReport> get filteredReports {
     final now = DateTime.now();
     return _reports.where((r) {
+      // Date scope
+      bool inRange;
       switch (_filterType) {
         case 'today':
-          return r.date.year == now.year && r.date.month == now.month && r.date.day == now.day;
+          inRange = r.date.year == now.year && r.date.month == now.month && r.date.day == now.day;
+          break;
         case 'week':
           final weekAgo = now.subtract(const Duration(days: 7));
-          return r.date.isAfter(weekAgo);
+          inRange = r.date.isAfter(weekAgo);
+          break;
         case 'month':
-          return r.date.year == now.year && r.date.month == now.month;
+          inRange = r.date.year == now.year && r.date.month == now.month;
+          break;
         case 'custom':
-          if (_customStart == null || _customEnd == null) return true;
-          final s = DateTime(_customStart!.year, _customStart!.month, _customStart!.day);
-          final e = DateTime(_customEnd!.year, _customEnd!.month, _customEnd!.day, 23, 59, 59);
-          return !r.date.isBefore(s) && !r.date.isAfter(e);
+          if (_customStart == null || _customEnd == null) {
+            inRange = true;
+          } else {
+            final s = DateTime(_customStart!.year, _customStart!.month, _customStart!.day);
+            final e = DateTime(_customEnd!.year, _customEnd!.month, _customEnd!.day, 23, 59, 59);
+            inRange = !r.date.isBefore(s) && !r.date.isAfter(e);
+          }
+          break;
         default:
-          return true;
+          inRange = true;
       }
+      if (!inRange) return false;
+
+      // Store scope
+      if (_storeFilter != null && _storeFilter!.isNotEmpty) {
+        if ((r.storeCode ?? '').toUpperCase() != _storeFilter!.toUpperCase()) {
+          return false;
+        }
+      }
+      return true;
     }).toList();
   }
 
@@ -59,6 +93,11 @@ class SalesProvider extends ChangeNotifier {
     _customEnd = end;
     notifyListeners();
     loadReports();
+  }
+
+  void setStoreFilter(String? storeCode) {
+    _storeFilter = (storeCode == null || storeCode.isEmpty) ? null : storeCode;
+    notifyListeners();
   }
 
   Future<void> loadReports() async {

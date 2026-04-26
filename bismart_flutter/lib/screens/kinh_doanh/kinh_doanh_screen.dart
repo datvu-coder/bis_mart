@@ -11,7 +11,6 @@ import '../../providers/sales_provider.dart';
 import '../../services/export_service.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
-import '../../widgets/common/filter_dropdown.dart';
 import '../../widgets/common/weighted_tab_selector.dart';
 
 class KinhDoanhScreen extends StatefulWidget {
@@ -411,71 +410,96 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   }
 
   Widget _buildFilterPanel(SalesProvider provider) {
-    final isCustom = provider.filterType == 'custom';
+    final stores = provider.availableStores;
+    final activeStoreCode = provider.storeFilter;
+    final activeStoreName = activeStoreCode == null
+        ? null
+        : stores
+            .firstWhere(
+              (e) => e.key == activeStoreCode,
+              orElse: () => MapEntry(activeStoreCode, activeStoreCode),
+            )
+            .value;
+
+    String rangeLabel;
+    switch (provider.filterType) {
+      case 'today':
+        rangeLabel = AppStrings.homNay;
+        break;
+      case 'week':
+        rangeLabel = AppStrings.tuanNay;
+        break;
+      case 'month':
+        rangeLabel = AppStrings.thangNay;
+        break;
+      case 'custom':
+        rangeLabel = (provider.customStart != null && provider.customEnd != null)
+            ? '${DateFormatter.formatDate(provider.customStart!)} → ${DateFormatter.formatDate(provider.customEnd!)}'
+            : 'Tuỳ chỉnh';
+        break;
+      default:
+        rangeLabel = 'Tất cả';
+    }
+
+    final filteredReports = provider.filteredReports;
+    final totalRev =
+        filteredReports.fold<double>(0, (s, r) => s + r.revenue);
+    final totalSaleOut =
+        filteredReports.fold<double>(0, (s, r) => s + r.saleOut);
+    final totalNu = filteredReports.fold<int>(0, (s, r) => s + r.nu);
+
     return DataPanel(
       title: AppStrings.boLoc,
       trailing: PopupMenuButton<String>(
-        tooltip: 'Chức năng',
+        tooltip: 'Bộ lọc',
         position: PopupMenuPosition.under,
         icon: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             color: AppColors.primaryLight,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: const [
-              Icon(Icons.more_horiz_rounded, size: 18, color: AppColors.primary),
-              SizedBox(width: 4),
-              Text('Chức năng',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary)),
-            ],
-          ),
+          child: const Icon(Icons.filter_list_rounded,
+              size: 20, color: AppColors.primary),
         ),
         onSelected: (value) async {
-          switch (value) {
-            case 'today':
-            case 'week':
-            case 'month':
-              provider.setFilter(value);
-              break;
-            case 'custom':
-              await _pickCustomRange(provider);
-              break;
-            case 'pdf':
-              ExportService.exportToHtmlTable(
-                provider.filteredReports,
-                filterType: provider.filterType,
-                from: provider.customStart,
-                to: provider.customEnd,
-              );
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: const Text('Đang xuất PDF...'),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ));
-              break;
-            case 'excel':
-              ExportService.exportToCsv(
-                provider.filteredReports,
-                filterType: provider.filterType,
-                from: provider.customStart,
-                to: provider.customEnd,
-              );
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: const Text('Đang xuất Excel...'),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-              ));
-              break;
+          if (value == 'today' || value == 'week' || value == 'month') {
+            provider.setFilter(value);
+          } else if (value == 'custom') {
+            await _pickCustomRange(provider);
+          } else if (value == 'store_all') {
+            provider.setStoreFilter(null);
+          } else if (value.startsWith('store:')) {
+            provider.setStoreFilter(value.substring('store:'.length));
+          } else if (value == 'pdf') {
+            ExportService.exportToHtmlTable(
+              provider.filteredReports,
+              filterType: provider.filterType,
+              from: provider.customStart,
+              to: provider.customEnd,
+            );
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text('Đang xuất PDF...'),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ));
+          } else if (value == 'excel') {
+            ExportService.exportToCsv(
+              provider.filteredReports,
+              filterType: provider.filterType,
+              from: provider.customStart,
+              to: provider.customEnd,
+            );
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: const Text('Đang xuất Excel...'),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ));
           }
         },
         itemBuilder: (ctx) => [
@@ -495,6 +519,23 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
               Icons.calendar_month_rounded, provider.filterType),
           _filterMenuItem('custom', 'Tuỳ chỉnh',
               Icons.date_range_rounded, provider.filterType),
+          const PopupMenuDivider(),
+          const PopupMenuItem(
+            enabled: false,
+            child: Text('Cửa hàng',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textGrey)),
+          ),
+          _storeMenuItem('store_all', 'Tất cả cửa hàng',
+              Icons.store_mall_directory_rounded, activeStoreCode == null),
+          ...stores.map((s) => _storeMenuItem(
+                'store:${s.key}',
+                '${s.key} · ${s.value}',
+                Icons.storefront_rounded,
+                activeStoreCode == s.key,
+              )),
           const PopupMenuDivider(),
           const PopupMenuItem(
             enabled: false,
@@ -526,53 +567,167 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          FilterDropdown(
-            value: provider.filterType,
-            onChanged: (v) async {
-              if (v == 'custom') {
-                await _pickCustomRange(provider);
-              } else {
-                provider.setFilter(v);
-              }
-            },
+          // Active filter chips
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _activeFilterChip(
+                icon: Icons.event_rounded,
+                label: 'Thời gian: $rangeLabel',
+                color: AppColors.primary,
+                onClear: provider.filterType == 'today'
+                    ? null
+                    : () => provider.setFilter('today'),
+              ),
+              _activeFilterChip(
+                icon: Icons.store_rounded,
+                label: activeStoreCode == null
+                    ? 'Cửa hàng: Tất cả'
+                    : 'Cửa hàng: $activeStoreCode · $activeStoreName',
+                color: AppColors.info,
+                onClear: activeStoreCode == null
+                    ? null
+                    : () => provider.setStoreFilter(null),
+              ),
+            ],
           ),
-          if (isCustom) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primaryLight.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.borderLight),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.date_range_rounded,
-                      size: 18, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      provider.customStart != null && provider.customEnd != null
-                          ? 'Từ ${DateFormatter.formatDate(provider.customStart!)} đến ${DateFormatter.formatDate(provider.customEnd!)}'
-                          : 'Chưa chọn khoảng ngày',
-                      style: AppTextStyles.bodyText
-                          .copyWith(fontWeight: FontWeight.w600),
+          const SizedBox(height: 14),
+          // Summary of filtered content
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderLight),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.fact_check_rounded,
+                        size: 18, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text('Nội dung đang lọc',
+                        style: AppTextStyles.bodyText
+                            .copyWith(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _summaryStat('Số báo cáo', '${filteredReports.length}',
+                        AppColors.info),
+                    _summaryStat(
+                        'Tổng NU', '$totalNu', AppColors.primary),
+                    _summaryStat(
+                        'Sale Out',
+                        CurrencyFormatter.formatVND(totalSaleOut),
+                        AppColors.warning),
+                    _summaryStat('Doanh thu',
+                        CurrencyFormatter.formatVND(totalRev), AppColors.success),
+                  ],
+                ),
+                if (filteredReports.isEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text('Không có báo cáo phù hợp với bộ lọc.',
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.textGrey)),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  ...filteredReports.take(8).map((r) => Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.circle,
+                                size: 6, color: AppColors.textGrey),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '${DateFormatter.formatDate(r.date)} · ${r.pgName}'
+                                '${r.storeCode != null ? " · ${r.storeCode}" : ""}',
+                                style: AppTextStyles.caption,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Text(CurrencyFormatter.formatVND(r.revenue),
+                                style: AppTextStyles.caption.copyWith(
+                                    color: AppColors.success,
+                                    fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      )),
+                  if (filteredReports.length > 8)
+                    Text(
+                      '... và ${filteredReports.length - 8} báo cáo khác',
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.textGrey),
                     ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => _pickCustomRange(provider),
-                    icon: const Icon(Icons.edit_calendar_rounded, size: 16),
-                    label: const Text('Đổi'),
-                  ),
                 ],
-              ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _activeFilterChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    VoidCallback? onClear,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(label,
+              style: AppTextStyles.caption
+                  .copyWith(color: color, fontWeight: FontWeight.w700)),
+          if (onClear != null) ...[
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: onClear,
+              borderRadius: BorderRadius.circular(12),
+              child: Icon(Icons.close_rounded, size: 14, color: color),
             ),
           ],
-          const SizedBox(height: 8),
-          Text(
-            'Đang lọc · ${provider.filteredReports.length} báo cáo',
-            style: AppTextStyles.caption,
-          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryStat(String label, String value, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+              style: AppTextStyles.caption
+                  .copyWith(color: AppColors.textGrey, fontSize: 11)),
+          const SizedBox(height: 2),
+          Text(value,
+              style: TextStyle(
+                  color: color, fontWeight: FontWeight.w800, fontSize: 14)),
         ],
       ),
     );
@@ -598,6 +753,33 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
             const Spacer(),
             const Icon(Icons.check_rounded, size: 16, color: AppColors.primary),
           ],
+        ],
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _storeMenuItem(
+      String value, String label, IconData icon, bool selected) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon,
+              size: 18,
+              color: selected ? AppColors.info : AppColors.textGrey),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontWeight:
+                        selected ? FontWeight.w700 : FontWeight.w500,
+                    color:
+                        selected ? AppColors.info : AppColors.textPrimary)),
+          ),
+          if (selected)
+            const Icon(Icons.check_rounded, size: 16, color: AppColors.info),
         ],
       ),
     );
