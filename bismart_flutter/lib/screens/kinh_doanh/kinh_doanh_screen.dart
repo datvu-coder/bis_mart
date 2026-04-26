@@ -7,6 +7,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../models/sales_report.dart';
+import '../../models/store.dart';
 import '../../providers/sales_provider.dart';
 import '../../providers/permission_provider.dart';
 import '../../providers/store_provider.dart';
@@ -76,6 +77,53 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     final own = (perm.ownStoreCode ?? '').trim();
     if (own.isNotEmpty) codes.add(own.toUpperCase());
     return codes;
+  }
+
+  /// Danh sách cửa hàng (mã, tên) hiển thị trong dropdown của bộ lọc —
+  /// nguồn dữ liệu DUY NHẤT là phân quyền của tài khoản, KHÔNG phụ thuộc
+  /// vào dữ liệu báo cáo. Cách lấy:
+  /// - Admin: toàn bộ `StoreProvider.stores`.
+  /// - Người dùng khác:
+  ///     • managedStoreIds → ánh xạ qua `StoreProvider.getStoreById(id)`.
+  ///     • + cửa hàng có `storeCode == ownStoreCode` (employee.storeCode).
+  /// Trả về sắp xếp theo mã, không trùng lặp.
+  List<MapEntry<String, String>> _resolvePermittedStores(BuildContext context) {
+    final perm = context.watch<PermissionProvider>();
+    final storeProv = context.watch<StoreProvider>();
+    final all = storeProv.stores;
+    final byCode = <String, String>{};
+    void add(String code, String name) {
+      final c = code.trim().toUpperCase();
+      if (c.isEmpty) return;
+      byCode[c] = name.trim().isEmpty ? c : name.trim();
+    }
+
+    if (perm.isAdmin) {
+      for (final s in all) {
+        add(s.storeCode, s.name);
+      }
+    } else {
+      // Cửa hàng được phân làm quản lý.
+      for (final id in perm.managedStoreIds) {
+        final s = storeProv.getStoreById(id);
+        if (s != null) add(s.storeCode, s.name);
+      }
+      // Cửa hàng được gán cho tài khoản.
+      final own = (perm.ownStoreCode ?? '').trim().toUpperCase();
+      if (own.isNotEmpty) {
+        Store? s;
+        for (final x in all) {
+          if (x.storeCode.trim().toUpperCase() == own) {
+            s = x;
+            break;
+          }
+        }
+        add(own, s?.name ?? own);
+      }
+    }
+    final list = byCode.entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return list;
   }
 
   @override
@@ -456,13 +504,15 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   }
 
   Widget _buildFilterPanel(SalesProvider provider) {
-    final stores = provider.availableStores;
+    // Danh sách cửa hàng dựa trên PHÂN QUYỀN (không liên quan tới báo cáo).
+    final stores = _resolvePermittedStores(context);
     final activeStoreCode = provider.storeFilter;
     final activeStoreName = activeStoreCode == null
         ? null
         : stores
             .firstWhere(
-              (e) => e.key == activeStoreCode,
+              (e) => e.key.toUpperCase() ==
+                  activeStoreCode.toUpperCase(),
               orElse: () => MapEntry(activeStoreCode, activeStoreCode),
             )
             .value;
@@ -1019,7 +1069,8 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         // Lắng nghe SalesProvider để dropdown / chip cập nhật theo thời gian thực.
         return Consumer<SalesProvider>(
           builder: (ctx, prov, _) {
-            final stores = prov.availableStores;
+            // Nguồn dropdown: PHÂN QUYỀN của tài khoản (không lấy từ báo cáo).
+            final stores = _resolvePermittedStores(ctx);
             final activeStore = prov.storeFilter;
             return SafeArea(
               top: false,
