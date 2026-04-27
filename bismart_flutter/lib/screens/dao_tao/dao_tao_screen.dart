@@ -415,7 +415,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     // Mobile: margin ngang = 0 → cách mép màn hình 2 px (đồng nhất).
     final hMargin = isMobile ? 0.0 : 12.0;
     final visiblePosts = provider.posts.where((post) {
-    final visiblePosts = provider.posts.where((post) {
       if (post.visibility != 'store') return true;
       if (post.authorId != null && post.authorId == currentUser?.id) return true;
       if (post.storeCode == null || post.storeCode!.isEmpty) return true;
