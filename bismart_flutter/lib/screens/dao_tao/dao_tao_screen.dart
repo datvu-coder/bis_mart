@@ -333,9 +333,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final isMobile = MediaQuery.of(context).size.width < 900;
     return DataPanel(
       title: 'Trợ lý AI',
-      // Mobile: nội dung cách viền khung lớn 2 px (ngang).
+      // Mobile: padding ngang = 0 → với SingleChildScrollView (2 px),
+      // nội dung cách viền màn hình đúng 2 px tổng.
       padding: isMobile
-          ? const EdgeInsets.fromLTRB(2, 18, 2, 18)
+          ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
           : null,
       trailing: canManageAi
           ? TextButton.icon(
@@ -411,8 +412,8 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final userName = authProvider.currentUser?.fullName ?? 'Bạn';
     final currentStore = currentUser?.storeCode;
     final isMobile = MediaQuery.of(context).size.width < 900;
-    // Mobile: card composer / empty / post chỉ cách viền khung lớn 2 px.
-    final hMargin = isMobile ? 2.0 : 12.0;
+    // Mobile: không thêm margin ngang → outer scroll đã cách viền 2 px.
+    final hMargin = isMobile ? 0.0 : 12.0;
     final visiblePosts = provider.posts.where((post) {
       if (post.visibility != 'store') return true;
       if (post.authorId != null && post.authorId == currentUser?.id) return true;
@@ -565,7 +566,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     // Trên mobile: bỏ padding ngang của DataPanel để LessonCard cách viền
     // khung lớn đúng 2 px (chỉ còn padding của SingleChildScrollView = 2 px).
     final panelPadding = isMobile
-        ? const EdgeInsets.fromLTRB(2, 18, 2, 18)
+        ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
         : null;
     return DataPanel(
       title: 'Bài giảng',
@@ -628,9 +629,9 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
 
     return DataPanel(
       title: 'Lịch học',
-      // Mobile: nội dung cách viền khung lớn 2 px (ngang).
+      // Mobile: padding ngang = 0 → tổng với outer scroll = 2 px.
       padding: isMobile
-          ? const EdgeInsets.fromLTRB(2, 18, 2, 18)
+          ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
           : null,
       trailing: TextButton.icon(
         onPressed: () => _showAddEventDialog(provider),
