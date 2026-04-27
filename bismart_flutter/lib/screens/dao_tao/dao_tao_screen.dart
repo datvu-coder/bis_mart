@@ -330,8 +330,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   }
 
   Widget _buildAiAssistantPanel(bool canManageAi) {
+    final isMobile = MediaQuery.of(context).size.width < 900;
     return DataPanel(
       title: 'Trợ lý AI',
+      // Mobile: padding ngang = 0 → nội dung cách mép màn hình 2 px
+      // (do outer SingleChildScrollView = 2 px), đồng nhất toàn tab.
+      padding: isMobile
+          ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
+          : null,
       trailing: canManageAi
           ? TextButton.icon(
               onPressed: _showAddAiAssistantDialog,
@@ -405,8 +411,9 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final currentUser = authProvider.currentUser;
     final userName = authProvider.currentUser?.fullName ?? 'Bạn';
     final currentStore = currentUser?.storeCode;
-    // Margin chuẩn của card composer / empty (outer scroll đã cách màn hình 2 px).
-    const hMargin = 12.0;
+    final isMobile = MediaQuery.of(context).size.width < 900;
+    // Mobile: margin ngang = 0 → cách mép màn hình 2 px (đồng nhất).
+    final hMargin = isMobile ? 0.0 : 12.0;
     final visiblePosts = provider.posts.where((post) {
     final visiblePosts = provider.posts.where((post) {
       if (post.visibility != 'store') return true;
@@ -557,9 +564,9 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   Widget _buildLessonPanel(TrainingProvider provider) {
     final isAdmin = _isAdmin();
     final isMobile = MediaQuery.of(context).size.width < 900;
-    // Yêu cầu: thẻ bài giảng cách viền khung lớn 2 px trên mobile.
+    // Mobile: padding ngang = 0 → cách mép màn hình 2 px (đồng nhất).
     final panelPadding = isMobile
-        ? const EdgeInsets.fromLTRB(2, 18, 2, 18)
+        ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
         : null;
     return DataPanel(
       title: 'Bài giảng',
@@ -618,9 +625,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             ? provider.getEventsForDay(_selectedDay!)
             : provider.getEventsForDay(_focusedDay))
         .toList();
+    final isMobile = MediaQuery.of(context).size.width < 900;
 
     return DataPanel(
       title: 'Lịch học',
+      // Mobile: padding ngang = 0 → cách mép màn hình 2 px (đồng nhất).
+      padding: isMobile
+          ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
+          : null,
       trailing: TextButton.icon(
         onPressed: () => _showAddEventDialog(provider),
         icon: const Icon(Icons.add_rounded, size: 16),
