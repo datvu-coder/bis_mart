@@ -950,9 +950,9 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               : 680.0;
           return Dialog(
             insetPadding: EdgeInsets.fromLTRB(
-              isMobileDialog ? 2 : 40,
+              isMobileDialog ? 4 : 40,
               isMobileDialog ? 8 : 24,
-              isMobileDialog ? 2 : 40,
+              isMobileDialog ? 4 : 40,
               isMobileDialog ? 8 : 24,
             ),
             shape: RoundedRectangleBorder(
@@ -1879,9 +1879,9 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               : 720.0;
           return Dialog(
             insetPadding: EdgeInsets.fromLTRB(
-              isMobileDialog ? 2 : 40,
+              isMobileDialog ? 4 : 40,
               isMobileDialog ? 8 : 24,
-              isMobileDialog ? 2 : 40,
+              isMobileDialog ? 4 : 40,
               isMobileDialog ? 8 : 24,
             ),
             shape: RoundedRectangleBorder(
@@ -2219,9 +2219,9 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         final isMobileDialog = mq.size.width < 600;
         return AlertDialog(
           insetPadding: EdgeInsets.fromLTRB(
-            isMobileDialog ? 2 : 40,
+            isMobileDialog ? 4 : 40,
             isMobileDialog ? 8 : 24,
-            isMobileDialog ? 2 : 40,
+            isMobileDialog ? 4 : 40,
             isMobileDialog ? 8 : 24,
           ),
           shape: RoundedRectangleBorder(
