@@ -330,8 +330,13 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   }
 
   Widget _buildAiAssistantPanel(bool canManageAi) {
+    final isMobile = MediaQuery.of(context).size.width < 900;
     return DataPanel(
       title: 'Trợ lý AI',
+      // Mobile: nội dung cách viền khung lớn 2 px (ngang).
+      padding: isMobile
+          ? const EdgeInsets.fromLTRB(2, 18, 2, 18)
+          : null,
       trailing: canManageAi
           ? TextButton.icon(
               onPressed: _showAddAiAssistantDialog,
@@ -405,6 +410,9 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final currentUser = authProvider.currentUser;
     final userName = authProvider.currentUser?.fullName ?? 'Bạn';
     final currentStore = currentUser?.storeCode;
+    final isMobile = MediaQuery.of(context).size.width < 900;
+    // Mobile: card composer / empty / post chỉ cách viền khung lớn 2 px.
+    final hMargin = isMobile ? 2.0 : 12.0;
     final visiblePosts = provider.posts.where((post) {
       if (post.visibility != 'store') return true;
       if (post.authorId != null && post.authorId == currentUser?.id) return true;
@@ -419,7 +427,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 680),
             child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+              margin: EdgeInsets.fromLTRB(hMargin, 12, hMargin, 12),
               decoration: BoxDecoration(
                 color: AppColors.white,
                 borderRadius: BorderRadius.circular(14),
@@ -505,7 +513,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 680),
               child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 12),
+                margin: EdgeInsets.symmetric(horizontal: hMargin),
                 padding: const EdgeInsets.all(40),
                 decoration: BoxDecoration(
                   color: AppColors.white,
@@ -557,7 +565,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     // Trên mobile: bỏ padding ngang của DataPanel để LessonCard cách viền
     // khung lớn đúng 2 px (chỉ còn padding của SingleChildScrollView = 2 px).
     final panelPadding = isMobile
-        ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
+        ? const EdgeInsets.fromLTRB(2, 18, 2, 18)
         : null;
     return DataPanel(
       title: 'Bài giảng',
@@ -616,9 +624,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             ? provider.getEventsForDay(_selectedDay!)
             : provider.getEventsForDay(_focusedDay))
         .toList();
+    final isMobile = MediaQuery.of(context).size.width < 900;
 
     return DataPanel(
       title: 'Lịch học',
+      // Mobile: nội dung cách viền khung lớn 2 px (ngang).
+      padding: isMobile
+          ? const EdgeInsets.fromLTRB(2, 18, 2, 18)
+          : null,
       trailing: TextButton.icon(
         onPressed: () => _showAddEventDialog(provider),
         icon: const Icon(Icons.add_rounded, size: 16),
