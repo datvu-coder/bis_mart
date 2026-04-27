@@ -1868,16 +1868,36 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 600, maxHeight: 720),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
-                  child: Row(
+        builder: (ctx, setS) {
+          final mq = MediaQuery.of(ctx);
+          final isMobileDialog = mq.size.width < 600;
+          final availableHeight = mq.size.height -
+              mq.viewInsets.bottom -
+              (isMobileDialog ? 16 : 48);
+          final dialogMaxHeight = isMobileDialog
+              ? availableHeight.clamp(320.0, mq.size.height)
+              : 720.0;
+          return Dialog(
+            insetPadding: EdgeInsets.fromLTRB(
+              isMobileDialog ? 2 : 40,
+              isMobileDialog ? 8 : 24,
+              isMobileDialog ? 2 : 40,
+              isMobileDialog ? 8 : 24,
+            ),
+            shape: RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(isMobileDialog ? 12 : 16)),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: 600,
+                maxHeight: dialogMaxHeight,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 8, 12),
+                    child: Row(
                     children: [
                       const Expanded(
                         child: Text('Thêm bài giảng',
@@ -2126,7 +2146,8 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               ],
             ),
           ),
-        ),
+        );
+        },
       ),
     );
   }
@@ -2193,28 +2214,47 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Thêm sự kiện'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'Tên sự kiện...',
-            border: OutlineInputBorder(),
+      builder: (ctx) {
+        final mq = MediaQuery.of(ctx);
+        final isMobileDialog = mq.size.width < 600;
+        return AlertDialog(
+          insetPadding: EdgeInsets.fromLTRB(
+            isMobileDialog ? 2 : 40,
+            isMobileDialog ? 8 : 24,
+            isMobileDialog ? 2 : 40,
+            isMobileDialog ? 8 : 24,
           ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-          ElevatedButton(
-            onPressed: () {
-              if (controller.text.trim().isEmpty) return;
-              provider.addEvent(targetDay, controller.text.trim());
-              Navigator.pop(ctx);
-            },
-            child: const Text('Thêm'),
+          shape: RoundedRectangleBorder(
+              borderRadius:
+                  BorderRadius.circular(isMobileDialog ? 12 : 16)),
+          contentPadding: EdgeInsets.fromLTRB(
+              isMobileDialog ? 14 : 24, 16, isMobileDialog ? 14 : 24, 12),
+          title: const Text('Thêm sự kiện'),
+          content: SingleChildScrollView(
+            child: TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Tên sự kiện...',
+                border: OutlineInputBorder(),
+              ),
+            ),
           ),
-        ],
-      ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Hủy')),
+            ElevatedButton(
+              onPressed: () {
+                if (controller.text.trim().isEmpty) return;
+                provider.addEvent(targetDay, controller.text.trim());
+                Navigator.pop(ctx);
+              },
+              child: const Text('Thêm'),
+            ),
+          ],
+        );
+      },
     );
   }
 
