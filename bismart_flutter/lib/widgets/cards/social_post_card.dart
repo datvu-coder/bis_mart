@@ -91,11 +91,12 @@ class SocialPostCard extends StatelessWidget {
       ),
     );
 
+    final isMobile = MediaQuery.of(context).size.width < 900;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 680),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: EdgeInsets.symmetric(horizontal: isMobile ? 0 : 12),
           child: card,
         ),
       ),
