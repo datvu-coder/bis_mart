@@ -332,7 +332,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   Widget _buildAiAssistantPanel(bool canManageAi) {
     final isMobile = MediaQuery.of(context).size.width < 900;
     return DataPanel(
-      title: 'Trợ lý AI',
       // Mobile: padding ngang = 0 → nội dung cách mép màn hình 2 px
       // (do outer SingleChildScrollView = 2 px), đồng nhất toàn tab.
       padding: isMobile
@@ -568,7 +567,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
         : null;
     return DataPanel(
-      title: 'Bài giảng',
       padding: panelPadding,
       trailing: isAdmin
           ? TextButton.icon(
@@ -627,7 +625,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final isMobile = MediaQuery.of(context).size.width < 900;
 
     return DataPanel(
-      title: 'Lịch học',
       // Mobile: padding ngang = 0 → cách mép màn hình 2 px (đồng nhất).
       padding: isMobile
           ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
