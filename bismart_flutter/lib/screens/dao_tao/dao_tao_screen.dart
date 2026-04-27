@@ -939,10 +939,29 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             });
           }
 
+          final mq = MediaQuery.of(ctx);
+          final isMobileDialog = mq.size.width < 600;
+          // Available height after virtual keyboard inset (avoid hiding the
+          // text field / action bar / submit button).
+          final availableHeight =
+              mq.size.height - mq.viewInsets.bottom - (isMobileDialog ? 16 : 48);
+          final dialogMaxHeight = isMobileDialog
+              ? availableHeight.clamp(320.0, mq.size.height)
+              : 680.0;
           return Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            insetPadding: EdgeInsets.fromLTRB(
+              isMobileDialog ? 2 : 40,
+              isMobileDialog ? 8 : 24,
+              isMobileDialog ? 2 : 40,
+              isMobileDialog ? 8 : 24,
+            ),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(isMobileDialog ? 12 : 16)),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560, maxHeight: 680),
+              constraints: BoxConstraints(
+                maxWidth: 560,
+                maxHeight: dialogMaxHeight,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
