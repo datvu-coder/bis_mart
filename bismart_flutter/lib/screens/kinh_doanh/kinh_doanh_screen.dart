@@ -153,7 +153,8 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         }
 
         final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 2.0;
-        final contentPad = isWide ? hPad : 10.0;
+        // Mobile: nội dung cách mép màn hình 2 px (đồng nhất với tab Đào tạo).
+        final contentPad = isWide ? hPad : 2.0;
 
         // Tab layout for all screen sizes
         final body = Column(
@@ -162,24 +163,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
               Padding(
                 padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
                 child: _buildScreenHeader(provider, isWide),
-              ),
-            if (isCompactMobile)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-                child: SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, AppRoutes.createReport),
-                    icon: const Icon(Icons.add_rounded, size: 16),
-                    label: const Text(AppStrings.taoPhieuBaoCao),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      textStyle: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ),
               ),
             Container(
               margin: EdgeInsets.fromLTRB(hPad, isCompactMobile ? 10 : 0, hPad, 0),
@@ -447,8 +430,25 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
 
   Widget _buildReportList(SalesProvider provider) {
     final reports = provider.filteredReports;
+    final isMobile = MediaQuery.of(context).size.width < 900;
     return DataPanel(
-      title: 'Báo cáo (${reports.length})',
+      padding: isMobile
+          ? const EdgeInsets.fromLTRB(0, 14, 0, 18)
+          : null,
+      trailing: TextButton.icon(
+        onPressed: () =>
+            Navigator.pushNamed(context, AppRoutes.createReport),
+        icon: const Icon(Icons.add_rounded, size: 16),
+        label: const Text(AppStrings.taoPhieuBaoCao),
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          textStyle: const TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w700),
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10)),
+        ),
+      ),
       child: reports.isEmpty
           ? Padding(
               padding: const EdgeInsets.all(20),
@@ -558,9 +558,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(AppStrings.boLoc,
-                          style: AppTextStyles.sectionHeader),
-                      const SizedBox(height: 4),
                       Row(
                         children: [
                           _scopePill(Icons.event_outlined, rangeLabel),
