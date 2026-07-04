@@ -17,10 +17,6 @@ class Permission {
     'MNG': 'Quản lý (chuỗi)',
     'ASM': 'Quản lý khu vực',
     'TMK': 'Giám sát',
-    'SM':  'Cửa hàng trưởng',
-    'TLD': 'Trưởng nhóm',
-    'PG':  'Nhân viên tư vấn',
-    'CS':  'Chủ shop chuỗi',
   };
 
   // ── Store role display labels ─────────────────────────────────────────────

@@ -59,12 +59,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (text.isEmpty) return;
     setState(() => _sending = true);
     try {
-      provider.addCommentText(widget.postId, text, authorName: name);
       _commentCtrl.clear();
       FocusScope.of(context).unfocus();
-      // Re-pull from server so any other comments made elsewhere appear too,
-      // and the new one gets its real server id / timestamp.
-      Future.delayed(const Duration(milliseconds: 350), _refreshComments);
+      await provider.addCommentText(widget.postId, text, authorName: name);
+      // Re-pull from server now that the comment is persisted, so any other
+      // comments made elsewhere appear too and the new one gets its real
+      // server id / timestamp.
+      await _refreshComments();
     } finally {
       if (mounted) setState(() => _sending = false);
     }
