@@ -348,42 +348,48 @@ def api_login():
         )
         user_row = cur.fetchone()
 
-    # If no users-table record exists yet, auto-provision one for any matching
-    # employees.employee_code where the provided password equals the employee
-    # code itself (default first-time password). Subsequent logins go through
-    # the regular hash check above. This lets every imported employee log in
+    # First-time login: either no users-table record exists yet, or one exists
+    # but has no password set (e.g. bulk-imported employees never got a hash).
+    # Auto-provision using the employee's configured default password
+    # (employees.password, defaults to '1111'), falling back to the employee
+    # code itself for backward compatibility. Subsequent logins go through the
+    # regular hash check below. This lets every imported employee log in
     # without an admin manually creating a user row each time.
-    if not user_row:
+    if not user_row or not user_row.get("password_hash"):
         with db.cursor() as cur:
             cur.execute(
                 "SELECT * FROM employees WHERE employee_code = %s LIMIT 1",
                 (username,),
             )
             emp = cur.fetchone()
-        if emp and password == username:
+        default_password = (emp.get("password") if emp else None) or username
+        if emp and password == default_password:
             new_hash = generate_password_hash(password, method="pbkdf2:sha256")
             with db.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO users (username, password_hash, employee_id) "
-                    "VALUES (%s, %s, %s) "
-                    "ON CONFLICT (username) DO NOTHING "
-                    "RETURNING id",
-                    (username, new_hash, emp["id"]),
-                )
-                inserted = cur.fetchone()
-            db.commit()
-            if inserted:
-                with db.cursor() as cur:
+                if user_row:
                     cur.execute(
-                        "SELECT u.id as user_id, u.username, "
-                        "u.employee_id as auth_employee_id, u.password_hash, e.* "
-                        "FROM users u LEFT JOIN employees e ON u.employee_id = e.id "
-                        "WHERE u.id = %s",
-                        (inserted["id"],),
+                        "UPDATE users SET password_hash = %s WHERE id = %s",
+                        (new_hash, user_row["user_id"]),
                     )
-                    user_row = cur.fetchone()
+                else:
+                    cur.execute(
+                        "INSERT INTO users (username, password_hash, employee_id) "
+                        "VALUES (%s, %s, %s) "
+                        "ON CONFLICT (username) DO NOTHING",
+                        (username, new_hash, emp["id"]),
+                    )
+            db.commit()
+            with db.cursor() as cur:
+                cur.execute(
+                    "SELECT u.id as user_id, u.username, "
+                    "u.employee_id as auth_employee_id, u.password_hash, e.* "
+                    "FROM users u LEFT JOIN employees e ON u.employee_id = e.id "
+                    "WHERE u.username = %s",
+                    (username,),
+                )
+                user_row = cur.fetchone()
 
-    if not user_row or not check_password_hash(user_row["password_hash"], password):
+    if not user_row or not user_row.get("password_hash") or not check_password_hash(user_row["password_hash"], password):
         return jsonify({"error": "Invalid credentials"}), 401
 
     token = create_token(user_row["user_id"], user_row.get("auth_employee_id"))
