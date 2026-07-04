@@ -39,10 +39,6 @@ class FilterDropdown extends StatelessWidget {
               value: 'month',
               child: Text(AppStrings.thangNay),
             ),
-            DropdownMenuItem(
-              value: 'custom',
-              child: Text('Tuỳ chỉnh'),
-            ),
           ],
           onChanged: (v) {
             if (v != null) onChanged(v);

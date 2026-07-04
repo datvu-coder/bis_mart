@@ -36,7 +36,7 @@ class QuizResult {
   final String employeeCode;
   final String fullName;
   final String? storeName;
-  final double score;
+  final String score;
   final String? answersJson;
 
   QuizResult({
@@ -45,7 +45,7 @@ class QuizResult {
     required this.fullName,
     this.submittedAt,
     this.storeName,
-    this.score = 0,
+    this.score = '',
     this.answersJson,
   });
 
@@ -56,7 +56,7 @@ class QuizResult {
       employeeCode: json['employeeCode'] as String,
       fullName: json['fullName'] as String,
       storeName: json['storeName'] as String?,
-      score: (json['score'] as num?)?.toDouble() ?? 0,
+      score: json['score']?.toString() ?? '',
       answersJson: json['answersJson'] as String?,
     );
   }

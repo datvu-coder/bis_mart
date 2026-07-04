@@ -210,9 +210,7 @@ class _LessonHistoryScreenState extends State<LessonHistoryScreen> {
         final pid = int.parse(partId);
         final p = widget.lesson.parts.firstWhere(
           (e) => int.tryParse(e.id) == pid,
-          orElse: () => widget.lesson.parts.isNotEmpty
-              ? widget.lesson.parts.first
-              : LessonPart(id: '0', lessonId: '', title: 'Phần $partId'),
+          orElse: () => LessonPart(id: '0', lessonId: '', title: 'Phần $partId'),
         );
         partTitle = p.title.isEmpty ? 'Phần ${p.orderIndex}' : p.title;
       } catch (_) {}

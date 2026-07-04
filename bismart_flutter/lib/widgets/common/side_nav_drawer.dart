@@ -141,7 +141,7 @@ class SideNavDrawer extends StatelessWidget {
         return;
       case 6:
         route = AppRoutes.info;
-        return;
+        break;
       default:
         route = AppRoutes.dashboard;
     }
