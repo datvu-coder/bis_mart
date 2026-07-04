@@ -1652,10 +1652,9 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                         itemCount: historyAtts.length,
                         itemBuilder: (context, index) {
                           final att = historyAtts[index];
-                          final emp = prov.employees.firstWhere(
-                            (e) => e.id == att.employeeId,
-                            orElse: () => prov.employees.first,
-                          );
+                          final employeeName = att.employeeName ??
+                              (prov.getEmployeeById(att.employeeId)?.fullName ??
+                                  'Không rõ');
                           return ListTile(
                             dense: true,
                             contentPadding: EdgeInsets.symmetric(
@@ -1667,7 +1666,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                               color: att.checkOutTime != null ? AppColors.textGrey : AppColors.success,
                               size: 20,
                             ),
-                            title: Text(emp.fullName),
+                            title: Text(employeeName),
                             subtitle: Text(
                               'Vào: ${att.checkInTime != null ? '${att.checkInTime!.hour.toString().padLeft(2, '0')}:${att.checkInTime!.minute.toString().padLeft(2, '0')}' : '--'}'
                               ' | Ra: ${att.checkOutTime != null ? '${att.checkOutTime!.hour.toString().padLeft(2, '0')}:${att.checkOutTime!.minute.toString().padLeft(2, '0')}' : '--'}',

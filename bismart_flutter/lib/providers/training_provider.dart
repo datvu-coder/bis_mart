@@ -110,7 +110,7 @@ class TrainingProvider extends ChangeNotifier {
     }
   }
 
-  void addCommentText(String postId, String text, {String authorName = 'Bạn'}) async {
+  Future<void> addCommentText(String postId, String text, {String authorName = 'Bạn'}) async {
     final index = _posts.indexWhere((p) => p.id == postId);
     if (index != -1) {
       _posts[index].comments.add(

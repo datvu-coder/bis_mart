@@ -410,6 +410,48 @@ def api_auth_me():
     return jsonify({"user": _user_to_api_json(user_row)})
 
 
+@app.put("/api/auth/profile")
+@login_required
+def api_update_profile():
+    """Update the current user's own employee profile (self-service)."""
+    data = request.get_json(silent=True) or {}
+    current_user = g.current_user or {}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT e.id, e.full_name, e.email, e.work_location FROM users u "
+            "LEFT JOIN employees e ON u.employee_id = e.id WHERE u.id = %s",
+            (current_user.get("user_id"),),
+        )
+        existing = cur.fetchone()
+
+    if not existing or not existing.get("id"):
+        return jsonify({"error": "Unauthorized"}), 401
+
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE employees SET full_name = %s, email = %s, work_location = %s WHERE id = %s",
+            (
+                data.get("fullName", existing.get("full_name")),
+                data.get("email", existing.get("email")),
+                data.get("workLocation", existing.get("work_location")),
+                existing["id"],
+            ),
+        )
+    db.commit()
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT u.id as user_id, u.username, u.employee_id as auth_employee_id, e.* FROM users u "
+            "LEFT JOIN employees e ON u.employee_id = e.id "
+            "WHERE u.id = %s",
+            (current_user.get("user_id"),),
+        )
+        user_row = cur.fetchone()
+
+    return jsonify({"user": _user_to_api_json(user_row)})
+
+
 @app.get("/api/dashboard")
 @login_required
 def api_dashboard():
@@ -427,8 +469,9 @@ def api_dashboard():
         total_revenue = float((cur.fetchone() or {}).get("total_revenue") or 0)
 
         cur.execute(
-            "SELECT COALESCE(SUM(revenue), 0) AS group_revenue "
-            "FROM sales_reports WHERE LEFT(report_date, 10) >= %s AND LEFT(report_date, 10) <= %s",
+            "SELECT COALESCE(SUM(sr.revenue), 0) AS group_revenue "
+            "FROM sales_reports sr JOIN stores s ON UPPER(s.store_code) = UPPER(sr.store_code) "
+            "WHERE s.store_group = 'I' AND LEFT(sr.report_date, 10) >= %s AND LEFT(sr.report_date, 10) <= %s",
             (start_date, end_date),
         )
         group_revenue = float((cur.fetchone() or {}).get("group_revenue") or 0)
@@ -1407,6 +1450,86 @@ def api_get_reports():
 
     result = [_report_to_api_json(row, items_by_report.get(row["id"], [])) for row in report_rows]
     return jsonify(result)
+
+
+@app.put("/api/reports/<int:report_id>")
+@login_required
+def api_update_report(report_id: int):
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, report_date, pg_name, store_name, nu, sale_out, store_code, "
+            "report_month, revenue, points, employee_code FROM sales_reports WHERE id = %s",
+            (report_id,),
+        )
+        existing = cur.fetchone()
+    if not existing:
+        return jsonify({"error": "Report not found"}), 404
+
+    report_date = _normalize_report_date(data.get("date")) if "date" in data else existing.get("report_date")
+    store_code = _normalize_store_code(data.get("storeCode")) if "storeCode" in data else existing.get("store_code")
+    resolved_code, resolved_store_name = _get_store_info_by_code(db, store_code)
+    store_code = resolved_code
+    store_name = (data.get("storeName") or "").strip() or resolved_store_name or existing.get("store_name") or ""
+
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE sales_reports SET report_date = %s, pg_name = %s, store_name = %s, nu = %s, "
+            "sale_out = %s, store_code = %s, report_month = %s, revenue = %s, points = %s, employee_code = %s "
+            "WHERE id = %s",
+            (
+                report_date,
+                data.get("pgName", existing.get("pg_name")),
+                store_name,
+                data.get("nu", existing.get("nu")),
+                data.get("saleOut", existing.get("sale_out")),
+                store_code,
+                data.get("reportMonth", existing.get("report_month")),
+                data.get("revenue", existing.get("revenue")),
+                data.get("points", existing.get("points")),
+                data.get("employeeCode", existing.get("employee_code")),
+                report_id,
+            ),
+        )
+
+        if "products" in data:
+            cur.execute("DELETE FROM sale_items WHERE report_id = %s", (report_id,))
+            for item in data.get("products", []):
+                cur.execute(
+                    "INSERT INTO sale_items (report_id, product_id, product_name, quantity, unit_price) "
+                    "VALUES (%s, %s, %s, %s, %s)",
+                    (report_id, item.get("productId"), item.get("productName", ""),
+                     item.get("quantity", 0), item.get("unitPrice", 0)),
+                )
+    db.commit()
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code "
+            "FROM sales_reports WHERE id = %s",
+            (report_id,),
+        )
+        updated_report = cur.fetchone()
+        cur.execute(
+            "SELECT product_id, product_name, quantity, unit_price, unit, product_group "
+            "FROM sale_items WHERE report_id = %s ORDER BY id ASC",
+            (report_id,),
+        )
+        updated_items = cur.fetchall()
+
+    return jsonify(_report_to_api_json(updated_report, updated_items))
+
+
+@app.delete("/api/reports/<int:report_id>")
+@login_required
+def api_delete_report(report_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM sales_reports WHERE id = %s", (report_id,))
+    db.commit()
+    return jsonify({"ok": True})
 
 
 def _scheduled_shift_for(db, emp_id: Any, attend_date: str) -> dict | None:
@@ -2952,7 +3075,8 @@ def api_quiz_submit():
     submitted_at = datetime.now(VN_TZ).strftime("%Y-%m-%d %H:%M:%S")
     employee_code = user["employee_code"]
     full_name = user["full_name"]
-    store_name = user["store_code"]
+    _, resolved_store_name = _get_store_info_by_code(db, user.get("store_code"))
+    store_name = resolved_store_name or user["store_code"]
     score_text = f"{earned}/{total}"
     with db.cursor() as cur:
         cur.execute(

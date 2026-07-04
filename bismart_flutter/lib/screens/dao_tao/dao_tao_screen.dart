@@ -1670,7 +1670,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final isOwnerById = post.authorId != null && post.authorId == currentUser.id;
     final isOwnerByName = post.authorName == currentUser.fullName;
     final role = (currentUser.position ?? '').toString().toUpperCase();
-    final isPrivileged = role == 'ADM' || role == 'TMK';
+    final isPrivileged = role == 'ADM' || role == 'ADMIN' || role == 'TMK';
     return isOwnerById || isOwnerByName || isPrivileged;
   }
 

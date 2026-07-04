@@ -18,13 +18,41 @@ from datetime import datetime, timedelta, timezone
 VN_TZ = timezone(timedelta(hours=7))
 
 class SmokeTest:
-    def __init__(self, backend_url: str, timeout: int = 30):
+    def __init__(self, backend_url: str, timeout: int = 30, username: str | None = None, password: str | None = None):
         self.backend_url = backend_url.rstrip('/')
         self.timeout = timeout
+        self.username = username
+        self.password = password
         self.token = None
         self.report_ids = []
         self.errors = []
-        
+
+    def test_login(self):
+        """Test 0: Authenticate so later tests can exercise protected endpoints."""
+        print("\n[TEST 0] Authentication")
+        print("-" * 50)
+        if not self.username or not self.password:
+            print("  ⚠ Skipping (no --username/--password provided)")
+            return True
+        try:
+            url = f"{self.backend_url}/api/auth/login"
+            r = requests.post(
+                url,
+                json={"username": self.username, "password": self.password},
+                timeout=self.timeout,
+            )
+            if r.status_code == 200:
+                self.token = r.json().get("token")
+                print("  ✓ Logged in successfully")
+                return True
+            print(f"  ✗ Status {r.status_code}: {r.text}")
+            self.errors.append(f"Login failed: {r.status_code}")
+            return False
+        except Exception as e:
+            print(f"  ✗ Error: {e}")
+            self.errors.append(f"Login failed: {e}")
+            return False
+
     def test_health(self):
         """Test 1: /healthz endpoint returns 200"""
         print("\n[TEST 1] Health Check")
@@ -73,7 +101,7 @@ class SmokeTest:
                     "nu": report_num,
                     "saleOut": report_num * 10,
                     "storeCode": f"ST{report_num:03d}",
-                    "reportMonth": now.strftime("%Y-%m"),
+                    "reportMonth": int(now.strftime("%Y%m")),
                     "revenue": 1000.0 * report_num,
                     "points": 100 + report_num,
                     "employeeCode": f"EMP{report_num:03d}",
@@ -121,10 +149,19 @@ class SmokeTest:
         # Check for duplicates (race condition symptom)
         report_ids = [r.get("report_id") for r in results if r.get("status") == "success"]
         unique_ids = set(report_ids)
-        
+
         print(f"  Created {len(report_ids)} reports")
         print(f"  Unique report IDs: {len(unique_ids)}")
-        
+
+        if not report_ids:
+            failures = [r for r in results if r.get("status") != "success"]
+            msg = f"No reports were created successfully ({len(failures)} failures)"
+            print(f"  ✗ {msg}")
+            for f in failures:
+                print(f"    · #{f.get('num')}: {f.get('error')}")
+            self.errors.append(msg)
+            return False
+
         if len(unique_ids) == len(report_ids):
             print(f"  ✓ No duplicate IDs - atomic RETURNING working correctly")
             self.report_ids = list(unique_ids)
@@ -207,6 +244,7 @@ class SmokeTest:
         print(f"Time: {datetime.now(tz=VN_TZ).isoformat()}")
         
         results = [
+            ("Authentication", self.test_login()),
             ("Health Check", self.test_health()),
             ("Concurrent Reports", self.test_concurrent_reports()),
             ("Data Persistence", self.test_data_persistence()),
@@ -261,10 +299,18 @@ def main():
         default=5,
         help="Number of concurrent report requests (default: 5)"
     )
-    
+    parser.add_argument(
+        "--username",
+        help="Username for login (required to exercise report/attendance tests)"
+    )
+    parser.add_argument(
+        "--password",
+        help="Password for login (required to exercise report/attendance tests)"
+    )
+
     args = parser.parse_args()
-    
-    tester = SmokeTest(args.backend, timeout=args.timeout)
+
+    tester = SmokeTest(args.backend, timeout=args.timeout, username=args.username, password=args.password)
     success = tester.run_all()
     
     return 0 if success else 1
