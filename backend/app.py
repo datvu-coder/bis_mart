@@ -2487,6 +2487,37 @@ def _is_admin_user():
     return role in ("ADM", "ADMIN", "TMK")
 
 
+@app.get("/api/ai-tools")
+@login_required
+def api_get_ai_tools():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT id, name, link FROM ai_tools ORDER BY id ASC")
+        rows = cur.fetchall()
+    return jsonify([{"id": r["id"], "name": r["name"], "link": r.get("link")} for r in rows])
+
+
+@app.post("/api/ai-tools")
+@login_required
+def api_create_ai_tool():
+    if not _is_admin_user():
+        return jsonify({"error": "Forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "name required"}), 400
+    link = (data.get("link") or "").strip() or None
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO ai_tools (name, link) VALUES (%s, %s) RETURNING id, name, link",
+            (name, link),
+        )
+        row = cur.fetchone()
+    db.commit()
+    return jsonify({"id": row["id"], "name": row["name"], "link": row.get("link")}), 201
+
+
 def _current_employee_info():
     user_id = (g.current_user or {}).get("user_id")
     if not user_id:

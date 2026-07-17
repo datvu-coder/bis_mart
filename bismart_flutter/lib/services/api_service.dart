@@ -540,6 +540,17 @@ class ApiService {
     return response.data as List<dynamic>;
   }
 
+  Future<Map<String, dynamic>> createAiTool({
+    required String name,
+    String? link,
+  }) async {
+    final response = await _dio.post('/api/ai-tools', data: {
+      'name': name,
+      if (link != null) 'link': link,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<List<dynamic>> getAiUsage({String? employeeCode}) async {
     final params = <String, dynamic>{};
     if (employeeCode != null) params['employeeCode'] = employeeCode;

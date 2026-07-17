@@ -131,6 +131,17 @@ class LmsProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<bool> addAiTool({required String name, String? link}) async {
+    try {
+      final created = await _api.createAiTool(name: name, link: link);
+      _aiTools = [..._aiTools, AiTool.fromJson(created)];
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> loadAiUsage({String? employeeCode}) async {
     try {
       final data = await _api.getAiUsage(employeeCode: employeeCode);
