@@ -1,0 +1,34 @@
+# Template for /opt/apps/bismart/docker-compose.yml on the VPS.
+# This file lives ONLY on the VPS (not built/synced by deploy-vps.sh) —
+# copy it there once by hand and adjust the TODOs before the first deploy.
+#
+# TODO: replace `bismart_shared_net` below with whatever network
+# bismart-postgres actually runs on. Find it with:
+#   docker inspect bismart-postgres --format '{{json .NetworkSettings.Networks}}'
+# If bismart-postgres isn't on a named bridge network yet, create one and
+# attach it:
+#   docker network create bismart_shared_net
+#   docker network connect bismart_shared_net bismart-postgres
+
+services:
+  backend:
+    image: bismart-backend:latest
+    container_name: bis_mart_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - bismart_lesson_videos:/data/lesson_videos
+      - bismart_post_videos:/data/post_videos
+    networks:
+      - bismart_shared_net
+
+volumes:
+  bismart_lesson_videos:
+  bismart_post_videos:
+
+networks:
+  bismart_shared_net:
+    external: true
