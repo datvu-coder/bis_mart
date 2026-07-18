@@ -53,8 +53,12 @@ jobs:
           echo "APPSTORE_P12_CERTIFICATE length: ${#APPSTORE_P12_CERTIFICATE}"
           echo "APPSTORE_PROVISIONING_PROFILE length: ${#APPSTORE_PROVISIONING_PROFILE}"
 
-          echo -n "$APPSTORE_P12_CERTIFICATE" | tr -d '[:space:]' | base64 -D -o "$CERTIFICATE_PATH"
-          echo -n "$APPSTORE_PROVISIONING_PROFILE" | tr -d '[:space:]' | base64 -D -o "$PROFILE_PATH"
+          # Keep only valid base64 alphabet characters. Whitespace alone isn't
+          # enough to sanitize copy-pasted secrets — stray characters (e.g. a
+          # trailing "%" some shells append when copying output that doesn't
+          # end in a newline) also break decoding and aren't whitespace.
+          echo -n "$APPSTORE_P12_CERTIFICATE" | tr -dc 'A-Za-z0-9+/=' | base64 -D -o "$CERTIFICATE_PATH"
+          echo -n "$APPSTORE_PROVISIONING_PROFILE" | tr -dc 'A-Za-z0-9+/=' | base64 -D -o "$PROFILE_PATH"
 
           echo "Decoded certificate.p12 size: $(wc -c < "$CERTIFICATE_PATH")"
           echo "Decoded profile.mobileprovision size: $(wc -c < "$PROFILE_PATH")"
