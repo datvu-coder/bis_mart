@@ -39,5 +39,14 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    # Pod targets never need their own signing identity/profile — Xcode
+    # re-signs embedded frameworks with Runner's own identity when it
+    # copies them into the app bundle. Without this, an Archive using
+    # Manual signing for Runner fails on every dynamic-framework pod with
+    # "conflicting provisioning settings" (they default to Automatic).
+    target.build_configurations.each do |config|
+      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+    end
   end
 end
