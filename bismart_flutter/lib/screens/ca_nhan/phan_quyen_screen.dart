@@ -1,6 +1,7 @@
+import 'dart:convert';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:html' as html show InputElement, FileReader, Blob, Url, AnchorElement;
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/permission.dart';
@@ -11,6 +12,8 @@ import '../../models/employee.dart';
 import '../../models/store.dart';
 import '../../providers/employee_provider.dart';
 import '../../services/api_service.dart';
+import '../../services/export_service_stub.dart'
+    if (dart.library.html) '../../services/export_service_web.dart';
 
 class PhanQuyenScreen extends StatefulWidget {
   const PhanQuyenScreen({super.key});
@@ -1158,54 +1161,45 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
         'NV001,CH001,PG\n'
         'NV002,CH002,SM\n'
         'NV003,CH001,ASM\n';
-    final blob = html.Blob([csv], 'text/csv;charset=utf-8');
-    final url = html.Url.createObjectUrlFromBlob(blob);
-    final anchor = html.AnchorElement(href: url)
-      ..setAttribute('download', 'mau_phan_cong.csv')
-      ..click();
-    html.Url.revokeObjectUrl(url);
+    downloadFile(utf8.encode(csv), 'mau_phan_cong.csv', 'text/csv;charset=utf-8');
   }
 
   Future<void> _importAssignmentsFromCsv(
       List<dynamic> stores, List<dynamic> employees) async {
-    final input = html.InputElement()
-      ..type = 'file'
-      ..accept = '.csv';
-    input.click();
+    final result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+      allowMultiple: false,
+      withData: true,
+    );
+    final bytes = result?.files.firstOrNull?.bytes;
+    if (bytes == null) return;
 
-    input.onChange.listen((_) {
-      final file = input.files?.isNotEmpty == true ? input.files!.first : null;
-      if (file == null) return;
+    final raw = utf8.decode(bytes, allowMalformed: true);
+    if (raw.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('File CSV trống.'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+      return;
+    }
 
-      final reader = html.FileReader();
-      reader.readAsText(file);
-      reader.onLoadEnd.listen((_) async {
-        final raw = (reader.result ?? '').toString();
-        if (raw.trim().isEmpty) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: const Text('File CSV trống.'),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: AppColors.error,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ));
-          }
-          return;
-        }
+    final lines = raw
+        .split(RegExp(r'\r?\n'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList();
+    if (lines.isEmpty) return;
 
-        final lines = raw
-            .split(RegExp(r'\r?\n'))
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList();
-        if (lines.isEmpty) return;
-
-        final start = lines.first.toLowerCase().contains('employeecode') ? 1 : 0;
-        if (start >= lines.length) return;
-
-        setState(() => _importingAssign = true);
-        int success = 0;
-        int failed = 0;
+    final start = lines.first.toLowerCase().contains('employeecode') ? 1 : 0;
+    if (start < lines.length) {
+      setState(() => _importingAssign = true);
+      int success = 0;
+      int failed = 0;
 
         final storeIdByCode = <String, String>{
           for (final s in stores)
@@ -1254,18 +1248,17 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
           }
         }
 
-        await _loadAssignments();
-        await _refreshCurrentUserPermissions();
-        if (mounted) {
-          setState(() => _importingAssign = false);
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Import xong: $success thành công, $failed thất bại.'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: failed == 0 ? AppColors.success : AppColors.warning,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ));
-        }
-      });
-    });
+      await _loadAssignments();
+      await _refreshCurrentUserPermissions();
+      if (mounted) {
+        setState(() => _importingAssign = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Import xong: $success thành công, $failed thất bại.'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: failed == 0 ? AppColors.success : AppColors.warning,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ));
+      }
+    }
   }
 }

@@ -1,10 +1,9 @@
-import 'dart:typed_data';
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -12,6 +11,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/lms_provider.dart';
 import '../../providers/training_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/common/desktop_layout.dart';
@@ -24,6 +24,28 @@ import '../../models/lesson.dart';
 import 'lesson_detail_screen.dart';
 import 'lesson_history_screen.dart';
 import 'post_detail_screen.dart';
+
+const _videoExtensions = {'mp4', 'mov', 'webm', 'm4v', 'avi', 'mkv'};
+
+bool _isVideoExtension(String? extension) =>
+    _videoExtensions.contains((extension ?? '').toLowerCase());
+
+String _imageMimeType(String? extension) {
+  switch ((extension ?? '').toLowerCase()) {
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'heic':
+      return 'image/heic';
+    case 'jpg':
+    case 'jpeg':
+    default:
+      return 'image/jpeg';
+  }
+}
 
 class DaoTaoScreen extends StatefulWidget {
   const DaoTaoScreen({super.key});
@@ -40,13 +62,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
   late TabController _tabController;
-  final List<_AiAssistantItem> _aiAssistants = [
-    const _AiAssistantItem(
-      name: 'AI Trợ lý Momcare',
-      description: 'Khám phá AI hỗ trợ chăm sóc mẹ & bé',
-      url: 'https://momcare.ai',
-    ),
-  ];
 
   @override
   void initState() {
@@ -54,6 +69,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TrainingProvider>().loadTrainingData();
+      context.read<LmsProvider>().loadAiTools();
     });
   }
 
@@ -331,6 +347,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
 
   Widget _buildAiAssistantPanel(bool canManageAi) {
     final isMobile = MediaQuery.of(context).size.width < 900;
+    final aiTools = context.watch<LmsProvider>().aiTools;
     return DataPanel(
       // Mobile: padding ngang = 0 → nội dung cách mép màn hình 2 px
       // (do outer SingleChildScrollView = 2 px), đồng nhất toàn tab.
@@ -344,62 +361,70 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               label: const Text('Thêm AI'),
             )
           : null,
-      child: Column(
-        children: _aiAssistants.map((item) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(14),
-                onTap: () => _openAiTool(item.url),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(Icons.auto_awesome_rounded,
-                            color: Colors.white, size: 20),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+      child: aiTools.isEmpty
+          ? Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Text('Chưa có trợ lý AI nào.',
+                  style: AppTextStyles.caption),
+            )
+          : Column(
+              children: aiTools.map((item) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => _openAiTool(item.link ?? ''),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Row(
                           children: [
-                            Text(item.name,
-                                style: AppTextStyles.bodyTextMedium
-                                    .copyWith(color: Colors.white)),
-                            const SizedBox(height: 2),
-                            Text(item.description,
-                                style: AppTextStyles.caption
-                                    .copyWith(color: Colors.white70)),
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.auto_awesome_rounded,
+                                  color: Colors.white, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(item.name,
+                                      style: AppTextStyles.bodyTextMedium
+                                          .copyWith(color: Colors.white)),
+                                  if ((item.link ?? '').isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(item.link!,
+                                        style: AppTextStyles.caption
+                                            .copyWith(color: Colors.white70)),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.open_in_new_rounded,
+                                color: Colors.white70, size: 18),
                           ],
                         ),
                       ),
-                      const Icon(Icons.open_in_new_rounded,
-                          color: Colors.white70, size: 18),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              }).toList(),
             ),
-          );
-        }).toList(),
-      ),
     );
   }
 
@@ -745,113 +770,88 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         builder: (ctx, setDialogState) {
           Future<void> pickMedia({bool videoOnly = false}) async {
             try {
-              final uploadInput = html.FileUploadInputElement()
-                ..accept = videoOnly ? 'video/*' : 'image/*,video/*'
-                ..multiple = true;
-              html.document.body!.append(uploadInput);
-              uploadInput.onChange.listen((event) async {
-                final files = uploadInput.files;
-                if (files == null) return;
-                for (final file in files) {
-                  final isVideo = file.type.startsWith('video/');
-                  if (isVideo) {
-                    // Only one video per post.
-                    if (pickedFiles.any((f) => f['isVideo'] == true)) {
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(
-                            content:
-                                Text('Mỗi bài chỉ được đính kèm 1 video.'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                      continue;
-                    }
-                    if (file.size > 1024 * 1024 * 1024) {
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(
-                            content: Text('Video vượt quá 1GB.'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                      continue;
-                    }
-                    // Insert placeholder while uploading.
-                    final placeholder = <String, dynamic>{
-                      'name': file.name,
-                      'isVideo': true,
-                      'uploading': true,
-                      'progress': 0.0,
-                    };
-                    setDialogState(() => pickedFiles.add(placeholder));
-                    try {
-                      final reader = html.FileReader();
-                      final completer = Completer<List<int>>();
-                      reader.onLoadEnd.listen((_) {
-                        final result = reader.result;
-                        if (result is List<int>) {
-                          completer.complete(result);
-                        } else if (result is ByteBuffer) {
-                          completer
-                              .complete(Uint8List.view(result));
-                        } else {
-                          completer.completeError(
-                              StateError('unexpected reader result'));
-                        }
-                      });
-                      reader.onError.listen((_) =>
-                          completer.completeError(StateError('read error')));
-                      reader.readAsArrayBuffer(file);
-                      final bytes = await completer.future;
-                      final remote = await ApiService().uploadPostVideo(
-                        bytes: bytes,
-                        filename: file.name,
-                        onProgress: (sent, total) {
-                          if (total > 0) {
-                            setDialogState(() {
-                              placeholder['progress'] = sent / total;
-                            });
-                          }
-                        },
+              final result = await FilePicker.pickFiles(
+                type: videoOnly ? FileType.video : FileType.media,
+                allowMultiple: true,
+                withData: true,
+              );
+              if (result == null) return;
+              for (final file in result.files) {
+                final bytes = file.bytes;
+                if (bytes == null) continue;
+                final isVideo = _isVideoExtension(file.extension);
+                if (isVideo) {
+                  // Only one video per post.
+                  if (pickedFiles.any((f) => f['isVideo'] == true)) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text('Mỗi bài chỉ được đính kèm 1 video.'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
                       );
-                      setDialogState(() {
-                        placeholder['uploading'] = false;
-                        placeholder['remoteUrl'] = remote;
-                        placeholder['progress'] = 1.0;
-                      });
-                    } catch (e) {
-                      setDialogState(() => pickedFiles.remove(placeholder));
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(
-                            content: Text('Tải video lỗi: $e'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
                     }
-                  } else {
-                    final reader = html.FileReader();
-                    reader.onLoadEnd.listen((_) {
-                      final dataUrl = reader.result as String?;
-                      if (dataUrl != null) {
-                        setDialogState(() {
-                          pickedFiles.add({
-                            'name': file.name,
-                            'dataUrl': dataUrl,
-                            'isVideo': false,
-                          });
-                        });
-                      }
-                    });
-                    reader.readAsDataUrl(file);
+                    continue;
                   }
+                  if (file.size > 1024 * 1024 * 1024) {
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text('Video vượt quá 1GB.'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                    continue;
+                  }
+                  // Insert placeholder while uploading.
+                  final placeholder = <String, dynamic>{
+                    'name': file.name,
+                    'isVideo': true,
+                    'uploading': true,
+                    'progress': 0.0,
+                  };
+                  setDialogState(() => pickedFiles.add(placeholder));
+                  try {
+                    final remote = await ApiService().uploadPostVideo(
+                      bytes: bytes,
+                      filename: file.name,
+                      onProgress: (sent, total) {
+                        if (total > 0) {
+                          setDialogState(() {
+                            placeholder['progress'] = sent / total;
+                          });
+                        }
+                      },
+                    );
+                    setDialogState(() {
+                      placeholder['uploading'] = false;
+                      placeholder['remoteUrl'] = remote;
+                      placeholder['progress'] = 1.0;
+                    });
+                  } catch (e) {
+                    setDialogState(() => pickedFiles.remove(placeholder));
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text('Tải video lỗi: $e'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  }
+                } else {
+                  final dataUrl =
+                      'data:${_imageMimeType(file.extension)};base64,${base64Encode(bytes)}';
+                  setDialogState(() {
+                    pickedFiles.add({
+                      'name': file.name,
+                      'dataUrl': dataUrl,
+                      'isVideo': false,
+                    });
+                  });
                 }
-              });
-              uploadInput.click();
+              }
             } catch (_) {
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
@@ -1951,33 +1951,28 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                                         ? null
                                         : () async {
                                             try {
-                                              final input = html.FileUploadInputElement()
-                                                ..accept = 'video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v'
-                                                ..multiple = false;
-                                              input.click();
-                                              await input.onChange.first;
-                                              final files = input.files;
-                                              if (files == null || files.isEmpty) return;
-                                              final file = files.first;
-                                              final name = file.name.toLowerCase();
-                                              const allowed = ['.mp4', '.webm', '.mov', '.m4v'];
-                                              if (!allowed.any(name.endsWith)) {
+                                              final result = await FilePicker.pickFiles(
+                                                type: FileType.video,
+                                                allowMultiple: false,
+                                                withData: true,
+                                              );
+                                              if (result == null || result.files.isEmpty) return;
+                                              final file = result.files.first;
+                                              const allowed = ['mp4', 'webm', 'mov', 'm4v'];
+                                              if (!allowed.contains((file.extension ?? '').toLowerCase())) {
                                                 setS(() => errorMsg = 'Định dạng không hỗ trợ. Chỉ nhận: mp4, webm, mov, m4v');
                                                 return;
                                               }
-                                              final reader = html.FileReader();
-                                              reader.readAsArrayBuffer(file);
-                                              await reader.onLoad.first;
-                                              final result = reader.result;
-                                              if (result is List<int>) {
-                                                setS(() {
-                                                  videoBytes = Uint8List.fromList(result);
-                                                  videoFilename = file.name;
-                                                  errorMsg = null;
-                                                });
-                                              } else {
+                                              final bytes = file.bytes;
+                                              if (bytes == null) {
                                                 setS(() => errorMsg = 'Không đọc được dữ liệu file.');
+                                                return;
                                               }
+                                              setS(() {
+                                                videoBytes = bytes;
+                                                videoFilename = file.name;
+                                                errorMsg = null;
+                                              });
                                             } catch (e) {
                                               setS(() => errorMsg = 'Lỗi mở file: $e');
                                             }
@@ -2283,92 +2278,84 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     }
 
     final nameController = TextEditingController();
-    final descController = TextEditingController();
     final urlController = TextEditingController(text: 'https://');
+    bool saving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Thêm trợ lý AI mới'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(
-                labelText: 'Tên AI',
-                border: OutlineInputBorder(),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Thêm trợ lý AI mới'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Tên AI',
+                  border: OutlineInputBorder(),
+                ),
               ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: urlController,
+                decoration: const InputDecoration(
+                  labelText: 'Đường dẫn',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: saving ? null : () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: descController,
-              decoration: const InputDecoration(
-                labelText: 'Mô tả ngắn',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: urlController,
-              decoration: const InputDecoration(
-                labelText: 'Đường dẫn',
-                border: OutlineInputBorder(),
-              ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final name = nameController.text.trim();
+                      final url = urlController.text.trim();
+                      final parsed = Uri.tryParse(url);
+
+                      if (name.isEmpty ||
+                          parsed == null ||
+                          parsed.scheme.isEmpty ||
+                          parsed.host.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Vui lòng nhập đầy đủ và URL hợp lệ.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => saving = true);
+                      final ok = await context
+                          .read<LmsProvider>()
+                          .addAiTool(name: name, link: url);
+                      if (!ctx.mounted) return;
+                      if (ok) {
+                        Navigator.pop(ctx);
+                      } else {
+                        setDialogState(() => saving = false);
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                            content: Text('Không thể thêm trợ lý AI. Vui lòng thử lại.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+              child: Text(saving ? 'Đang lưu...' : 'Thêm'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              final desc = descController.text.trim();
-              final url = urlController.text.trim();
-              final parsed = Uri.tryParse(url);
-
-              if (name.isEmpty ||
-                  desc.isEmpty ||
-                  parsed == null ||
-                  parsed.scheme.isEmpty ||
-                  parsed.host.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Vui lòng nhập đầy đủ và URL hợp lệ.'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-                return;
-              }
-
-              setState(() {
-                _aiAssistants.add(
-                  _AiAssistantItem(name: name, description: desc, url: url),
-                );
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text('Thêm'),
-          ),
-        ],
       ),
     );
   }
-}
-
-class _AiAssistantItem {
-  final String name;
-  final String description;
-  final String url;
-
-  const _AiAssistantItem({
-    required this.name,
-    required this.description,
-    required this.url,
-  });
 }
 
 class _QuizDraft {

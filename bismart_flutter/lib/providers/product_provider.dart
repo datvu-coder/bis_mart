@@ -67,28 +67,39 @@ class ProductProvider extends ChangeNotifier {
     return _products.where((p) => p.productGroup == group).toList();
   }
 
-  void addProduct(Product product) async {
+  Future<bool> addProduct(Product product) async {
     try {
       final result = await _api.createProduct(product.toJson());
       _products.add(Product.fromJson(result));
+      notifyListeners();
+      return true;
     } catch (_) {
-      _products.add(product);
+      return false;
     }
-    notifyListeners();
   }
 
-  void updateProduct(Product updated) async {
-    try { await _api.updateProduct(int.parse(updated.id), updated.toJson()); } catch (_) {}
+  Future<bool> updateProduct(Product updated) async {
+    try {
+      await _api.updateProduct(int.parse(updated.id), updated.toJson());
+    } catch (_) {
+      return false;
+    }
     final index = _products.indexWhere((p) => p.id == updated.id);
     if (index != -1) {
       _products[index] = updated;
       notifyListeners();
     }
+    return true;
   }
 
-  void deleteProduct(String id) async {
-    try { await _api.deleteProduct(int.parse(id)); } catch (_) {}
+  Future<bool> deleteProduct(String id) async {
+    try {
+      await _api.deleteProduct(int.parse(id));
+    } catch (_) {
+      return false;
+    }
     _products.removeWhere((p) => p.id == id);
     notifyListeners();
+    return true;
   }
 }

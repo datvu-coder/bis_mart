@@ -1,27 +1,11 @@
-import 'dart:async';
 import 'dart:math' as math;
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'location_platform_stub.dart'
+    if (dart.library.html) 'location_platform_web.dart'
+    if (dart.library.io) 'location_platform_io.dart';
 
 class LocationService {
-  static Future<({double latitude, double longitude})> getCurrentPosition() async {
-    final completer = Completer<({double latitude, double longitude})>();
-
-    html.window.navigator.geolocation.getCurrentPosition().then((position) {
-      final coords = position.coords;
-      if (coords == null) {
-        completer.completeError('Không thể lấy toạ độ GPS');
-        return;
-      }
-      completer.complete((
-        latitude: (coords.latitude ?? 0).toDouble(),
-        longitude: (coords.longitude ?? 0).toDouble(),
-      ));
-    }).catchError((error) {
-      completer.completeError('Không thể lấy vị trí GPS. Vui lòng cấp quyền truy cập vị trí.');
-    });
-
-    return completer.future;
+  static Future<({double latitude, double longitude})> getCurrentPosition() {
+    return getPlatformPosition();
   }
 
   /// Haversine distance in meters

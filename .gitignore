@@ -12,6 +12,13 @@ bismart.db-wal
 # macOS
 .DS_Store
 
+# Local debug/API response dumps (may contain tokens or PII)
+token.txt
+login_res.json
+products_res.txt
+stores_res.txt
+permissions.json
+
 # Flutter
 bismart_flutter/.dart_tool/
 bismart_flutter/.idea/

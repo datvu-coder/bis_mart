@@ -31,7 +31,10 @@ dependencies:
 
   # Video player (anti-piracy lesson playback)
   video_player: ^2.9.1
-  file_picker: ^8.1.4
+  file_picker: ^11.0.2
+
+  # GPS check-in (mobile)
+  geolocator: ^13.0.4
 
 dev_dependencies:
   flutter_test:
