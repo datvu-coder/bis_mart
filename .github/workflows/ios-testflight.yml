@@ -50,8 +50,8 @@ jobs:
           KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
           KEYCHAIN_PASSWORD="$(uuidgen)"
 
-          echo -n "$APPSTORE_P12_CERTIFICATE" | base64 --decode -o "$CERTIFICATE_PATH"
-          echo -n "$APPSTORE_PROVISIONING_PROFILE" | base64 --decode -o "$PROFILE_PATH"
+          echo -n "$APPSTORE_P12_CERTIFICATE" | base64 -D -o "$CERTIFICATE_PATH"
+          echo -n "$APPSTORE_PROVISIONING_PROFILE" | base64 -D -o "$PROFILE_PATH"
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
