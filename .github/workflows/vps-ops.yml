@@ -1,0 +1,88 @@
+name: VPS Ops
+
+# Manually-triggered maintenance actions for the backend VPS, meant to be
+# run by tapping "Run workflow" from the GitHub app/web on a phone — no
+# terminal or SSH client needed on the operator's device. The workflow
+# itself holds the SSH key (as a repo secret) and does the SSH/DB work.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Hành động'
+        required: true
+        default: 'diagnose'
+        type: choice
+        options:
+          - diagnose
+          - restart_backend
+          - set_admin
+
+jobs:
+  ops:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -H 146.196.64.92 >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Diagnose backend
+        if: ${{ github.event.inputs.action == 'diagnose' }}
+        run: |
+          ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=accept-new root@146.196.64.92 '
+            set -e
+            echo "=== containers ==="
+            docker ps -a --filter "name=bismart" --filter "name=bis_mart"
+            echo
+            echo "=== backend logs (last 150 lines) ==="
+            docker logs --tail 150 bis_mart_backend 2>&1 || echo "(khong tim thay container bis_mart_backend)"
+            echo
+            echo "=== backend health ==="
+            docker inspect --format="Status: {{.State.Status}}  Health: {{if .State.Health}}{{.State.Health.Status}}{{else}}(no healthcheck){{end}}" bis_mart_backend 2>&1 || true
+            echo
+            echo "=== disk space ==="
+            df -h /
+          '
+
+      - name: Restart backend
+        if: ${{ github.event.inputs.action == 'restart_backend' }}
+        run: |
+          ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=accept-new root@146.196.64.92 '
+            set -e
+            cd /opt/apps/bismart
+            docker compose up -d --force-recreate
+            sleep 5
+            docker compose ps
+            echo
+            echo "=== backend logs after restart ==="
+            docker logs --tail 50 bis_mart_backend
+          '
+
+      - name: Set admin account
+        if: ${{ github.event.inputs.action == 'set_admin' }}
+        env:
+          ADMIN_EMPLOYEE_CODE: ${{ secrets.ADMIN_EMPLOYEE_CODE }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          if [ -z "$ADMIN_EMPLOYEE_CODE" ] || [ -z "$ADMIN_PASSWORD" ]; then
+            echo "Thieu secret ADMIN_EMPLOYEE_CODE hoac ADMIN_PASSWORD" >&2
+            exit 1
+          fi
+          ESC_PW=$(printf '%s' "$ADMIN_PASSWORD" | sed "s/'/''/g")
+          ESC_CODE=$(printf '%s' "$ADMIN_EMPLOYEE_CODE" | sed "s/'/''/g")
+          cat > /tmp/set_admin.sql <<SQL
+          UPDATE employees SET password='$ESC_PW', position='ADM' WHERE employee_code='$ESC_CODE';
+          SELECT employee_code, position FROM employees WHERE employee_code='$ESC_CODE';
+          SQL
+          ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=accept-new root@146.196.64.92 \
+            'docker exec -i bismart-postgres psql -U bismart -d bismart' < /tmp/set_admin.sql
+          rm -f /tmp/set_admin.sql
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/vps_key
