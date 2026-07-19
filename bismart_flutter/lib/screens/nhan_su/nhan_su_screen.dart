@@ -881,67 +881,139 @@ class _NhanSuScreenState extends State<NhanSuScreen>
             ],
           ),
           const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    children: [
-                      headerCell('Nhân viên', width: 150),
-                      headerCell('Ngày', width: 50, align: TextAlign.center),
-                      headerCell('Giờ', width: 60, align: TextAlign.center),
-                      headerCell('Muộn', width: 70, align: TextAlign.center),
-                      headerCell('Về sớm', width: 80, align: TextAlign.center),
-                      headerCell('OT', width: 60, align: TextAlign.center),
-                    ],
-                  ),
-                ),
-                ...rows.map((r) {
-                  final name = (r['fullName'] ?? '').toString();
-                  final daysWorked = (r['daysWorked'] ?? 0).toString();
-                  final totalHours = (r['totalHours'] ?? 0).toString();
-                  final lateCount = (r['lateCount'] ?? 0) as int;
-                  final lateMinutes = (r['lateMinutes'] ?? 0) as int;
-                  final earlyCount = (r['earlyLeaveCount'] ?? 0) as int;
-                  final earlyMinutes = (r['earlyLeaveMinutes'] ?? 0) as int;
-                  final overtimeMin = (r['overtimeMinutes'] ?? 0) as int;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: AppColors.white,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+          if (isMobile)
+            Column(
+              children: rows.map((r) => _buildHoursReportMobileCard(r)).toList(),
+            )
+          else
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
                       children: [
-                        bodyCell(name, width: 150, fw: FontWeight.w600),
-                        bodyCell(daysWorked, width: 50, align: TextAlign.center),
-                        bodyCell('${totalHours}h', width: 60, align: TextAlign.center,
-                            color: AppColors.info, fw: FontWeight.w700),
-                        bodyCell(lateCount > 0 ? '$lateCount/${lateMinutes}\'' : '0',
-                            width: 70,
-                            align: TextAlign.center,
-                            color: lateCount > 0 ? AppColors.error : AppColors.textGrey,
-                            fw: lateCount > 0 ? FontWeight.w700 : FontWeight.w500),
-                        bodyCell(earlyCount > 0 ? '$earlyCount/${earlyMinutes}\'' : '0',
-                            width: 80,
-                            align: TextAlign.center,
-                            color: earlyCount > 0 ? AppColors.error : AppColors.textGrey,
-                            fw: earlyCount > 0 ? FontWeight.w700 : FontWeight.w500),
-                        bodyCell(overtimeMin > 0 ? '${overtimeMin}\'' : '0',
-                            width: 60,
-                            align: TextAlign.center,
-                            color: overtimeMin > 0 ? AppColors.success : AppColors.textGrey,
-                            fw: overtimeMin > 0 ? FontWeight.w700 : FontWeight.w500),
+                        headerCell('Nhân viên', width: 150),
+                        headerCell('Ngày', width: 50, align: TextAlign.center),
+                        headerCell('Giờ', width: 60, align: TextAlign.center),
+                        headerCell('Muộn', width: 70, align: TextAlign.center),
+                        headerCell('Về sớm', width: 80, align: TextAlign.center),
+                        headerCell('OT', width: 60, align: TextAlign.center),
                       ],
                     ),
-                  );
-                }),
-              ],
+                  ),
+                  ...rows.map((r) {
+                    final name = (r['fullName'] ?? '').toString();
+                    final daysWorked = (r['daysWorked'] ?? 0).toString();
+                    final totalHours = (r['totalHours'] ?? 0).toString();
+                    final lateCount = (r['lateCount'] ?? 0) as int;
+                    final lateMinutes = (r['lateMinutes'] ?? 0) as int;
+                    final earlyCount = (r['earlyLeaveCount'] ?? 0) as int;
+                    final earlyMinutes = (r['earlyLeaveMinutes'] ?? 0) as int;
+                    final overtimeMin = (r['overtimeMinutes'] ?? 0) as int;
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          bodyCell(name, width: 150, fw: FontWeight.w600),
+                          bodyCell(daysWorked, width: 50, align: TextAlign.center),
+                          bodyCell('${totalHours}h', width: 60, align: TextAlign.center,
+                              color: AppColors.info, fw: FontWeight.w700),
+                          bodyCell(lateCount > 0 ? '$lateCount/${lateMinutes}\'' : '0',
+                              width: 70,
+                              align: TextAlign.center,
+                              color: lateCount > 0 ? AppColors.error : AppColors.textGrey,
+                              fw: lateCount > 0 ? FontWeight.w700 : FontWeight.w500),
+                          bodyCell(earlyCount > 0 ? '$earlyCount/${earlyMinutes}\'' : '0',
+                              width: 80,
+                              align: TextAlign.center,
+                              color: earlyCount > 0 ? AppColors.error : AppColors.textGrey,
+                              fw: earlyCount > 0 ? FontWeight.w700 : FontWeight.w500),
+                          bodyCell(overtimeMin > 0 ? '${overtimeMin}\'' : '0',
+                              width: 60,
+                              align: TextAlign.center,
+                              color: overtimeMin > 0 ? AppColors.success : AppColors.textGrey,
+                              fw: overtimeMin > 0 ? FontWeight.w700 : FontWeight.w500),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHoursReportMobileCard(Map<String, dynamic> r) {
+    final name = (r['fullName'] ?? '').toString();
+    final daysWorked = (r['daysWorked'] ?? 0).toString();
+    final totalHours = (r['totalHours'] ?? 0).toString();
+    final lateCount = (r['lateCount'] ?? 0) as int;
+    final lateMinutes = (r['lateMinutes'] ?? 0) as int;
+    final earlyCount = (r['earlyLeaveCount'] ?? 0) as int;
+    final earlyMinutes = (r['earlyLeaveMinutes'] ?? 0) as int;
+    final overtimeMin = (r['overtimeMinutes'] ?? 0) as int;
+
+    Widget stat(String label, String value, {Color? color}) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: (color ?? AppColors.textGrey).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          '$label $value',
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w700,
+            color: color ?? AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(name,
+                    style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700)),
+              ),
+              const SizedBox(width: 8),
+              stat('Giờ', '${totalHours}h', color: AppColors.info),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              stat('Ngày', daysWorked),
+              stat('Muộn', lateCount > 0 ? '$lateCount/${lateMinutes}\'' : '0',
+                  color: lateCount > 0 ? AppColors.error : null),
+              stat('Về sớm', earlyCount > 0 ? '$earlyCount/${earlyMinutes}\'' : '0',
+                  color: earlyCount > 0 ? AppColors.error : null),
+              stat('OT', overtimeMin > 0 ? '${overtimeMin}\'' : '0',
+                  color: overtimeMin > 0 ? AppColors.success : null),
+            ],
           ),
         ],
       ),
