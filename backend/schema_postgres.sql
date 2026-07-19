@@ -346,13 +346,104 @@ CREATE TABLE IF NOT EXISTS training_events (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- Migration: add store_code to pre-existing tables from before this column
--- was introduced (CREATE TABLE IF NOT EXISTS is a no-op on those, so the
--- column would otherwise never appear and the indexes below would fail).
+-- Migration: add columns to pre-existing tables from before those columns
+-- were introduced (CREATE TABLE IF NOT EXISTS is a no-op on those, so the
+-- columns would otherwise never appear — first store_code broke the
+-- indexes below, then password broke the login auto-provision flow, so
+-- the rest of employees' newer columns are guarded here too to avoid
+-- finding out about each one via a production crash).
 DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='date_of_birth') THEN
+        ALTER TABLE employees ADD COLUMN date_of_birth TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='cccd') THEN
+        ALTER TABLE employees ADD COLUMN cccd TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='address') THEN
+        ALTER TABLE employees ADD COLUMN address TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='status') THEN
+        ALTER TABLE employees ADD COLUMN status TEXT NOT NULL DEFAULT 'Chính thức';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='position') THEN
+        ALTER TABLE employees ADD COLUMN position TEXT NOT NULL DEFAULT 'PG';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='department') THEN
+        ALTER TABLE employees ADD COLUMN department TEXT NOT NULL DEFAULT 'Kinh doanh';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='work_location') THEN
+        ALTER TABLE employees ADD COLUMN work_location TEXT NOT NULL DEFAULT '';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='province') THEN
+        ALTER TABLE employees ADD COLUMN province TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='area') THEN
+        ALTER TABLE employees ADD COLUMN area TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='created_date') THEN
+        ALTER TABLE employees ADD COLUMN created_date TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='probation_date') THEN
+        ALTER TABLE employees ADD COLUMN probation_date TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='official_date') THEN
+        ALTER TABLE employees ADD COLUMN official_date TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='resign_date') THEN
+        ALTER TABLE employees ADD COLUMN resign_date TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='resign_reason') THEN
+        ALTER TABLE employees ADD COLUMN resign_reason TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='phone') THEN
+        ALTER TABLE employees ADD COLUMN phone TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='email') THEN
+        ALTER TABLE employees ADD COLUMN email TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='password') THEN
+        ALTER TABLE employees ADD COLUMN password TEXT DEFAULT '1111';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='avatar_url') THEN
+        ALTER TABLE employees ADD COLUMN avatar_url TEXT;
+    END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                                  WHERE table_name='employees' AND column_name='store_code') THEN
         ALTER TABLE employees ADD COLUMN store_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='geo_position') THEN
+        ALTER TABLE employees ADD COLUMN geo_position TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='score') THEN
+        ALTER TABLE employees ADD COLUMN score INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='rank_level') THEN
+        ALTER TABLE employees ADD COLUMN rank_level TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='is_active') THEN
+        ALTER TABLE employees ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                                  WHERE table_name='sales_reports' AND column_name='store_code') THEN
