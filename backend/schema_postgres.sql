@@ -346,6 +346,24 @@ CREATE TABLE IF NOT EXISTS training_events (
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- Migration: add store_code to pre-existing tables from before this column
+-- was introduced (CREATE TABLE IF NOT EXISTS is a no-op on those, so the
+-- column would otherwise never appear and the indexes below would fail).
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='employees' AND column_name='store_code') THEN
+        ALTER TABLE employees ADD COLUMN store_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='store_code') THEN
+        ALTER TABLE sales_reports ADD COLUMN store_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sale_items' AND column_name='store_code') THEN
+        ALTER TABLE sale_items ADD COLUMN store_code TEXT;
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_employees_code ON employees(employee_code);
 CREATE INDEX IF NOT EXISTS idx_employees_position ON employees(position);
 CREATE INDEX IF NOT EXISTS idx_employees_store ON employees(store_code);
