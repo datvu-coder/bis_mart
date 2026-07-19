@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../models/employee.dart';
 import '../services/auth_service.dart';
@@ -30,11 +31,38 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _error = 'Lỗi: $e';
+      _error = _friendlyLoginError(e);
       _isLoading = false;
       notifyListeners();
       return false;
     }
+  }
+
+  String _friendlyLoginError(Object e) {
+    if (e is DioException) {
+      switch (e.type) {
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          return 'Kết nối đến máy chủ quá lâu. Vui lòng kiểm tra mạng và thử lại.';
+        case DioExceptionType.connectionError:
+          return 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng.';
+        case DioExceptionType.badResponse:
+          final status = e.response?.statusCode;
+          final data = e.response?.data;
+          final serverMessage = (data is Map) ? data['error'] as String? : null;
+          if (status == 401 || status == 400) {
+            return 'Mã nhân viên hoặc mật khẩu không đúng.';
+          }
+          if (status != null && status >= 500) {
+            return 'Hệ thống đang gặp sự cố. Vui lòng thử lại sau ít phút.';
+          }
+          return serverMessage ?? 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+        default:
+          return 'Không thể kết nối đến máy chủ. Vui lòng thử lại.';
+      }
+    }
+    return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
   }
 
   Future<void> logout() async {
