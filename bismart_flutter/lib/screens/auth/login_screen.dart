@@ -100,11 +100,6 @@ class _LoginScreenState extends State<LoginScreen>
                             width: 88,
                             height: 88,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
                               borderRadius: BorderRadius.circular(24),
                               boxShadow: [
                                 BoxShadow(
@@ -114,15 +109,11 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                               ],
                             ),
-                            child: const Center(
-                              child: Text(
-                                'B',
-                                style: TextStyle(
-                                  color: AppColors.white,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 44,
-                                  letterSpacing: -1,
-                                ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.cover,
                               ),
                             ),
                           ),
@@ -192,9 +183,6 @@ class _LoginScreenState extends State<LoginScreen>
                                     width: 68,
                                     height: 68,
                                     decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                                      ),
                                       borderRadius: BorderRadius.circular(20),
                                       boxShadow: [
                                         BoxShadow(
@@ -204,14 +192,11 @@ class _LoginScreenState extends State<LoginScreen>
                                         ),
                                       ],
                                     ),
-                                    child: const Center(
-                                      child: Text(
-                                        'B',
-                                        style: TextStyle(
-                                          color: AppColors.white,
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: 34,
-                                        ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(20),
+                                      child: Image.asset(
+                                        'assets/images/logo.png',
+                                        fit: BoxFit.cover,
                                       ),
                                     ),
                                   ),
