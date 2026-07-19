@@ -46,7 +46,7 @@ jobs:
         working-directory: bismart_flutter/ios
 
       - name: Flutter build (compiles Dart, prepares Flutter.framework)
-        run: flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign --build-number=${{ github.run_number }}
 
       # Manual signing: import the team's existing Apple Distribution
       # certificate + provisioning profile instead of letting Xcode
