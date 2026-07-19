@@ -207,9 +207,6 @@ class _MobileDrawer extends StatelessWidget {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                      ),
                       borderRadius: BorderRadius.circular(14),
                       boxShadow: [
                         BoxShadow(
@@ -219,9 +216,9 @@ class _MobileDrawer extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: const Center(
-                      child: Text('B',
-                        style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -467,11 +464,6 @@ class _DesktopSidebar extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
               borderRadius: BorderRadius.circular(13),
               boxShadow: [
                 BoxShadow(
@@ -481,16 +473,9 @@ class _DesktopSidebar extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Center(
-              child: Text(
-                'B',
-                style: TextStyle(
-                  color: AppColors.white,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 22,
-                  letterSpacing: -0.5,
-                ),
-              ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(13),
+              child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
             ),
           ),
           if (isExpanded) ...[
