@@ -75,19 +75,13 @@ jobs:
           cp "$PROFILE_PATH" ~/Library/MobileDevice/Provisioning\ Profiles/
 
       - name: Archive
-        env:
-          APPSTORE_TEAM_ID: ${{ secrets.APPSTORE_TEAM_ID }}
         run: |
           xcodebuild archive \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -sdk iphoneos \
             -configuration Release \
-            -archivePath "$PWD/build/ios/Runner.xcarchive" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            DEVELOPMENT_TEAM="$APPSTORE_TEAM_ID" \
-            PROVISIONING_PROFILE_SPECIFIER="Bismart"
+            -archivePath "$PWD/build/ios/Runner.xcarchive"
 
       - name: Export IPA
         run: |
