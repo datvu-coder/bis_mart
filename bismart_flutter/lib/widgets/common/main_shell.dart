@@ -44,23 +44,6 @@ class _MainShellState extends State<MainShell> {
     _NavItem(Icons.person_outline_rounded, Icons.person_rounded, AppStrings.caNhan),
   ];
 
-  Widget _buildPage(int index) {
-    switch (index) {
-      case 0:
-        return const DashboardScreen();
-      case 1:
-        return const NhanSuScreen();
-      case 2:
-        return const KinhDoanhScreen();
-      case 3:
-        return const DaoTaoScreen();
-      case 4:
-        return const CaNhanScreen();
-      default:
-        return const DashboardScreen();
-    }
-  }
-
   void _onNavTap(int index) {
     setState(() => _selectedIndex = index);
     _pageController.animateToPage(
@@ -124,22 +107,30 @@ class _MainShellState extends State<MainShell> {
         shape: const Border(
           bottom: BorderSide(color: AppColors.sidebarBorder, width: 1),
         ),
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_rounded, color: AppColors.textDark),
-            onPressed: () => Scaffold.of(ctx).openDrawer(),
-          ),
+        automaticallyImplyLeading: false,
+        title: Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              _navItems[_selectedIndex].label,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textDark,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ],
         ),
-        title: Text(
-          _navItems[_selectedIndex].label,
-          style: const TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textDark,
-            letterSpacing: -0.3,
-          ),
-        ),
-        centerTitle: true,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: AppColors.textHint, size: 22),
@@ -148,17 +139,6 @@ class _MainShellState extends State<MainShell> {
           ),
           const SizedBox(width: 4),
         ],
-      ),
-      drawer: _MobileDrawer(
-        selectedIndex: _selectedIndex,
-        onItemTap: (i) {
-          _onNavTap(i);
-          Navigator.pop(context);
-        },
-        onLogout: () {
-          Navigator.pop(context);
-          _handleLogout();
-        },
       ),
       body: PageView(
         controller: _pageController,
@@ -172,187 +152,16 @@ class _MainShellState extends State<MainShell> {
           CaNhanScreen(),
         ],
       ),
-    );
-  }
-}
-
-// --- Mobile Drawer ---
-class _MobileDrawer extends StatelessWidget {
-  final int selectedIndex;
-  final ValueChanged<int> onItemTap;
-  final VoidCallback onLogout;
-
-  const _MobileDrawer({
-    required this.selectedIndex,
-    required this.onItemTap,
-    required this.onLogout,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final user = context.watch<AuthProvider>().currentUser;
-
-    return Drawer(
-      backgroundColor: AppColors.sidebarBg,
-      child: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 24),
-            // Logo
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.28),
-                          blurRadius: 14,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  const Text(AppStrings.appName,
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textDark, letterSpacing: -0.4)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 28),
-
-            // User info
-            if (user != null)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.sidebarSurfaceHover,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.sidebarBorder, width: 1),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Center(
-                        child: Text(
-                          user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
-                          style: const TextStyle(color: AppColors.white, fontSize: 16, fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(user.fullName,
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark),
-                            overflow: TextOverflow.ellipsis),
-                          const SizedBox(height: 2),
-                          Text(user.positionLabel,
-                            style: const TextStyle(fontSize: 12, color: AppColors.sidebarMuted, fontWeight: FontWeight.w500)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            const SizedBox(height: 20),
-
-            // Nav items
-            ...List.generate(_MainShellState._navItems.length, (i) {
-              final item = _MainShellState._navItems[i];
-              final isSelected = selectedIndex == i;
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                child: InkWell(
-                  onTap: () => onItemTap(i),
-                  borderRadius: BorderRadius.circular(12),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppColors.sidebarSurface : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                      border: isSelected
-                          ? Border.all(color: AppColors.primary.withValues(alpha: 0.12), width: 1)
-                          : null,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isSelected ? item.selectedIcon : item.icon,
-                          color: isSelected ? AppColors.sidebarActive : AppColors.sidebarText,
-                          size: 22,
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Text(
-                            item.label,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                              color: isSelected ? AppColors.sidebarActive : AppColors.sidebarText,
-                            ),
-                          ),
-                        ),
-                        if (isSelected)
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: AppColors.primary,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }),
-
-            const Spacer(),
-
-            // Logout
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-              child: InkWell(
-                onTap: onLogout,
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.logout_rounded, color: AppColors.error, size: 22),
-                      const SizedBox(width: 14),
-                      Text(AppStrings.dangXuat,
-                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: AppColors.error)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _selectedIndex,
+        onDestinationSelected: _onNavTap,
+        destinations: _navItems
+            .map((item) => NavigationDestination(
+                  icon: Icon(item.icon),
+                  selectedIcon: Icon(item.selectedIcon),
+                  label: item.label,
+                ))
+            .toList(),
       ),
     );
   }
