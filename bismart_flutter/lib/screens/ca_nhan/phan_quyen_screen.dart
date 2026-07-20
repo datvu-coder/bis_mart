@@ -167,7 +167,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
           child: CircularProgressIndicator(color: AppColors.primary));
     }
     final isWide = MediaQuery.of(context).size.width >= 600;
-    final hPad = isWide ? 24.0 : 2.0;
+    final hPad = isWide ? 24.0 : 16.0;
     final innerPad = isWide ? 24.0 : 10.0;
 
     final systemKeys = Permission.systemRoleLabels.keys.toSet();
@@ -613,7 +613,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
           child: CircularProgressIndicator(color: AppColors.primary));
     }
     final isWide = MediaQuery.of(context).size.width >= 600;
-    final hPad = isWide ? 24.0 : 2.0;
+    final hPad = isWide ? 24.0 : 16.0;
     final innerPad = isWide ? 24.0 : 10.0;
 
     final stores = context.watch<StoreProvider>().stores;

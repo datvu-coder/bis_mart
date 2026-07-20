@@ -81,7 +81,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     }
 
     return SingleChildScrollView(
-      padding: EdgeInsets.symmetric(horizontal: isWide ? 24 : 2, vertical: isWide ? 24 : 10),
+      padding: EdgeInsets.symmetric(horizontal: isWide ? 24 : 16, vertical: isWide ? 24 : 16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 560),
