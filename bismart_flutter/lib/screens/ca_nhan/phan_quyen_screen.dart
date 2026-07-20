@@ -14,6 +14,7 @@ import '../../providers/employee_provider.dart';
 import '../../services/api_service.dart';
 import '../../services/export_service_stub.dart'
     if (dart.library.html) '../../services/export_service_web.dart';
+import '../../widgets/common/responsive_form.dart';
 
 class PhanQuyenScreen extends StatefulWidget {
   const PhanQuyenScreen({super.key});
@@ -516,92 +517,83 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
       'canProductList':      'Danh sách sản phẩm',
     };
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(existing == null ? 'Thêm chức vụ mới' : 'Sửa quyền — ${existing.position}'),
-          content: SizedBox(
-            width: 400,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (existing == null) ...[
-                    TextField(
-                      controller: posCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Mã chức vụ (VD: ADM, SM, PG)',
-                        hintText: 'Nhập mã in hoa',
-                      ),
-                      textCapitalization: TextCapitalization.characters,
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  TextField(
-                    controller: descCtrl,
-                    decoration: const InputDecoration(labelText: 'Mô tả'),
-                  ),
-                  const SizedBox(height: 14),
-                  Text('Quyền hạn:', style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  ...flagLabels.entries.map((e) => SwitchListTile(
-                    dense: true,
-                    title: Text(e.value, style: AppTextStyles.bodyText),
-                    value: flags[e.key] ?? false,
-                    activeColor: AppColors.primary,
-                    onChanged: (v) => setDialogState(() => flags[e.key] = v),
-                  )),
-                ],
+      title: existing == null ? 'Thêm chức vụ mới' : 'Sửa quyền — ${existing.position}',
+      contentBuilder: (ctx, setDialogState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (existing == null) ...[
+            TextField(
+              controller: posCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Mã chức vụ (VD: ADM, SM, PG)',
+                hintText: 'Nhập mã in hoa',
               ),
+              textCapitalization: TextCapitalization.characters,
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  final payload = {
-                    'position': existing?.position ?? posCtrl.text.trim().toUpperCase(),
-                    'description': descCtrl.text.trim(),
-                    ...flags,
-                  };
-                  if (existing == null) {
-                    await _api.createPermission(payload);
-                  } else {
-                    await _api.updatePermission(existing.position, payload);
-                  }
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx);
-                  await _loadPermissions();
-                  await _refreshCurrentUserPermissions();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(existing == null
-                          ? 'Đã thêm chức vụ mới'
-                          : 'Đã cập nhật quyền cho ${existing.position}'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.success,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ));
-                  }
-                } catch (e) {
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                      content: Text('Lưu quyền thất bại: $e'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.error,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ));
-                  }
-                }
-              },
-              child: Text(existing == null ? 'Thêm' : 'Lưu'),
-            ),
+            const SizedBox(height: 8),
           ],
-        ),
+          TextField(
+            controller: descCtrl,
+            decoration: const InputDecoration(labelText: 'Mô tả'),
+          ),
+          const SizedBox(height: 14),
+          Text('Quyền hạn:', style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          ...flagLabels.entries.map((e) => SwitchListTile(
+            dense: true,
+            title: Text(e.value, style: AppTextStyles.bodyText),
+            value: flags[e.key] ?? false,
+            activeColor: AppColors.primary,
+            onChanged: (v) => setDialogState(() => flags[e.key] = v),
+          )),
+        ],
       ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+        ElevatedButton(
+          onPressed: () async {
+            try {
+              final payload = {
+                'position': existing?.position ?? posCtrl.text.trim().toUpperCase(),
+                'description': descCtrl.text.trim(),
+                ...flags,
+              };
+              if (existing == null) {
+                await _api.createPermission(payload);
+              } else {
+                await _api.updatePermission(existing.position, payload);
+              }
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+              await _loadPermissions();
+              await _refreshCurrentUserPermissions();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(existing == null
+                      ? 'Đã thêm chức vụ mới'
+                      : 'Đã cập nhật quyền cho ${existing.position}'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.success,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ));
+              }
+            } catch (e) {
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                  content: Text('Lưu quyền thất bại: $e'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.error,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ));
+              }
+            }
+          },
+          child: Text(existing == null ? 'Thêm' : 'Lưu'),
+        ),
+      ],
     );
   }
 
@@ -934,219 +926,205 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
       return null;
     }
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          return AlertDialog(
-            title: const Text('Phân công nhân viên vào cửa hàng'),
-            content: SizedBox(
-              width: 380,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Autocomplete<Employee>(
-                    displayStringForOption: (e) =>
-                        '${e.fullName} (${e.employeeCode})',
-                    optionsBuilder: (textEditingValue) {
-                      employeeQuery = textEditingValue.text;
-                      if (textEditingValue.text.trim().isEmpty) return employeeList;
-                      final query = textEditingValue.text.toLowerCase();
-                      return employeeList.where((e) =>
-                          e.fullName.toLowerCase().contains(query) ||
-                          e.employeeCode.toLowerCase().contains(query));
-                    },
-                    onSelected: (e) =>
-                        setDialogState(() => employeeId = e.id),
-                    fieldViewBuilder:
-                        (context, controller, focusNode, onFieldSubmitted) {
-                      return TextFormField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        decoration: const InputDecoration(
-                          labelText: 'Nhân viên',
-                          hintText: 'Tìm tên hoặc mã nhân viên...',
-                          prefixIcon: Icon(Icons.search_rounded, size: 18),
-                        ),
-                        onChanged: (value) => setDialogState(() {
-                          employeeQuery = value;
-                          employeeId = null;
-                        }),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  Autocomplete<Store>(
-                    displayStringForOption: (s) =>
-                        '${s.name} (${s.storeCode})',
-                    optionsBuilder: (textEditingValue) {
-                      storeQuery = textEditingValue.text;
-                      if (textEditingValue.text.trim().isEmpty) return storeList;
-                      final query = textEditingValue.text.toLowerCase();
-                      return storeList.where((s) =>
-                          s.name.toLowerCase().contains(query) ||
-                          s.storeCode.toLowerCase().contains(query));
-                    },
-                    onSelected: (s) =>
-                        setDialogState(() => storeId = s.id),
-                    fieldViewBuilder:
-                        (context, controller, focusNode, onFieldSubmitted) {
-                      return TextFormField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        decoration: const InputDecoration(
-                          labelText: 'Cửa hàng',
-                          hintText: 'Tìm tên hoặc mã cửa hàng...',
-                          prefixIcon: Icon(Icons.store_rounded, size: 18),
-                        ),
-                        onChanged: (value) => setDialogState(() {
-                          storeQuery = value;
-                          storeId = null;
-                        }),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    decoration: const InputDecoration(labelText: 'Chức vụ tại cửa hàng'),
-                    value: storeRole,
-                    items: Permission.storeRoleLabels.entries
-                        .map((e) => DropdownMenuItem(
-                              value: e.key,
-                              child: Text('${e.key} — ${e.value}'),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => storeRole = v!),
-                  ),
-                ],
-              ),
-            ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-            ElevatedButton(
-              onPressed: () async {
-                final selectedEmployee = employeeId != null
-                    ? employeeList.where((e) => e.id == employeeId).firstOrNull
-                    : findEmployee(employeeQuery);
-                final selectedStore = storeId != null
-                    ? storeList.where((s) => s.id == storeId).firstOrNull
-                    : findStore(storeQuery);
-
-                if (selectedEmployee == null || selectedStore == null) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                    content: const Text(
-                      'Hãy chọn đúng nhân viên và cửa hàng từ danh sách gợi ý hoặc nhập đúng mã.',
-                    ),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: AppColors.warning,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ));
-                  return;
-                }
-
-                final duplicated = _assignments.any((item) {
-                  return (item['employeeCode'] ?? '').toString().toUpperCase() ==
-                          selectedEmployee.employeeCode.toUpperCase() &&
-                      (item['storeCode'] ?? '').toString().toUpperCase() ==
-                          selectedStore.storeCode.toUpperCase();
-                });
-                if (duplicated) {
-                  ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                    content: const Text('Nhân viên này đã được phân công vào cửa hàng đã chọn.'),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: AppColors.warning,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  ));
-                  return;
-                }
-
-                try {
-                  await _api.createStoreManager({
-                    'storeId': selectedStore.id,
-                    'employeeId': selectedEmployee.id,
-                    'storeRole': storeRole,
-                  });
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx);
-                  await _loadAssignments();
-                  await _refreshCurrentUserPermissions();
-                } catch (e) {
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                      content: Text('Phân công thất bại: $e'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.error,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ));
-                  }
-                }
-              },
-              child: const Text('Phân công'),
-            ),
-          ],
-          );
-        },
+      title: 'Phân công nhân viên vào cửa hàng',
+      contentBuilder: (ctx, setDialogState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Autocomplete<Employee>(
+            displayStringForOption: (e) =>
+                '${e.fullName} (${e.employeeCode})',
+            optionsBuilder: (textEditingValue) {
+              employeeQuery = textEditingValue.text;
+              if (textEditingValue.text.trim().isEmpty) return employeeList;
+              final query = textEditingValue.text.toLowerCase();
+              return employeeList.where((e) =>
+                  e.fullName.toLowerCase().contains(query) ||
+                  e.employeeCode.toLowerCase().contains(query));
+            },
+            onSelected: (e) =>
+                setDialogState(() => employeeId = e.id),
+            fieldViewBuilder:
+                (context, controller, focusNode, onFieldSubmitted) {
+              return TextFormField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: const InputDecoration(
+                  labelText: 'Nhân viên',
+                  hintText: 'Tìm tên hoặc mã nhân viên...',
+                  prefixIcon: Icon(Icons.search_rounded, size: 18),
+                ),
+                onChanged: (value) => setDialogState(() {
+                  employeeQuery = value;
+                  employeeId = null;
+                }),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          Autocomplete<Store>(
+            displayStringForOption: (s) =>
+                '${s.name} (${s.storeCode})',
+            optionsBuilder: (textEditingValue) {
+              storeQuery = textEditingValue.text;
+              if (textEditingValue.text.trim().isEmpty) return storeList;
+              final query = textEditingValue.text.toLowerCase();
+              return storeList.where((s) =>
+                  s.name.toLowerCase().contains(query) ||
+                  s.storeCode.toLowerCase().contains(query));
+            },
+            onSelected: (s) =>
+                setDialogState(() => storeId = s.id),
+            fieldViewBuilder:
+                (context, controller, focusNode, onFieldSubmitted) {
+              return TextFormField(
+                controller: controller,
+                focusNode: focusNode,
+                decoration: const InputDecoration(
+                  labelText: 'Cửa hàng',
+                  hintText: 'Tìm tên hoặc mã cửa hàng...',
+                  prefixIcon: Icon(Icons.store_rounded, size: 18),
+                ),
+                onChanged: (value) => setDialogState(() {
+                  storeQuery = value;
+                  storeId = null;
+                }),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(labelText: 'Chức vụ tại cửa hàng'),
+            value: storeRole,
+            items: Permission.storeRoleLabels.entries
+                .map((e) => DropdownMenuItem(
+                      value: e.key,
+                      child: Text('${e.key} — ${e.value}'),
+                    ))
+                .toList(),
+            onChanged: (v) => setDialogState(() => storeRole = v!),
+          ),
+        ],
       ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+        ElevatedButton(
+          onPressed: () async {
+            final selectedEmployee = employeeId != null
+                ? employeeList.where((e) => e.id == employeeId).firstOrNull
+                : findEmployee(employeeQuery);
+            final selectedStore = storeId != null
+                ? storeList.where((s) => s.id == storeId).firstOrNull
+                : findStore(storeQuery);
+
+            if (selectedEmployee == null || selectedStore == null) {
+              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: const Text(
+                  'Hãy chọn đúng nhân viên và cửa hàng từ danh sách gợi ý hoặc nhập đúng mã.',
+                ),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: AppColors.warning,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ));
+              return;
+            }
+
+            final duplicated = _assignments.any((item) {
+              return (item['employeeCode'] ?? '').toString().toUpperCase() ==
+                      selectedEmployee.employeeCode.toUpperCase() &&
+                  (item['storeCode'] ?? '').toString().toUpperCase() ==
+                      selectedStore.storeCode.toUpperCase();
+            });
+            if (duplicated) {
+              ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                content: const Text('Nhân viên này đã được phân công vào cửa hàng đã chọn.'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: AppColors.warning,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ));
+              return;
+            }
+
+            try {
+              await _api.createStoreManager({
+                'storeId': selectedStore.id,
+                'employeeId': selectedEmployee.id,
+                'storeRole': storeRole,
+              });
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+              await _loadAssignments();
+              await _refreshCurrentUserPermissions();
+            } catch (e) {
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                  content: Text('Phân công thất bại: $e'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.error,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ));
+              }
+            }
+          },
+          child: const Text('Phân công'),
+        ),
+      ],
     );
   }
 
   void _showEditRoleDialog(Map<String, dynamic> assignment) {
     String storeRole = assignment['storeRole'] as String? ?? Permission.storeRolePG;
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Đổi chức vụ — ${assignment['employeeName']}'),
-          content: SizedBox(
-            width: 320,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Cửa hàng: ${assignment['storeName']}',
-                    style: AppTextStyles.caption),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  decoration: const InputDecoration(labelText: 'Chức vụ tại cửa hàng'),
-                  value: storeRole,
-                  items: Permission.storeRoleLabels.entries
-                      .map((e) => DropdownMenuItem(
-                            value: e.key,
-                            child: Text('${e.key} — ${e.value}'),
-                          ))
-                      .toList(),
-                  onChanged: (v) => setDialogState(() => storeRole = v!),
-                ),
-              ],
-            ),
+      title: 'Đổi chức vụ — ${assignment['employeeName']}',
+      contentBuilder: (ctx, setDialogState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Cửa hàng: ${assignment['storeName']}',
+              style: AppTextStyles.caption),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            decoration: const InputDecoration(labelText: 'Chức vụ tại cửa hàng'),
+            value: storeRole,
+            items: Permission.storeRoleLabels.entries
+                .map((e) => DropdownMenuItem(
+                      value: e.key,
+                      child: Text('${e.key} — ${e.value}'),
+                    ))
+                .toList(),
+            onChanged: (v) => setDialogState(() => storeRole = v!),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-            ElevatedButton(
-              onPressed: () async {
-                try {
-                  await _api.updateStoreManager(
-                      assignment['id'] as int, {'storeRole': storeRole});
-                  if (!ctx.mounted) return;
-                  Navigator.pop(ctx);
-                  await _loadAssignments();
-                  await _refreshCurrentUserPermissions();
-                } catch (e) {
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                      content: Text('Cập nhật chức vụ thất bại: $e'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.error,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ));
-                  }
-                }
-              },
-              child: const Text('Lưu'),
-            ),
-          ],
-        ),
+        ],
       ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+        ElevatedButton(
+          onPressed: () async {
+            try {
+              await _api.updateStoreManager(
+                  assignment['id'] as int, {'storeRole': storeRole});
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+              await _loadAssignments();
+              await _refreshCurrentUserPermissions();
+            } catch (e) {
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                  content: Text('Cập nhật chức vụ thất bại: $e'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.error,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ));
+              }
+            }
+          },
+          child: const Text('Lưu'),
+        ),
+      ],
     );
   }
 
