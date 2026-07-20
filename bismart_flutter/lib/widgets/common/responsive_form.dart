@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
+import '../../core/constants/app_colors.dart';
 
 /// Shows a form as a full-screen page on mobile (proper native feel, no
 /// cramped centered box) and as a centered dialog on wider/desktop screens.
