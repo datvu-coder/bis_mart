@@ -11,6 +11,7 @@ import '../../providers/store_provider.dart';
 import '../../models/employee.dart';
 import '../../models/store.dart';
 import '../../services/api_service.dart';
+import '../../widgets/common/responsive_form.dart';
 
 class CaNhanScreen extends StatefulWidget {
   const CaNhanScreen({super.key});
@@ -401,156 +402,157 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     String selectedRole = 'PG';
     bool isLoading = false;
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx2, setDialogState) {
-          final stores = context
-              .read<StoreProvider>()
-              .stores
-              .where((s) => managedIds.contains(s.id))
-              .toList();
-          return AlertDialog(
-            title: const Text('Chuyển cửa hàng'),
-            content: SizedBox(
-              width: 360,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '${user.fullName} (${user.employeeCode})',
-                    style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
-                  ),
-                  const SizedBox(height: 16),
-                  Autocomplete<Store>(
-                    displayStringForOption: (s) => '${s.name} (${s.storeCode})',
-                    optionsBuilder: (textEditingValue) {
-                      storeQuery = textEditingValue.text;
-                      if (textEditingValue.text.trim().isEmpty) return stores;
-                      final query = textEditingValue.text.toLowerCase();
-                      return stores.where((s) =>
-                          s.name.toLowerCase().contains(query) ||
-                          s.storeCode.toLowerCase().contains(query));
-                    },
-                    onSelected: (s) => setDialogState(() => selectedStoreId = s.id),
-                    fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) =>
-                        TextFormField(
-                          controller: controller,
-                          focusNode: focusNode,
-                          onChanged: (_) => setDialogState(() => selectedStoreId = null),
-                          decoration: const InputDecoration(
-                            labelText: 'Cửa hàng *',
-                            prefixIcon: Icon(Icons.store_rounded, size: 18),
-                          ),
-                        ),
-                    optionsViewBuilder: (context, onSelected, options) => Align(
-                      alignment: Alignment.topLeft,
-                      child: Material(
-                        elevation: 4,
-                        borderRadius: BorderRadius.circular(10),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxHeight: 200, maxWidth: 360),
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: options.length,
-                            itemBuilder: (context, index) {
-                              final store = options.elementAt(index);
-                              return ListTile(
-                                dense: true,
-                                title: Text(store.name),
-                                subtitle: Text(store.storeCode),
-                                onTap: () => onSelected(store),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
+      title: 'Chuyển cửa hàng',
+      contentBuilder: (ctx, setDialogState) {
+        final stores = context
+            .read<StoreProvider>()
+            .stores
+            .where((s) => managedIds.contains(s.id))
+            .toList();
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${user.fullName} (${user.employeeCode})',
+              style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 16),
+            Autocomplete<Store>(
+              displayStringForOption: (s) => '${s.name} (${s.storeCode})',
+              optionsBuilder: (textEditingValue) {
+                storeQuery = textEditingValue.text;
+                if (textEditingValue.text.trim().isEmpty) return stores;
+                final query = textEditingValue.text.toLowerCase();
+                return stores.where((s) =>
+                    s.name.toLowerCase().contains(query) ||
+                    s.storeCode.toLowerCase().contains(query));
+              },
+              onSelected: (s) => setDialogState(() => selectedStoreId = s.id),
+              fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) =>
+                  TextFormField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    onChanged: (_) => setDialogState(() => selectedStoreId = null),
+                    decoration: const InputDecoration(
+                      labelText: 'Cửa hàng *',
+                      prefixIcon: Icon(Icons.store_rounded, size: 18),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedRole,
-                    decoration: const InputDecoration(labelText: 'Vai trò'),
-                    items: ['PG', 'TLD', 'MNG', 'CS', 'ADM']
-                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => selectedRole = v!),
+              optionsViewBuilder: (context, onSelected, options) => Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 4,
+                  borderRadius: BorderRadius.circular(10),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 200, maxWidth: 360),
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      itemBuilder: (context, index) {
+                        final store = options.elementAt(index);
+                        return ListTile(
+                          dense: true,
+                          title: Text(store.name),
+                          subtitle: Text(store.storeCode),
+                          onTap: () => onSelected(store),
+                        );
+                      },
+                    ),
                   ),
-                ],
+                ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx2),
-                child: const Text('Hủy'),
-              ),
-              ElevatedButton(
-                onPressed: isLoading
-                    ? null
-                    : () async {
-                        Store? store;
-                        if (selectedStoreId != null) {
-                          try {
-                            store = stores.firstWhere((s) => s.id == selectedStoreId);
-                          } catch (_) {}
-                        }
-                        if (store == null && storeQuery.isNotEmpty) {
-                          final q = storeQuery.toLowerCase();
-                          try {
-                            store = stores.firstWhere((s) =>
-                                s.name.toLowerCase().contains(q) ||
-                                s.storeCode.toLowerCase().contains(q));
-                          } catch (_) {}
-                        }
-                        if (store == null) {
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            SnackBar(
-                              content: const Text('Vui lòng chọn cửa hàng hợp lệ'),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: AppColors.error,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          );
-                          return;
-                        }
-                        setDialogState(() => isLoading = true);
-                        try {
-                          await ApiService().createStoreManager({
-                            'storeId': store.id,
-                            'employeeId': user.id,
-                            'storeRole': selectedRole,
-                          });
-                          if (ctx2.mounted) Navigator.pop(ctx2);
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            SnackBar(
-                              content: Text('Đã chuyển ${user.fullName} đến ${store.name}!'),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: AppColors.success,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          );
-                        } catch (e) {
-                          setDialogState(() => isLoading = false);
-                          if (!mounted) return;
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            SnackBar(
-                              content: Text('Lỗi: $e'),
-                              behavior: SnackBarBehavior.floating,
-                              backgroundColor: AppColors.error,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          );
-                        }
-                      },
-                child: isLoading
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text('Chuyển'),
-              ),
-            ],
-          );
-        },
-      ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: selectedRole,
+              decoration: const InputDecoration(labelText: 'Vai trò'),
+              items: ['PG', 'TLD', 'MNG', 'CS', 'ADM']
+                  .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                  .toList(),
+              onChanged: (v) => setDialogState(() => selectedRole = v!),
+            ),
+          ],
+        );
+      },
+      actionsBuilder: (ctx, setDialogState) {
+        final stores = context
+            .read<StoreProvider>()
+            .stores
+            .where((s) => managedIds.contains(s.id))
+            .toList();
+        return [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: isLoading
+                ? null
+                : () async {
+                    Store? store;
+                    if (selectedStoreId != null) {
+                      try {
+                        store = stores.firstWhere((s) => s.id == selectedStoreId);
+                      } catch (_) {}
+                    }
+                    if (store == null && storeQuery.isNotEmpty) {
+                      final q = storeQuery.toLowerCase();
+                      try {
+                        store = stores.firstWhere((s) =>
+                            s.name.toLowerCase().contains(q) ||
+                            s.storeCode.toLowerCase().contains(q));
+                      } catch (_) {}
+                    }
+                    if (store == null) {
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Vui lòng chọn cửa hàng hợp lệ'),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: AppColors.error,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                      return;
+                    }
+                    setDialogState(() => isLoading = true);
+                    try {
+                      await ApiService().createStoreManager({
+                        'storeId': store.id,
+                        'employeeId': user.id,
+                        'storeRole': selectedRole,
+                      });
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: Text('Đã chuyển ${user.fullName} đến ${store.name}!'),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: AppColors.success,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    } catch (e) {
+                      setDialogState(() => isLoading = false);
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: Text('Lỗi: $e'),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: AppColors.error,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    }
+                  },
+            child: isLoading
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Chuyển'),
+          ),
+        ];
+      },
     );
   }
 
@@ -558,40 +560,39 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     final nameCtrl = TextEditingController(text: user?.fullName ?? '');
     final emailCtrl = TextEditingController(text: user?.email ?? '');
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Chỉnh sửa hồ sơ'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Họ tên')),
-            const SizedBox(height: 8),
-            TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-          ElevatedButton(
-            onPressed: () {
-              context.read<AuthProvider>().updateProfile(
-                fullName: nameCtrl.text,
-                email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
-              );
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Đã cập nhật hồ sơ!'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: AppColors.success,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
-            },
-            child: const Text('Lưu'),
-          ),
+      title: 'Chỉnh sửa hồ sơ',
+      contentBuilder: (ctx, setDialogState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Họ tên')),
+          const SizedBox(height: 8),
+          TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
         ],
       ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+        ElevatedButton(
+          onPressed: () {
+            context.read<AuthProvider>().updateProfile(
+              fullName: nameCtrl.text,
+              email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
+            );
+            Navigator.pop(ctx);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Đã cập nhật hồ sơ!'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: AppColors.success,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            );
+          },
+          child: const Text('Lưu'),
+        ),
+      ],
     );
   }
 }

@@ -17,6 +17,7 @@ import '../../services/api_service.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/weighted_tab_selector.dart';
 import '../../widgets/common/data_panel.dart';
+import '../../widgets/common/responsive_form.dart';
 import '../../widgets/cards/lesson_card.dart';
 import '../../widgets/cards/social_post_card.dart';
 import 'package:bismart_flutter/models/community_post.dart';
@@ -1677,73 +1678,70 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final controller = TextEditingController(text: post.content ?? '');
     var visibility = post.visibility;
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Sửa bài viết'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: controller,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  hintText: 'Nội dung bài viết...',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                value: visibility,
-                decoration: const InputDecoration(
-                  labelText: 'Quyền xem',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'public', child: Text('Mọi người')),
-                  DropdownMenuItem(value: 'store', child: Text('Cửa hàng')),
-                ],
-                onChanged: (val) {
-                  if (val == null) return;
-                  setDialogState(() => visibility = val);
-                },
-              ),
-            ],
+      title: 'Sửa bài viết',
+      contentBuilder: (ctx, setDialogState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: controller,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Nội dung bài viết...',
+              border: OutlineInputBorder(),
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Hủy'),
+          const SizedBox(height: 10),
+          DropdownButtonFormField<String>(
+            value: visibility,
+            decoration: const InputDecoration(
+              labelText: 'Quyền xem',
+              border: OutlineInputBorder(),
             ),
-            ElevatedButton(
-              onPressed: () async {
-                final text = controller.text.trim();
-                if (text.isEmpty) return;
-                try {
-                  await provider.updatePost(
-                    post.id,
-                    content: text,
-                    visibility: visibility,
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                } catch (e) {
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(
-                        content: Text('Lưu thất bại: $e'),
-                        backgroundColor: Colors.red,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('Lưu'),
-            ),
-          ],
-        ),
+            items: const [
+              DropdownMenuItem(value: 'public', child: Text('Mọi người')),
+              DropdownMenuItem(value: 'store', child: Text('Cửa hàng')),
+            ],
+            onChanged: (val) {
+              if (val == null) return;
+              setDialogState(() => visibility = val);
+            },
+          ),
+        ],
       ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Hủy'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final text = controller.text.trim();
+            if (text.isEmpty) return;
+            try {
+              await provider.updatePost(
+                post.id,
+                content: text,
+                visibility: visibility,
+              );
+              if (ctx.mounted) Navigator.pop(ctx);
+            } catch (e) {
+              if (ctx.mounted) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(
+                    content: Text('Lưu thất bại: $e'),
+                    backgroundColor: Colors.red,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            }
+          },
+          child: const Text('Lưu'),
+        ),
+      ],
     ).then((_) => controller.dispose());
   }
 
@@ -2203,49 +2201,30 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final controller = TextEditingController();
     final targetDay = _selectedDay ?? _focusedDay;
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) {
-        final mq = MediaQuery.of(ctx);
-        final isMobileDialog = mq.size.width < 600;
-        return AlertDialog(
-          insetPadding: EdgeInsets.fromLTRB(
-            isMobileDialog ? 4 : 40,
-            isMobileDialog ? 8 : 24,
-            isMobileDialog ? 4 : 40,
-            isMobileDialog ? 8 : 24,
-          ),
-          shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(isMobileDialog ? 12 : 16)),
-          contentPadding: EdgeInsets.fromLTRB(
-              isMobileDialog ? 14 : 24, 16, isMobileDialog ? 14 : 24, 12),
-          title: const Text('Thêm sự kiện'),
-          content: SingleChildScrollView(
-            child: TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: const InputDecoration(
-                hintText: 'Tên sự kiện...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Hủy')),
-            ElevatedButton(
-              onPressed: () {
-                if (controller.text.trim().isEmpty) return;
-                provider.addEvent(targetDay, controller.text.trim());
-                Navigator.pop(ctx);
-              },
-              child: const Text('Thêm'),
-            ),
-          ],
-        );
-      },
+      title: 'Thêm sự kiện',
+      contentBuilder: (ctx, setDialogState) => TextField(
+        controller: controller,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: 'Tên sự kiện...',
+          border: OutlineInputBorder(),
+        ),
+      ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy')),
+        ElevatedButton(
+          onPressed: () {
+            if (controller.text.trim().isEmpty) return;
+            provider.addEvent(targetDay, controller.text.trim());
+            Navigator.pop(ctx);
+          },
+          child: const Text('Thêm'),
+        ),
+      ],
     );
   }
 
@@ -2280,79 +2259,76 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final urlController = TextEditingController(text: 'https://');
     bool saving = false;
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Thêm trợ lý AI mới'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Tên AI',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: urlController,
-                decoration: const InputDecoration(
-                  labelText: 'Đường dẫn',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
+      title: 'Thêm trợ lý AI mới',
+      contentBuilder: (ctx, setDialogState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: nameController,
+            decoration: const InputDecoration(
+              labelText: 'Tên AI',
+              border: OutlineInputBorder(),
+            ),
           ),
-          actions: [
-            TextButton(
-              onPressed: saving ? null : () => Navigator.pop(ctx),
-              child: const Text('Hủy'),
+          const SizedBox(height: 10),
+          TextField(
+            controller: urlController,
+            decoration: const InputDecoration(
+              labelText: 'Đường dẫn',
+              border: OutlineInputBorder(),
             ),
-            ElevatedButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final name = nameController.text.trim();
-                      final url = urlController.text.trim();
-                      final parsed = Uri.tryParse(url);
-
-                      if (name.isEmpty ||
-                          parsed == null ||
-                          parsed.scheme.isEmpty ||
-                          parsed.host.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Vui lòng nhập đầy đủ và URL hợp lệ.'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        return;
-                      }
-
-                      setDialogState(() => saving = true);
-                      final ok = await context
-                          .read<LmsProvider>()
-                          .addAiTool(name: name, link: url);
-                      if (!ctx.mounted) return;
-                      if (ok) {
-                        Navigator.pop(ctx);
-                      } else {
-                        setDialogState(() => saving = false);
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(
-                            content: Text('Không thể thêm trợ lý AI. Vui lòng thử lại.'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    },
-              child: Text(saving ? 'Đang lưu...' : 'Thêm'),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(
+          onPressed: saving ? null : () => Navigator.pop(ctx),
+          child: const Text('Hủy'),
+        ),
+        ElevatedButton(
+          onPressed: saving
+              ? null
+              : () async {
+                  final name = nameController.text.trim();
+                  final url = urlController.text.trim();
+                  final parsed = Uri.tryParse(url);
+
+                  if (name.isEmpty ||
+                      parsed == null ||
+                      parsed.scheme.isEmpty ||
+                      parsed.host.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Vui lòng nhập đầy đủ và URL hợp lệ.'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+
+                  setDialogState(() => saving = true);
+                  final ok = await context
+                      .read<LmsProvider>()
+                      .addAiTool(name: name, link: url);
+                  if (!ctx.mounted) return;
+                  if (ok) {
+                    Navigator.pop(ctx);
+                  } else {
+                    setDialogState(() => saving = false);
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Không thể thêm trợ lý AI. Vui lòng thử lại.'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+          child: Text(saving ? 'Đang lưu...' : 'Thêm'),
+        ),
+      ],
     );
   }
 }

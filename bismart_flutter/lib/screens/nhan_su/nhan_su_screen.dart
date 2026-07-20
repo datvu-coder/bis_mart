@@ -16,6 +16,7 @@ import '../../providers/permission_provider.dart';
 import '../../services/location_service.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
+import '../../widgets/common/responsive_form.dart';
 import '../../widgets/common/weighted_tab_selector.dart';
 import '../../widgets/cards/rank_list_tile.dart';
 
@@ -1212,76 +1213,73 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         ? '--:--'
         : '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-    final saved = await showDialog<bool>(
+    final saved = await showResponsiveForm<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSt) => AlertDialog(
-          title: const Text('Sửa chấm công'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.login_rounded, color: AppColors.success),
-                title: const Text('Giờ vào'),
-                subtitle: Text(fmt(checkIn)),
-                trailing: Wrap(
-                  spacing: 4,
-                  children: [
-                    if (checkIn != null)
-                      IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        tooltip: 'Xoá giờ vào',
-                        onPressed: () => setSt(() => checkIn = null),
-                      ),
-                    IconButton(
-                      icon: const Icon(Icons.access_time_rounded),
-                      onPressed: () async {
-                        final picked = await showTimePicker(
-                          context: ctx,
-                          initialTime: checkIn ?? TimeOfDay.now(),
-                        );
-                        if (picked != null) setSt(() => checkIn = picked);
-                      },
-                    ),
-                  ],
+      title: 'Sửa chấm công',
+      contentBuilder: (ctx, setSt) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.login_rounded, color: AppColors.success),
+            title: const Text('Giờ vào'),
+            subtitle: Text(fmt(checkIn)),
+            trailing: Wrap(
+              spacing: 4,
+              children: [
+                if (checkIn != null)
+                  IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    tooltip: 'Xoá giờ vào',
+                    onPressed: () => setSt(() => checkIn = null),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.access_time_rounded),
+                  onPressed: () async {
+                    final picked = await showTimePicker(
+                      context: ctx,
+                      initialTime: checkIn ?? TimeOfDay.now(),
+                    );
+                    if (picked != null) setSt(() => checkIn = picked);
+                  },
                 ),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.logout_rounded, color: AppColors.info),
-                title: const Text('Giờ ra'),
-                subtitle: Text(fmt(checkOut)),
-                trailing: Wrap(
-                  spacing: 4,
-                  children: [
-                    if (checkOut != null)
-                      IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        tooltip: 'Xoá giờ ra',
-                        onPressed: () => setSt(() => checkOut = null),
-                      ),
-                    IconButton(
-                      icon: const Icon(Icons.access_time_rounded),
-                      onPressed: () async {
-                        final picked = await showTimePicker(
-                          context: ctx,
-                          initialTime: checkOut ?? TimeOfDay.now(),
-                        );
-                        if (picked != null) setSt(() => checkOut = picked);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
-            ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Lưu')),
-          ],
-        ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.logout_rounded, color: AppColors.info),
+            title: const Text('Giờ ra'),
+            subtitle: Text(fmt(checkOut)),
+            trailing: Wrap(
+              spacing: 4,
+              children: [
+                if (checkOut != null)
+                  IconButton(
+                    icon: const Icon(Icons.clear, size: 18),
+                    tooltip: 'Xoá giờ ra',
+                    onPressed: () => setSt(() => checkOut = null),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.access_time_rounded),
+                  onPressed: () async {
+                    final picked = await showTimePicker(
+                      context: ctx,
+                      initialTime: checkOut ?? TimeOfDay.now(),
+                    );
+                    if (picked != null) setSt(() => checkOut = picked);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
+      actionsBuilder: (ctx, setSt) => [
+        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Huỷ')),
+        ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Lưu')),
+      ],
     );
 
     if (saved != true) return;
@@ -1793,124 +1791,121 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         .toList();
     String? selectedStoreId = provider.selectedShiftStoreId;
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('Thêm ca làm việc'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+      title: 'Thêm ca làm việc',
+      contentBuilder: (ctx, setDialogState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Tên ca',
+              hintText: 'VD: Ca tối',
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (stores.isNotEmpty)
+            DropdownButtonFormField<String?>(
+              decoration: const InputDecoration(labelText: 'Cửa hàng'),
+              value: selectedStoreId,
+              items: [
+                const DropdownMenuItem(
+                    value: null, child: Text('Không chọn')),
+                ...stores.map((s) => DropdownMenuItem(
+                      value: s.id,
+                      child: Text(s.name),
+                    )),
+              ],
+              onChanged: (v) =>
+                  setDialogState(() => selectedStoreId = v),
+            ),
+          const SizedBox(height: 12),
+          Row(
             children: [
-              TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Tên ca',
-                  hintText: 'VD: Ca tối',
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: startTime,
+                    );
+                    if (picked != null) {
+                      setDialogState(() => startTime = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: 'Giờ bắt đầu'),
+                    child: Text('${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}'),
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-              if (stores.isNotEmpty)
-                DropdownButtonFormField<String?>(
-                  decoration: const InputDecoration(labelText: 'Cửa hàng'),
-                  value: selectedStoreId,
-                  items: [
-                    const DropdownMenuItem(
-                        value: null, child: Text('Không chọn')),
-                    ...stores.map((s) => DropdownMenuItem(
-                          value: s.id,
-                          child: Text(s.name),
-                        )),
-                  ],
-                  onChanged: (v) =>
-                      setDialogState(() => selectedStoreId = v),
+              const SizedBox(width: 12),
+              Expanded(
+                child: InkWell(
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: endTime,
+                    );
+                    if (picked != null) {
+                      setDialogState(() => endTime = picked);
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: const InputDecoration(labelText: 'Giờ kết thúc'),
+                    child: Text('${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}'),
+                  ),
                 ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showTimePicker(
-                          context: context,
-                          initialTime: startTime,
-                        );
-                        if (picked != null) {
-                          setDialogState(() => startTime = picked);
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Giờ bắt đầu'),
-                        child: Text('${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}'),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: InkWell(
-                      onTap: () async {
-                        final picked = await showTimePicker(
-                          context: context,
-                          initialTime: endTime,
-                        );
-                        if (picked != null) {
-                          setDialogState(() => endTime = picked);
-                        }
-                      },
-                      child: InputDecorator(
-                        decoration: const InputDecoration(labelText: 'Giờ kết thúc'),
-                        child: Text('${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}'),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Hủy'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (nameCtrl.text.isNotEmpty) {
-                  try {
-                    await provider.addShift(WorkShift(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      name: nameCtrl.text,
-                      startTime: startTime,
-                      endTime: endTime,
-                      storeId: selectedStoreId,
-                    ));
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(
-                        content: Text('Đã thêm ca "${nameCtrl.text}"'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: AppColors.success,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                    );
-                  } catch (e) {
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(
-                        content: Text('Thêm ca thất bại: $e'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: Colors.red,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Text('Thêm'),
-            ),
-          ],
-        ),
+        ],
       ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Hủy'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            if (nameCtrl.text.isNotEmpty) {
+              try {
+                await provider.addShift(WorkShift(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  name: nameCtrl.text,
+                  startTime: startTime,
+                  endTime: endTime,
+                  storeId: selectedStoreId,
+                ));
+                if (ctx.mounted) Navigator.pop(ctx);
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: Text('Đã thêm ca "${nameCtrl.text}"'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.success,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              } catch (e) {
+                if (ctx.mounted) Navigator.pop(ctx);
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: Text('Thêm ca thất bại: $e'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              }
+            }
+          },
+          child: const Text('Thêm'),
+        ),
+      ],
     );
   }
 }
@@ -2127,107 +2122,101 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
             .toList();
     final shiftsInStore = provider.shifts; // already store-filtered via loadShifts
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text('Phân ca ${day.day}/${day.month}/${day.year}'),
-          content: SizedBox(
-            width: 360,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (empsInStore.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      'Cửa hàng chưa có nhân viên nào',
-                      style: AppTextStyles.caption.copyWith(color: AppColors.error),
-                    ),
-                  ),
-                if (shiftsInStore.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      'Cửa hàng chưa có ca làm việc nào — hãy tạo ca trước',
-                      style: AppTextStyles.caption.copyWith(color: AppColors.error),
-                    ),
-                  ),
-                DropdownButtonFormField<String>(
-                  decoration:
-                      const InputDecoration(labelText: 'Nhân viên'),
-                  value: selectedEmployeeId,
-                  isExpanded: true,
-                  items: empsInStore
-                      .map((e) =>
-                          DropdownMenuItem(value: e.id, child: Text(e.fullName)))
-                      .toList(),
-                  onChanged: (v) =>
-                      setDialogState(() => selectedEmployeeId = v),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  decoration:
-                      const InputDecoration(labelText: 'Ca làm việc'),
-                  value: selectedShiftId,
-                  isExpanded: true,
-                  items: shiftsInStore
-                      .map((s) => DropdownMenuItem(
-                            value: s.id,
-                            child: Text('${s.name} (${s.timeRange})'),
-                          ))
-                      .toList(),
-                  onChanged: (v) =>
-                      setDialogState(() => selectedShiftId = v),
-                ),
-              ],
+      title: 'Phân ca ${day.day}/${day.month}/${day.year}',
+      contentBuilder: (ctx, setDialogState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (empsInStore.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Cửa hàng chưa có nhân viên nào',
+                style: AppTextStyles.caption.copyWith(color: AppColors.error),
+              ),
             ),
+          if (shiftsInStore.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Cửa hàng chưa có ca làm việc nào — hãy tạo ca trước',
+                style: AppTextStyles.caption.copyWith(color: AppColors.error),
+              ),
+            ),
+          DropdownButtonFormField<String>(
+            decoration:
+                const InputDecoration(labelText: 'Nhân viên'),
+            value: selectedEmployeeId,
+            isExpanded: true,
+            items: empsInStore
+                .map((e) =>
+                    DropdownMenuItem(value: e.id, child: Text(e.fullName)))
+                .toList(),
+            onChanged: (v) =>
+                setDialogState(() => selectedEmployeeId = v),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Hủy'),
-            ),
-            ElevatedButton(
-              onPressed: (selectedEmployeeId != null && selectedShiftId != null)
-                  ? () async {
-                      try {
-                        await provider.addSchedule(
-                          employeeId: selectedEmployeeId!,
-                          shiftId: selectedShiftId!,
-                          workDate: day,
-                        );
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(this.context).showSnackBar(
-                          SnackBar(
-                            content: const Text('Đã phân ca thành công!'),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: AppColors.success,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
-                        );
-                      } catch (e) {
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(this.context).showSnackBar(
-                          SnackBar(
-                            content: Text('Phân ca thất bại: $e'),
-                            behavior: SnackBarBehavior.floating,
-                            backgroundColor: Colors.red,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
-                          ),
-                        );
-                      }
-                    }
-                  : null,
-              child: const Text('Lưu'),
-            ),
-          ],
-        ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            decoration:
+                const InputDecoration(labelText: 'Ca làm việc'),
+            value: selectedShiftId,
+            isExpanded: true,
+            items: shiftsInStore
+                .map((s) => DropdownMenuItem(
+                      value: s.id,
+                      child: Text('${s.name} (${s.timeRange})'),
+                    ))
+                .toList(),
+            onChanged: (v) =>
+                setDialogState(() => selectedShiftId = v),
+          ),
+        ],
       ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Hủy'),
+        ),
+        ElevatedButton(
+          onPressed: (selectedEmployeeId != null && selectedShiftId != null)
+              ? () async {
+                  try {
+                    await provider.addSchedule(
+                      employeeId: selectedEmployeeId!,
+                      shiftId: selectedShiftId!,
+                      workDate: day,
+                    );
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Đã phân ca thành công!'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: AppColors.success,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  } catch (e) {
+                    if (!ctx.mounted) return;
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(this.context).showSnackBar(
+                      SnackBar(
+                        content: Text('Phân ca thất bại: $e'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: Colors.red,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10)),
+                      ),
+                    );
+                  }
+                }
+              : null,
+          child: const Text('Lưu'),
+        ),
+      ],
     );
   }
 }

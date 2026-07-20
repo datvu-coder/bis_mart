@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/employee.dart';
 import '../../providers/employee_provider.dart';
 import '../../providers/store_provider.dart';
+import '../../widgets/common/responsive_form.dart';
 
 class EmployeeDetailScreen extends StatefulWidget {
   final Employee employee;
@@ -290,86 +291,84 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     String selectedPosition = _employee.position;
     String? selectedStoreCode = _employee.storeCode;
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final stores = this.context.watch<StoreProvider>().stores;
-          return AlertDialog(
-            title: const Text('Chỉnh sửa nhân viên'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Họ tên'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: emailCtrl,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: selectedStoreCode,
-                    decoration: const InputDecoration(labelText: 'Mã cửa hàng (nơi làm việc)'),
-                    items: stores
-                        .map((s) => DropdownMenuItem(
-                              value: s.storeCode,
-                              child: Text('${s.storeCode} - ${s.name}'),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => selectedStoreCode = v),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: selectedPosition,
-                    decoration: const InputDecoration(labelText: 'Vị trí'),
-                    items: ['ADM', 'PG', 'TLD', 'MNG', 'CS']
-                        .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => selectedPosition = v!),
-                  ),
-                ],
-              ),
+      title: 'Chỉnh sửa nhân viên',
+      contentBuilder: (ctx, setDialogState) {
+        final stores = this.context.watch<StoreProvider>().stores;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Họ tên'),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Hủy'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  final selectedStore = stores.cast<dynamic>().firstWhere(
-                    (s) => s.storeCode == selectedStoreCode,
-                    orElse: () => null,
-                  );
-                  final updated = _employee.copyWith(
-                    fullName: nameCtrl.text,
-                    position: selectedPosition,
-                    workLocation: selectedStore?.name ?? '',
-                    storeCode: selectedStoreCode,
-                    email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
-                  );
-                  this.context.read<EmployeeProvider>().updateEmployee(updated);
-                  setState(() => _employee = updated);
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(this.context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Đã cập nhật thông tin!'),
-                      behavior: SnackBarBehavior.floating,
-                      backgroundColor: AppColors.success,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  );
-                },
-                child: const Text('Lưu'),
-              ),
-            ],
-          );
-        },
-      ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: emailCtrl,
+              decoration: const InputDecoration(labelText: 'Email'),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: selectedStoreCode,
+              decoration: const InputDecoration(labelText: 'Mã cửa hàng (nơi làm việc)'),
+              items: stores
+                  .map((s) => DropdownMenuItem(
+                        value: s.storeCode,
+                        child: Text('${s.storeCode} - ${s.name}'),
+                      ))
+                  .toList(),
+              onChanged: (v) => setDialogState(() => selectedStoreCode = v),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: selectedPosition,
+              decoration: const InputDecoration(labelText: 'Vị trí'),
+              items: ['ADM', 'PG', 'TLD', 'MNG', 'CS']
+                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .toList(),
+              onChanged: (v) => setDialogState(() => selectedPosition = v!),
+            ),
+          ],
+        );
+      },
+      actionsBuilder: (ctx, setDialogState) {
+        final stores = this.context.read<StoreProvider>().stores;
+        return [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final selectedStore = stores.cast<dynamic>().firstWhere(
+                (s) => s.storeCode == selectedStoreCode,
+                orElse: () => null,
+              );
+              final updated = _employee.copyWith(
+                fullName: nameCtrl.text,
+                position: selectedPosition,
+                workLocation: selectedStore?.name ?? '',
+                storeCode: selectedStoreCode,
+                email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
+              );
+              this.context.read<EmployeeProvider>().updateEmployee(updated);
+              setState(() => _employee = updated);
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: const Text('Đã cập nhật thông tin!'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.success,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              );
+            },
+            child: const Text('Lưu'),
+          ),
+        ];
+      },
     );
   }
 
