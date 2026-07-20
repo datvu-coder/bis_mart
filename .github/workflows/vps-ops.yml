@@ -16,12 +16,17 @@ on:
         options:
           - diagnose
           - restart_backend
+          - deploy_backend
           - set_admin
 
 jobs:
   ops:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        if: ${{ github.event.inputs.action == 'deploy_backend' }}
+        uses: actions/checkout@v4
+
       - name: Setup SSH
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
@@ -62,6 +67,39 @@ jobs:
             echo "=== backend logs after restart ==="
             docker logs --tail 50 bis_mart_backend
           '
+
+      - name: Deploy backend (build + roll out latest code from this branch)
+        if: ${{ github.event.inputs.action == 'deploy_backend' }}
+        run: |
+          set -e
+          IMAGE_TAG="bismart-backend:$(git rev-parse --short HEAD)"
+          SSH="ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=accept-new root@146.196.64.92"
+
+          echo "==> Uploading backend/ source to VPS"
+          tar czf - -C backend . | $SSH '
+            set -e
+            rm -rf /opt/bismart-src
+            mkdir -p /opt/bismart-src
+            tar xzf - -C /opt/bismart-src
+          '
+
+          echo "==> Building image $IMAGE_TAG on VPS"
+          $SSH "cd /opt/bismart-src && docker build -t $IMAGE_TAG -t bismart-backend:latest ."
+
+          echo "==> Rolling out new container"
+          $SSH "cd /opt/apps/bismart && docker compose up -d --force-recreate"
+
+          echo "==> Waiting for health check"
+          sleep 5
+          $SSH "docker inspect bis_mart_backend --format 'health={{.State.Health.Status}}'" || true
+
+          echo "==> Verifying live domain"
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "https://api.bismart.id.vn/healthz")
+          echo "api.bismart.id.vn/healthz -> $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Healthz did not return 200 after deploy (got $code)"
+            exit 1
+          fi
 
       - name: Set admin account
         if: ${{ github.event.inputs.action == 'set_admin' }}
