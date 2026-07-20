@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../models/employee.dart';
 import '../../providers/employee_provider.dart';
 import '../../providers/store_provider.dart';
+import '../../widgets/common/responsive_form.dart';
 
 class EmployeeListScreen extends StatefulWidget {
   const EmployeeListScreen({super.key});
@@ -204,95 +205,93 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
     String selectedPosition = 'PG';
     String? selectedStoreCode;
 
-    showDialog(
+    showResponsiveForm(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          final stores = this.context.watch<StoreProvider>().stores;
-          return AlertDialog(
-            title: const Text('Thêm nhân viên'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Họ tên *'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: codeCtrl,
-                    decoration: const InputDecoration(labelText: 'Mã nhân viên *'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: emailCtrl,
-                    decoration: const InputDecoration(labelText: 'Email'),
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: selectedStoreCode,
-                    decoration: const InputDecoration(labelText: 'Mã cửa hàng (nơi làm việc)'),
-                    items: stores
-                        .map((s) => DropdownMenuItem(
-                              value: s.storeCode,
-                              child: Text('${s.storeCode} - ${s.name}'),
-                            ))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => selectedStoreCode = v),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: selectedPosition,
-                    decoration: const InputDecoration(labelText: 'Vị trí'),
-                    items: ['ADM', 'PG', 'TLD', 'MNG', 'CS']
-                        .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => selectedPosition = v!),
-                  ),
-                ],
-              ),
+      title: 'Thêm nhân viên',
+      contentBuilder: (ctx, setDialogState) {
+        final stores = this.context.watch<StoreProvider>().stores;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Họ tên *'),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Hủy'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (nameCtrl.text.isNotEmpty && codeCtrl.text.isNotEmpty) {
-                    final provider = this.context.read<EmployeeProvider>();
-                    final selectedStore = stores.cast<dynamic>().firstWhere(
-                      (s) => s.storeCode == selectedStoreCode,
-                      orElse: () => null,
-                    );
-                    provider.addEmployee(Employee(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      fullName: nameCtrl.text,
-                      employeeCode: codeCtrl.text,
-                      position: selectedPosition,
-                      workLocation: selectedStore?.name ?? '',
-                      storeCode: selectedStoreCode,
-                      email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
-                    ));
-                    Navigator.pop(ctx);
-                    ScaffoldMessenger.of(this.context).showSnackBar(
-                      SnackBar(
-                        content: Text('Đã thêm nhân viên "${nameCtrl.text}"'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: AppColors.success,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Thêm'),
-              ),
-            ],
-          );
-        },
-      ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: codeCtrl,
+              decoration: const InputDecoration(labelText: 'Mã nhân viên *'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: emailCtrl,
+              decoration: const InputDecoration(labelText: 'Email'),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: selectedStoreCode,
+              decoration: const InputDecoration(labelText: 'Mã cửa hàng (nơi làm việc)'),
+              items: stores
+                  .map((s) => DropdownMenuItem(
+                        value: s.storeCode,
+                        child: Text('${s.storeCode} - ${s.name}'),
+                      ))
+                  .toList(),
+              onChanged: (v) => setDialogState(() => selectedStoreCode = v),
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: selectedPosition,
+              decoration: const InputDecoration(labelText: 'Vị trí'),
+              items: ['ADM', 'PG', 'TLD', 'MNG', 'CS']
+                  .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                  .toList(),
+              onChanged: (v) => setDialogState(() => selectedPosition = v!),
+            ),
+          ],
+        );
+      },
+      actionsBuilder: (ctx, setDialogState) {
+        final stores = this.context.read<StoreProvider>().stores;
+        return [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (nameCtrl.text.isNotEmpty && codeCtrl.text.isNotEmpty) {
+                final provider = this.context.read<EmployeeProvider>();
+                final selectedStore = stores.cast<dynamic>().firstWhere(
+                  (s) => s.storeCode == selectedStoreCode,
+                  orElse: () => null,
+                );
+                provider.addEmployee(Employee(
+                  id: DateTime.now().millisecondsSinceEpoch.toString(),
+                  fullName: nameCtrl.text,
+                  employeeCode: codeCtrl.text,
+                  position: selectedPosition,
+                  workLocation: selectedStore?.name ?? '',
+                  storeCode: selectedStoreCode,
+                  email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
+                ));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: Text('Đã thêm nhân viên "${nameCtrl.text}"'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.success,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              }
+            },
+            child: const Text('Thêm'),
+          ),
+        ];
+      },
     );
   }
 }
