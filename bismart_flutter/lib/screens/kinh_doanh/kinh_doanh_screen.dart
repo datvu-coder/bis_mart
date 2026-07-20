@@ -152,9 +152,8 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           );
         }
 
-        final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 2.0;
-        // Mobile: nội dung cách mép màn hình 2 px (đồng nhất với tab Đào tạo).
-        final contentPad = isWide ? hPad : 2.0;
+        final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
+        final contentPad = isWide ? hPad : 16.0;
 
         // Tab layout for all screen sizes
         final body = Column(

@@ -75,7 +75,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
         children: [
           // Search
           Padding(
-            padding: EdgeInsets.fromLTRB(MediaQuery.of(context).size.width > 800 ? 16 : 2, 12, MediaQuery.of(context).size.width > 800 ? 16 : 2, 0),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: TextField(
               decoration: const InputDecoration(
                 hintText: 'Tìm cửa hàng...',
@@ -88,7 +88,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
           // Group filter chips
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.fromLTRB(MediaQuery.of(context).size.width > 800 ? 12 : 2, 12, MediaQuery.of(context).size.width > 800 ? 12 : 2, 12),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
             child: Row(
               children: ['Tất cả', 'CS', 'HO', 'I', 'II'].map((group) {
                 final selected = provider.selectedGroup == group;
@@ -114,7 +114,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                 : ListView.builder(
               itemCount: stores.length,
-              padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width > 800 ? 10 : 2),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               itemBuilder: (context, index) {
                 final store = stores[index];
                 return Container(
@@ -435,7 +435,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
         return StatefulBuilder(
           builder: (ctx, setLocal) => AlertDialog(
             insetPadding: EdgeInsets.symmetric(
-              horizontal: isWide ? 40 : 2,
+              horizontal: isWide ? 40 : 16,
               vertical: 24,
             ),
             contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),

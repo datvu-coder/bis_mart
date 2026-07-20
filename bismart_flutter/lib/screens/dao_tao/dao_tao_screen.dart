@@ -98,9 +98,8 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           );
         }
 
-        final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 2.0;
-        // Trên mobile: nội dung sát viền 2 px để tận dụng tối đa diện tích.
-        final contentPad = isWide ? hPad : 2.0;
+        final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
+        final contentPad = isWide ? hPad : 16.0;
 
         // Tab layout for all screen sizes
         final body = Column(

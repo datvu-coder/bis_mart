@@ -47,7 +47,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: MediaQuery.of(context).size.width > 800 ? 20 : 2, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         child: Column(
           children: [
             // Profile header

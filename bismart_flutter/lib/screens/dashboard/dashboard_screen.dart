@@ -64,8 +64,8 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           );
         }
 
-        final hPad = isDesktop ? 32.0 : (isWide ? 24.0 : 2.0);
-        final contentPad = isWide ? hPad : 10.0;
+        final hPad = isDesktop ? 32.0 : (isWide ? 24.0 : 16.0);
+        final contentPad = isWide ? hPad : 16.0;
 
         // Desktop: grid layout without tabs
         if (isDesktop) {
