@@ -647,6 +647,41 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
             }),
           ),
 
+          // ── Báo cáo thuế GTGT ──────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+            child: InkWell(
+              onTap: () => Navigator.pushNamed(context, AppRoutes.taxReport),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.warningLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.25)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.request_quote_rounded, color: AppColors.warning, size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Báo cáo thuế GTGT',
+                              style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700)),
+                          Text('Tổng hợp doanh thu để tham khảo khi kê khai thuế',
+                              style: AppTextStyles.caption),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
           // ── Báo cáo gần đây ────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
