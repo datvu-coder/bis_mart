@@ -580,6 +580,8 @@ def api_get_permission_by_position(position: str):
 @app.post("/api/permissions")
 @login_required
 def api_create_permission():
+    if not _is_admin_user():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
     try:
@@ -617,6 +619,8 @@ def api_create_permission():
 @app.put("/api/permissions/<position>")
 @login_required
 def api_update_permission(position: str):
+    if not _is_admin_user():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
     with db.cursor() as cur:
@@ -652,6 +656,8 @@ def api_update_permission(position: str):
 @app.delete("/api/permissions/<position>")
 @login_required
 def api_delete_permission(position: str):
+    if not _is_admin_user():
+        return _forbidden()
     db = get_db()
     with db.cursor() as cur:
         cur.execute("DELETE FROM permissions WHERE UPPER(position) = UPPER(%s)", (position,))
@@ -694,6 +700,8 @@ def api_get_store_managers():
 @app.post("/api/store-managers")
 @login_required
 def api_create_store_manager():
+    if not _has_crud_permission():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
     try:
@@ -736,6 +744,8 @@ def api_create_store_manager():
 @app.put("/api/store-managers/<int:sm_id>")
 @login_required
 def api_update_store_manager(sm_id: int):
+    if not _has_crud_permission():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
     with db.cursor() as cur:
@@ -759,6 +769,8 @@ def api_update_store_manager(sm_id: int):
 @app.delete("/api/store-managers/<int:sm_id>")
 @login_required
 def api_delete_store_manager(sm_id: int):
+    if not _has_crud_permission():
+        return _forbidden()
     db = get_db()
     with db.cursor() as cur:
         cur.execute("DELETE FROM store_managers WHERE id = %s", (sm_id,))
@@ -800,7 +812,7 @@ def api_me_permissions():
             cur.execute(
                 "SELECT sm.store_role, sm.id AS sm_id "
                 "FROM store_managers sm JOIN stores s ON s.id = sm.store_id "
-                "WHERE sm.employee_id = %s AND s.store_code = %s LIMIT 1",
+                "WHERE sm.employee_id = %s AND UPPER(s.store_code) = UPPER(%s) LIMIT 1",
                 (employee_id, store_code),
             )
             sm = cur.fetchone()
@@ -875,6 +887,8 @@ def api_get_employees():
 @app.post("/api/employees")
 @login_required
 def api_create_employee():
+    if not _has_crud_permission():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
     store_code, store_name = _get_store_info_by_code(db, data.get("storeCode"))
@@ -902,6 +916,8 @@ def api_create_employee():
 @app.put("/api/employees/<int:employee_id>")
 @login_required
 def api_update_employee(employee_id: int):
+    if not _has_crud_permission():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
 
@@ -953,6 +969,8 @@ def api_update_employee(employee_id: int):
 @app.delete("/api/employees/<int:employee_id>")
 @login_required
 def api_delete_employee(employee_id: int):
+    if not _has_crud_permission():
+        return _forbidden()
     db = get_db()
     with db.cursor() as cur:
         cur.execute("DELETE FROM employees WHERE id = %s", (employee_id,))
@@ -1001,6 +1019,8 @@ def api_get_shifts():
 @app.post("/api/shifts")
 @login_required
 def api_create_shift():
+    if not (_can_manage_attendance_user() or _has_crud_permission()):
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     store_id = int(data["storeId"]) if data.get("storeId") else None
     db = get_db()
@@ -1040,6 +1060,8 @@ def api_create_shift():
 @app.delete("/api/shifts/<int:shift_id>")
 @login_required
 def api_delete_shift(shift_id: int):
+    if not (_can_manage_attendance_user() or _has_crud_permission()):
+        return _forbidden()
     db = get_db()
     with db.cursor() as cur:
         cur.execute("DELETE FROM work_shifts WHERE id = %s", (shift_id,))
@@ -1097,6 +1119,8 @@ def api_get_schedules():
 @app.post("/api/employee-schedules")
 @login_required
 def api_create_schedule():
+    if not (_can_manage_attendance_user() or _has_crud_permission()):
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
     try:
@@ -1131,6 +1155,8 @@ def api_create_schedule():
 @app.delete("/api/employee-schedules/<int:schedule_id>")
 @login_required
 def api_delete_schedule(schedule_id: int):
+    if not (_can_manage_attendance_user() or _has_crud_permission()):
+        return _forbidden()
     db = get_db()
     with db.cursor() as cur:
         cur.execute("DELETE FROM employee_schedules WHERE id = %s", (schedule_id,))
@@ -1154,6 +1180,8 @@ def api_get_products():
 @app.post("/api/products")
 @login_required
 def api_create_product():
+    if not _has_crud_permission():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
     with db.cursor() as cur:
@@ -1176,6 +1204,8 @@ def api_create_product():
 @app.put("/api/products/<int:product_id>")
 @login_required
 def api_update_product(product_id: int):
+    if not _has_crud_permission():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
     with db.cursor() as cur:
@@ -1201,6 +1231,8 @@ def api_update_product(product_id: int):
 @app.delete("/api/products/<int:product_id>")
 @login_required
 def api_delete_product(product_id: int):
+    if not _has_crud_permission():
+        return _forbidden()
     db = get_db()
     with db.cursor() as cur:
         cur.execute("DELETE FROM products WHERE id = %s", (product_id,))
@@ -1248,6 +1280,8 @@ def api_get_stores():
 @app.post("/api/stores")
 @login_required
 def api_create_store():
+    if not _has_crud_permission():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
     with db.cursor() as cur:
@@ -1281,6 +1315,8 @@ def api_create_store():
 @app.put("/api/stores/<int:store_id>")
 @login_required
 def api_update_store(store_id: int):
+    if not _has_crud_permission():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     db = get_db()
     with db.cursor() as cur:
@@ -1316,6 +1352,8 @@ def api_update_store(store_id: int):
 @app.delete("/api/stores/<int:store_id>")
 @login_required
 def api_delete_store(store_id: int):
+    if not _has_crud_permission():
+        return _forbidden()
     db = get_db()
     with db.cursor() as cur:
         cur.execute("DELETE FROM stores WHERE id = %s", (store_id,))
@@ -1467,12 +1505,16 @@ def api_update_report(report_id: int):
     with db.cursor() as cur:
         cur.execute(
             "SELECT id, report_date, pg_name, store_name, nu, sale_out, store_code, "
-            "report_month, revenue, points, employee_code FROM sales_reports WHERE id = %s",
+            "report_month, revenue, points, employee_code, created_by FROM sales_reports WHERE id = %s",
             (report_id,),
         )
         existing = cur.fetchone()
     if not existing:
         return jsonify({"error": "Report not found"}), 404
+
+    user_id = g.current_user.get("user_id")
+    if existing.get("created_by") != user_id and not _has_crud_permission():
+        return _forbidden()
 
     report_date = _normalize_report_date(data.get("date")) if "date" in data else existing.get("report_date")
     store_code = _normalize_store_code(data.get("storeCode")) if "storeCode" in data else existing.get("store_code")
@@ -1532,6 +1574,16 @@ def api_update_report(report_id: int):
 @login_required
 def api_delete_report(report_id: int):
     db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT created_by FROM sales_reports WHERE id = %s", (report_id,))
+        existing = cur.fetchone()
+    if not existing:
+        return jsonify({"error": "Report not found"}), 404
+
+    user_id = g.current_user.get("user_id")
+    if existing.get("created_by") != user_id and not _has_crud_permission():
+        return _forbidden()
+
     with db.cursor() as cur:
         cur.execute("DELETE FROM sales_reports WHERE id = %s", (report_id,))
     db.commit()
@@ -1605,6 +1657,36 @@ def _evaluate_check_out(shift: dict | None, now: datetime) -> tuple[int | None, 
     return diff_min, "on_time"
 
 
+MAX_ATTENDANCE_DISTANCE_M = 50.0
+
+
+def _haversine_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    r = 6371000.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlambda / 2) ** 2
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _store_distance_for_employee(db, emp_id: Any, lat: float | None, lng: float | None) -> float | None:
+    """Distance in meters from (lat, lng) to the employee's assigned store, or None
+    if either the position or the store's coordinates are unknown."""
+    if lat is None or lng is None:
+        return None
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT s.latitude, s.longitude FROM employees e "
+            "LEFT JOIN stores s ON UPPER(s.store_code) = UPPER(e.store_code) "
+            "WHERE e.id = %s LIMIT 1",
+            (emp_id,),
+        )
+        row = cur.fetchone()
+    if not row or row.get("latitude") is None or row.get("longitude") is None:
+        return None
+    return _haversine_meters(float(lat), float(lng), float(row["latitude"]), float(row["longitude"]))
+
+
 @app.post("/api/attendances/checkin")
 @login_required
 def api_checkin():
@@ -1626,6 +1708,14 @@ def api_checkin():
         coords = f"{lat},{lng}"
 
     db = get_db()
+
+    distance = _store_distance_for_employee(db, emp_id, lat, lng)
+    if distance is not None and distance > MAX_ATTENDANCE_DISTANCE_M:
+        return jsonify({
+            "error": f"Quá xa cửa hàng ({distance:.0f}m, giới hạn {MAX_ATTENDANCE_DISTANCE_M:.0f}m)",
+            "distance": distance,
+        }), 400
+
     _ensure_attendance_indexes(db)
     now = datetime.now(tz=VN_TZ)
     date_str = now.strftime("%Y-%m-%d")
@@ -1639,10 +1729,10 @@ def api_checkin():
     try:
         with db.cursor() as cur:
             cur.execute(
-                "INSERT INTO attendances (employee_id, attend_date, check_in_time, coordinates, "
+                "INSERT INTO attendances (employee_id, attend_date, check_in_time, coordinates, distance_in, "
                 "                         shift_name, shift_time_range, check_in_diff, check_in_status) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                (emp_id, date_str, time_str, coords, shift_name, shift_range, diff_min, status),
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (emp_id, date_str, time_str, coords, distance, shift_name, shift_range, diff_min, status),
             )
         db.commit()
     except DBIntegrityError:
@@ -1655,16 +1745,17 @@ def api_checkin():
                 "UPDATE attendances "
                 "SET check_in_time = COALESCE(check_in_time, %s), "
                 "    coordinates = COALESCE(coordinates, %s), "
+                "    distance_in = COALESCE(distance_in, %s), "
                 "    shift_name = COALESCE(shift_name, %s), "
                 "    shift_time_range = COALESCE(shift_time_range, %s), "
                 "    check_in_diff = COALESCE(check_in_diff, %s), "
                 "    check_in_status = COALESCE(check_in_status, %s) "
                 "WHERE employee_id = %s AND attend_date = %s",
-                (time_str, coords, shift_name, shift_range, diff_min, status, emp_id, date_str),
+                (time_str, coords, distance, shift_name, shift_range, diff_min, status, emp_id, date_str),
             )
         db.commit()
 
-    return jsonify({"ok": True, "time": time_str, "checkInDiff": diff_min, "checkInStatus": status})
+    return jsonify({"ok": True, "time": time_str, "checkInDiff": diff_min, "checkInStatus": status, "distance": distance})
 
 
 @app.post("/api/attendances/checkout")
@@ -1682,12 +1773,34 @@ def api_checkout():
         coords_out = f"{lat},{lng}"
 
     db = get_db()
+
+    distance = _store_distance_for_employee(db, emp_id, lat, lng)
+    if distance is not None and distance > MAX_ATTENDANCE_DISTANCE_M:
+        return jsonify({
+            "error": f"Quá xa cửa hàng ({distance:.0f}m, giới hạn {MAX_ATTENDANCE_DISTANCE_M:.0f}m)",
+            "distance": distance,
+        }), 400
+
     _ensure_attendance_indexes(db)
     now = datetime.now(tz=VN_TZ)
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%Y-%m-%dT%H:%M:%S")
 
-    shift = _scheduled_shift_for(db, emp_id, date_str)
+    # Overnight shifts check in on one calendar day and check out after midnight
+    # on the next. Resolve the still-open (checked-in, not checked-out) row's
+    # actual attend_date instead of assuming "today", so the check-out pairs
+    # with the right check-in instead of creating an orphan row.
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT attend_date FROM attendances "
+            "WHERE employee_id = %s AND check_in_time IS NOT NULL AND check_out_time IS NULL "
+            "ORDER BY attend_date DESC LIMIT 1",
+            (emp_id,),
+        )
+        open_row = cur.fetchone()
+    attend_date = open_row["attend_date"] if open_row else date_str
+
+    shift = _scheduled_shift_for(db, emp_id, attend_date)
     diff_min, status = _evaluate_check_out(shift, now)
     shift_name = shift["name"] if shift else None
     shift_range = shift["time_range"] if shift else None
@@ -1695,12 +1808,13 @@ def api_checkout():
     with db.cursor() as cur:
         cur.execute(
             "UPDATE attendances SET check_out_time = %s, coordinates = COALESCE(%s, coordinates), "
+            "    distance_out = %s, "
             "    shift_name = COALESCE(shift_name, %s), "
             "    shift_time_range = COALESCE(shift_time_range, %s), "
             "    check_out_diff = %s, check_out_status = %s "
             "WHERE employee_id = %s AND attend_date = %s "
             "RETURNING id",
-            (time_str, coords_out, shift_name, shift_range, diff_min, status, emp_id, date_str),
+            (time_str, coords_out, distance, shift_name, shift_range, diff_min, status, emp_id, attend_date),
         )
         row = cur.fetchone()
         if not row:
@@ -1708,13 +1822,13 @@ def api_checkout():
             # the employee shows up in today's list. Most realistic flow is the
             # client preventing this, but be tolerant.
             cur.execute(
-                "INSERT INTO attendances (employee_id, attend_date, check_out_time, coordinates, "
+                "INSERT INTO attendances (employee_id, attend_date, check_out_time, coordinates, distance_out, "
                 "                         shift_name, shift_time_range, check_out_diff, check_out_status) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                (emp_id, date_str, time_str, coords_out, shift_name, shift_range, diff_min, status),
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                (emp_id, date_str, time_str, coords_out, distance, shift_name, shift_range, diff_min, status),
             )
     db.commit()
-    return jsonify({"ok": True, "time": time_str, "checkOutDiff": diff_min, "checkOutStatus": status})
+    return jsonify({"ok": True, "time": time_str, "checkOutDiff": diff_min, "checkOutStatus": status, "distance": distance})
 
 
 def _ensure_attendance_indexes(db):
@@ -2005,6 +2119,32 @@ def _can_manage_attendance_user() -> bool:
     return pos in {"ADM", "ADMIN", "MNG", "CS", "TMK"}
 
 
+def _has_crud_permission() -> bool:
+    """Admin, or anyone whose position/store-role has can_crud, may manage master data
+    (employees, stores, products, shifts, schedules, store-managers)."""
+    if _is_admin_user():
+        return True
+    user_id = (g.current_user or {}).get("user_id")
+    if not user_id:
+        return False
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT p.can_crud "
+            "FROM users u "
+            "LEFT JOIN employees e ON e.id = u.employee_id "
+            "LEFT JOIN permissions p ON UPPER(p.position) = UPPER(e.position) "
+            "WHERE u.id = %s",
+            (user_id,),
+        )
+        row = cur.fetchone() or {}
+    return bool(row.get("can_crud"))
+
+
+def _forbidden():
+    return jsonify({"error": "Forbidden"}), 403
+
+
 def _parse_attendance_time(value: Any, attend_date: str | None) -> str | None:
     """Accepts 'HH:MM', 'HH:MM:SS' or full ISO. Returns 'YYYY-MM-DDTHH:MM:SS' or None."""
     if value is None:
@@ -2179,6 +2319,16 @@ def api_update_post(post_id: int):
     data = request.get_json(silent=True) or {}
     db = get_db()
     _ensure_posts_columns(db)
+
+    with db.cursor() as cur:
+        cur.execute("SELECT author_id FROM community_posts WHERE id = %s", (post_id,))
+        existing = cur.fetchone()
+    if not existing:
+        return jsonify({"error": "Not found"}), 404
+    user_id = g.current_user.get("user_id")
+    if existing.get("author_id") != user_id and not _is_admin_user():
+        return _forbidden()
+
     image_urls = data.get("imageUrls")
     update_images = isinstance(image_urls, list)
     images_json = json.dumps([str(u) for u in (image_urls or []) if u]) if update_images else None
@@ -2209,6 +2359,15 @@ def api_update_post(post_id: int):
 @login_required
 def api_delete_post(post_id: int):
     db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT author_id FROM community_posts WHERE id = %s", (post_id,))
+        existing = cur.fetchone()
+    if not existing:
+        return jsonify({"error": "Not found"}), 404
+    user_id = g.current_user.get("user_id")
+    if existing.get("author_id") != user_id and not _is_admin_user():
+        return _forbidden()
+
     with db.cursor() as cur:
         cur.execute("DELETE FROM community_posts WHERE id = %s", (post_id,))
     db.commit()
@@ -3280,6 +3439,8 @@ def api_get_events():
 @app.post("/api/events")
 @login_required
 def api_create_event():
+    if not _is_admin_user():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
     date_str = (data.get("date") or "").strip()
@@ -3306,6 +3467,8 @@ def api_create_event():
 @app.delete("/api/events")
 @login_required
 def api_delete_event():
+    if not _is_admin_user():
+        return _forbidden()
     data = request.get_json(silent=True) or {}
     title = (data.get("title") or "").strip()
     date_str = (data.get("date") or "").strip()
