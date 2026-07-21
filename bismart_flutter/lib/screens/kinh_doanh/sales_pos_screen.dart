@@ -11,10 +11,14 @@ import '../../providers/sales_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../widgets/common/responsive_form.dart';
 
-/// POS-style "Bán hàng" screen: tap products to build a cart, then check out.
+/// POS-style "Bán hàng" tab: tap products to build a cart, then check out.
 /// Submits through the same sales-report API as the manual report form, so
 /// it shows up identically in the report list/statistics — the difference
 /// is purely the entry workflow (cart-first, like a cashier screen).
+///
+/// Embedded directly as a tab inside Kinh doanh's TabBarView (no own
+/// Scaffold/AppBar) — keeps its cart alive across tab switches via
+/// AutomaticKeepAliveClientMixin so browsing other tabs doesn't lose it.
 class SalesPosScreen extends StatefulWidget {
   const SalesPosScreen({super.key});
 
@@ -22,7 +26,11 @@ class SalesPosScreen extends StatefulWidget {
   State<SalesPosScreen> createState() => _SalesPosScreenState();
 }
 
-class _SalesPosScreenState extends State<SalesPosScreen> {
+class _SalesPosScreenState extends State<SalesPosScreen>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   static const _groups = ['Tất cả', 'DELI', 'DELIMIL', 'AUMIL', 'GOODLIFE', 'TP'];
 
   final List<SaleItem> _cart = [];
@@ -93,126 +101,124 @@ class _SalesPosScreenState extends State<SalesPosScreen> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final productProvider = context.watch<ProductProvider>();
     final products = productProvider.filteredProducts;
     final isWide = MediaQuery.of(context).size.width >= 900;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(title: const Text('Bán hàng')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              controller: _searchCtrl,
-              onChanged: (v) => productProvider.setSearch(v),
-              decoration: const InputDecoration(
-                hintText: 'Tìm sản phẩm...',
-                prefixIcon: Icon(Icons.search_rounded, size: 20),
-              ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => productProvider.setSearch(v),
+            decoration: const InputDecoration(
+              hintText: 'Tìm sản phẩm...',
+              prefixIcon: Icon(Icons.search_rounded, size: 20),
             ),
-          ),
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              scrollDirection: Axis.horizontal,
-              itemCount: _groups.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                final group = _groups[i];
-                return ChoiceChip(
-                  label: Text(group),
-                  selected: productProvider.selectedGroup == group,
-                  selectedColor: AppColors.primaryLight,
-                  onSelected: (_) => productProvider.setGroup(group),
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: productProvider.isLoading && products.isEmpty
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.primary))
-                : products.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.inventory_2_outlined,
-                                size: 40, color: AppColors.textHint),
-                            const SizedBox(height: 8),
-                            Text('Không có sản phẩm phù hợp',
-                                style: AppTextStyles.caption),
-                          ],
-                        ),
-                      )
-                    : GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: isWide ? 4 : 2,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: 0.92,
-                        ),
-                        itemCount: products.length,
-                        itemBuilder: (context, i) {
-                          final product = products[i];
-                          final qtyInCart = _cart
-                              .where((item) => item.productId == product.id)
-                              .fold<int>(0, (s, it) => s + it.quantity);
-                          return _ProductTile(
-                            product: product,
-                            quantityInCart: qtyInCart,
-                            onTap: () => _addToCart(product),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 12,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('$_cartCount sản phẩm', style: AppTextStyles.caption),
-                    Text(
-                      CurrencyFormatter.formatVND(_subtotal),
-                      style: AppTextStyles.sectionHeader
-                          .copyWith(color: AppColors.primary),
-                    ),
-                  ],
-                ),
-              ),
-              ElevatedButton.icon(
-                onPressed: _cart.isEmpty ? null : _openCheckout,
-                icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 18),
-                label: const Text('Thanh toán'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                ),
-              ),
-            ],
           ),
         ),
-      ),
+        SizedBox(
+          height: 40,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: _groups.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemBuilder: (context, i) {
+              final group = _groups[i];
+              return ChoiceChip(
+                label: Text(group),
+                selected: productProvider.selectedGroup == group,
+                selectedColor: AppColors.primaryLight,
+                onSelected: (_) => productProvider.setGroup(group),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: productProvider.isLoading && products.isEmpty
+              ? const Center(
+                  child: CircularProgressIndicator(color: AppColors.primary))
+              : products.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.inventory_2_outlined,
+                              size: 40, color: AppColors.textHint),
+                          const SizedBox(height: 8),
+                          Text('Không có sản phẩm phù hợp',
+                              style: AppTextStyles.caption),
+                        ],
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: isWide ? 4 : 2,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 0.92,
+                      ),
+                      itemCount: products.length,
+                      itemBuilder: (context, i) {
+                        final product = products[i];
+                        final qtyInCart = _cart
+                            .where((item) => item.productId == product.id)
+                            .fold<int>(0, (s, it) => s + it.quantity);
+                        return _ProductTile(
+                          product: product,
+                          quantityInCart: qtyInCart,
+                          onTap: () => _addToCart(product),
+                        );
+                      },
+                    ),
+        ),
+        SafeArea(
+          top: false,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.06),
+                  blurRadius: 12,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$_cartCount sản phẩm', style: AppTextStyles.caption),
+                      Text(
+                        CurrencyFormatter.formatVND(_subtotal),
+                        style: AppTextStyles.sectionHeader
+                            .copyWith(color: AppColors.primary),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _cart.isEmpty ? null : _openCheckout,
+                  icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 18),
+                  label: const Text('Thanh toán'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
