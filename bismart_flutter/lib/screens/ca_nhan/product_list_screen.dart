@@ -190,7 +190,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
   void _showAddProductDialog() {
     final nameCtrl = TextEditingController();
-    final codeCtrl = TextEditingController();
     final priceCtrl = TextEditingController();
     String unit = _units.first;
     String group = _groups.first;
@@ -204,8 +203,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên sản phẩm')),
-          const SizedBox(height: 8),
-          TextField(controller: codeCtrl, decoration: const InputDecoration(labelText: 'Mã sản phẩm')),
           const SizedBox(height: 8),
           TextField(
             controller: priceCtrl,
@@ -241,7 +238,15 @@ class _ProductListScreenState extends State<ProductListScreen> {
           onPressed: saving
               ? null
               : () async {
-                  if (nameCtrl.text.isEmpty || codeCtrl.text.isEmpty) return;
+                  if (nameCtrl.text.isEmpty) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Vui lòng nhập tên sản phẩm'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
                   setDialogState(() => saving = true);
                   final ok = await context.read<ProductProvider>().addProduct(Product(
                         id: DateTime.now().millisecondsSinceEpoch.toString(),
