@@ -45,7 +45,7 @@ Future<T?> showResponsiveForm<T>({
                     if (MediaQuery.of(ctx).viewInsets.bottom > 0)
                       Positioned(
                         right: 12,
-                        bottom: MediaQuery.of(ctx).viewInsets.bottom + 8,
+                        bottom: 8,
                         child: Material(
                           color: AppColors.textDark,
                           borderRadius: BorderRadius.circular(20),
