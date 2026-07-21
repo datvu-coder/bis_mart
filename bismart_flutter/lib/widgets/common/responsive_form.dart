@@ -32,9 +32,46 @@ Future<T?> showResponsiveForm<T>({
                 ),
               ),
               body: SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: contentBuilder(ctx, setState),
+                child: Stack(
+                  children: [
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: contentBuilder(ctx, setState),
+                    ),
+                    // Numeric keypads (e.g. iOS) have no built-in Done key,
+                    // and the action buttons below live in bottomNavigationBar
+                    // which the keyboard covers — without this, a focused
+                    // numeric field leaves no way to dismiss the keyboard.
+                    if (MediaQuery.of(ctx).viewInsets.bottom > 0)
+                      Positioned(
+                        right: 12,
+                        bottom: MediaQuery.of(ctx).viewInsets.bottom + 8,
+                        child: Material(
+                          color: AppColors.textDark,
+                          borderRadius: BorderRadius.circular(20),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(20),
+                            onTap: () => FocusScope.of(ctx).unfocus(),
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.keyboard_hide_rounded,
+                                      size: 16, color: AppColors.white),
+                                  SizedBox(width: 6),
+                                  Text('Xong',
+                                      style: TextStyle(
+                                          color: AppColors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
               bottomNavigationBar: actions.isEmpty
