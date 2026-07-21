@@ -15,4 +15,5 @@ class AppRoutes {
   static const productList = '/ca-nhan/san-pham';
   static const phanQuyen = '/ca-nhan/phan-quyen';
   static const einvoiceSettings = '/ca-nhan/hoa-don-dien-tu';
+  static const printerSettings = '/ca-nhan/may-in';
 }

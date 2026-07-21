@@ -117,35 +117,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   color: AppColors.surfaceVariant,
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: isDesktop
-                    ? WeightedTabSelector(
-                        controller: _tabController,
-                        labels: const ['Cộng đồng', 'Bài giảng', 'Lịch học', 'Trợ lý AI'],
-                      )
-                    : TabBar(
-                        controller: _tabController,
-                        isScrollable: true,
-                        tabAlignment: TabAlignment.start,
-                        labelColor: AppColors.primary,
-                        unselectedLabelColor: AppColors.textGrey,
-                        indicator: BoxDecoration(
-                          color: AppColors.white,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        dividerColor: Colors.transparent,
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 14),
-                        labelStyle: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w700),
-                        unselectedLabelStyle: const TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w500),
-                        tabs: const [
-                          Tab(text: 'Cộng đồng'),
-                          Tab(text: 'Bài giảng'),
-                          Tab(text: 'Lịch học'),
-                          Tab(text: 'Trợ lý AI'),
-                        ],
-                      ),
+                child: WeightedTabSelector(
+                  controller: _tabController,
+                  labels: const ['Cộng đồng', 'Bài giảng', 'Lịch học', 'Trợ lý AI'],
+                ),
               ),
               Expanded(
                 child: TabBarView(
