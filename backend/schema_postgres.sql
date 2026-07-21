@@ -489,3 +489,19 @@ CREATE TABLE IF NOT EXISTS employee_schedules (
 );
 CREATE INDEX IF NOT EXISTS idx_employee_schedules_date ON employee_schedules(work_date);
 CREATE INDEX IF NOT EXISTS idx_employee_schedules_employee ON employee_schedules(employee_id);
+
+-- Single-row config for an e-invoice provider (MISA meInvoice / VNPT / Viettel...).
+-- Storing credentials only; the app never talks to the tax authority directly —
+-- only to whichever licensed provider the business has a contract with.
+CREATE TABLE IF NOT EXISTS einvoice_settings (
+    id SERIAL PRIMARY KEY,
+    provider TEXT NOT NULL DEFAULT 'misa',
+    tax_code TEXT,
+    api_base_url TEXT,
+    api_key TEXT,
+    username TEXT,
+    is_active INTEGER NOT NULL DEFAULT 0,
+    updated_by INTEGER,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+);

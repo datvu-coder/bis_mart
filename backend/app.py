@@ -9,6 +9,8 @@ import json
 import math
 import mimetypes
 import os
+import urllib.error
+import urllib.request
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -1359,6 +1361,149 @@ def api_delete_store(store_id: int):
         cur.execute("DELETE FROM stores WHERE id = %s", (store_id,))
     db.commit()
     return jsonify({"ok": True})
+
+
+# ---- E-INVOICE PROVIDER SETTINGS ----
+# The app never talks to the tax authority directly. Submitting real
+# e-invoices requires the business to register with a licensed provider
+# (MISA meInvoice, VNPT, Viettel, BKAV...) that already has a certified API
+# relationship with Tổng cục Thuế, plus a digital-signature contract. These
+# routes only store that provider's connection details and do a basic
+# reachability check — they are not a tax-authority integration themselves.
+
+def _mask_secret(value: str | None) -> str | None:
+    if not value:
+        return value
+    if len(value) <= 4:
+        return "*" * len(value)
+    return "*" * (len(value) - 4) + value[-4:]
+
+
+@app.get("/api/einvoice/settings")
+@login_required
+def api_get_einvoice_settings():
+    if not _is_admin_user():
+        return _forbidden()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, provider, tax_code, api_base_url, api_key, username, is_active, updated_at "
+            "FROM einvoice_settings ORDER BY id DESC LIMIT 1"
+        )
+        row = cur.fetchone()
+    if not row:
+        return jsonify({
+            "provider": "misa",
+            "taxCode": None,
+            "apiBaseUrl": None,
+            "apiKeyMasked": None,
+            "username": None,
+            "isActive": False,
+            "configured": False,
+        })
+    return jsonify({
+        "provider": row.get("provider"),
+        "taxCode": row.get("tax_code"),
+        "apiBaseUrl": row.get("api_base_url"),
+        "apiKeyMasked": _mask_secret(row.get("api_key")),
+        "username": row.get("username"),
+        "isActive": bool(row.get("is_active")),
+        "configured": True,
+        "updatedAt": row.get("updated_at"),
+    })
+
+
+@app.put("/api/einvoice/settings")
+@login_required
+def api_update_einvoice_settings():
+    if not _is_admin_user():
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    user_id = g.current_user.get("user_id")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT id, api_key FROM einvoice_settings ORDER BY id DESC LIMIT 1")
+        existing = cur.fetchone()
+
+    # Keep the existing key if the client sends a blank value (i.e. the admin
+    # only changed other fields and didn't retype the key).
+    new_api_key = (data.get("apiKey") or "").strip()
+    if not new_api_key and existing:
+        new_api_key = existing.get("api_key")
+
+    with db.cursor() as cur:
+        if existing:
+            cur.execute(
+                "UPDATE einvoice_settings SET provider=%s, tax_code=%s, api_base_url=%s, "
+                "api_key=%s, username=%s, is_active=%s, updated_by=%s, updated_at=CURRENT_TIMESTAMP "
+                "WHERE id=%s",
+                (
+                    (data.get("provider") or "misa").strip().lower(),
+                    (data.get("taxCode") or "").strip() or None,
+                    (data.get("apiBaseUrl") or "").strip() or None,
+                    new_api_key,
+                    (data.get("username") or "").strip() or None,
+                    int(bool(data.get("isActive", False))),
+                    user_id,
+                    existing["id"],
+                ),
+            )
+        else:
+            cur.execute(
+                "INSERT INTO einvoice_settings "
+                "(provider, tax_code, api_base_url, api_key, username, is_active, updated_by) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (
+                    (data.get("provider") or "misa").strip().lower(),
+                    (data.get("taxCode") or "").strip() or None,
+                    (data.get("apiBaseUrl") or "").strip() or None,
+                    new_api_key,
+                    (data.get("username") or "").strip() or None,
+                    int(bool(data.get("isActive", False))),
+                    user_id,
+                ),
+            )
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/einvoice/test-connection")
+@login_required
+def api_test_einvoice_connection():
+    """Basic HTTP reachability check for the configured e-invoice provider
+    endpoint. This only confirms the URL responds and that the API key is
+    being sent — it does NOT validate against any specific provider's real
+    auth/invoice schema, since that differs per provider and requires their
+    official API documentation to implement correctly."""
+    if not _is_admin_user():
+        return _forbidden()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT api_base_url, api_key FROM einvoice_settings ORDER BY id DESC LIMIT 1"
+        )
+        row = cur.fetchone()
+    if not row or not row.get("api_base_url"):
+        return jsonify({"ok": False, "error": "Chưa cấu hình địa chỉ API (apiBaseUrl)"}), 400
+
+    req = urllib.request.Request(
+        row["api_base_url"],
+        method="GET",
+        headers={"Authorization": f"Bearer {row.get('api_key') or ''}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return jsonify({"ok": True, "statusCode": resp.status})
+    except urllib.error.HTTPError as e:
+        # Any HTTP response (even 401/404) at least proves the endpoint is reachable.
+        return jsonify({
+            "ok": True,
+            "statusCode": e.code,
+            "note": "Endpoint phản hồi nhưng có thể cần điều chỉnh xác thực",
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 502
+
 
 @app.post("/api/reports")
 @login_required

@@ -14,6 +14,7 @@ import 'screens/ca_nhan/store_list_screen.dart';
 import 'screens/ca_nhan/employee_list_screen.dart';
 import 'screens/ca_nhan/product_list_screen.dart';
 import 'screens/ca_nhan/phan_quyen_screen.dart';
+import 'screens/ca_nhan/einvoice_settings_screen.dart';
 import 'widgets/common/main_shell.dart';
 
 class BismartApp extends StatelessWidget {
@@ -76,6 +77,9 @@ class BismartApp extends StatelessWidget {
         break;
       case AppRoutes.phanQuyen:
         page = const PhanQuyenScreen();
+        break;
+      case AppRoutes.einvoiceSettings:
+        page = const EinvoiceSettingsScreen();
         break;
       default:
         page = const MainShell(initialIndex: 0);

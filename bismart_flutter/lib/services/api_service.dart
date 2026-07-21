@@ -598,6 +598,22 @@ class ApiService {
     await _dio.delete('/api/store-managers/$id');
   }
 
+  // ---- E-INVOICE PROVIDER SETTINGS ----
+  Future<Map<String, dynamic>> getEinvoiceSettings() async {
+    final response = await _dio.get('/api/einvoice/settings');
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateEinvoiceSettings(Map<String, dynamic> data) async {
+    final response = await _dio.put('/api/einvoice/settings', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> testEinvoiceConnection() async {
+    final response = await _dio.post('/api/einvoice/test-connection');
+    return response.data as Map<String, dynamic>;
+  }
+
   // ---- EFFECTIVE PERMISSIONS ----
   Future<Map<String, dynamic>> getMyEffectivePermissions() async {
     final response = await _dio.get('/api/me/permissions');
