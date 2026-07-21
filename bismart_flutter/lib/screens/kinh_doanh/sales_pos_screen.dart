@@ -428,7 +428,8 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                     paymentMethod: paymentMethod,
                   );
 
-                  final success = await context.read<SalesProvider>().createReport(report);
+                  final salesProvider = context.read<SalesProvider>();
+                  final success = await salesProvider.createReport(report);
                   if (!ctx.mounted) return;
                   if (success) {
                     Navigator.pop(ctx);
@@ -446,7 +447,8 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                     setDialogState(() => isSubmitting = false);
                     ScaffoldMessenger.of(ctx).showSnackBar(
                       SnackBar(
-                        content: const Text('Bán hàng thất bại. Vui lòng thử lại.'),
+                        content: Text(salesProvider.error ??
+                            'Bán hàng thất bại. Vui lòng thử lại.'),
                         behavior: SnackBarBehavior.floating,
                         backgroundColor: AppColors.error,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
