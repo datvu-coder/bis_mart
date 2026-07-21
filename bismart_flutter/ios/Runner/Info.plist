@@ -32,6 +32,8 @@
 	<string>Bi'S MART cần quyền camera để chụp ảnh/quay video cho bài đăng và báo cáo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Bi'S MART cần quyền thư viện ảnh để đính kèm ảnh/video vào bài đăng.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Bi'S MART cần quyền truy cập mạng cục bộ để kết nối và in hoá đơn qua máy in WiFi.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
