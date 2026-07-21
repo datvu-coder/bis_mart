@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../models/sales_report.dart';
 import '../services/api_service.dart';
@@ -166,8 +167,8 @@ class SalesProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true;
-    } catch (_) {
-      _error = 'Không thể lưu báo cáo lên máy chủ. Vui lòng thử lại.';
+    } catch (e) {
+      _error = _describeError(e);
       _isLoading = false;
       notifyListeners();
       return false;
@@ -188,9 +189,12 @@ class SalesProvider extends ChangeNotifier {
       if (index != -1) {
         _reports[index] = updated;
       }
+      _error = null;
       notifyListeners();
       return true;
-    } catch (_) {
+    } catch (e) {
+      _error = _describeError(e);
+      notifyListeners();
       return false;
     }
   }
@@ -201,5 +205,24 @@ class SalesProvider extends ChangeNotifier {
     } catch (_) {
       return null;
     }
+  }
+
+  String _describeError(Object e) {
+    if (e is DioException) {
+      final status = e.response?.statusCode;
+      final data = e.response?.data;
+      final serverMessage = data is Map ? data['error']?.toString() : null;
+      if (status == 401 || status == 403) {
+        return 'Bạn không có quyền thực hiện thao tác này.';
+      }
+      if (serverMessage != null && serverMessage.isNotEmpty) {
+        return serverMessage;
+      }
+      if (status != null) {
+        return 'Lỗi máy chủ (mã $status).';
+      }
+      return 'Không thể kết nối đến máy chủ. Kiểm tra lại mạng.';
+    }
+    return e.toString();
   }
 }

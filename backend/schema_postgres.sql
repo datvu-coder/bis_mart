@@ -659,3 +659,493 @@ DO $$ BEGIN
         ALTER TABLE attendances ADD COLUMN check_out_status TEXT;
     END IF;
 END $$;
+
+-- Migration: the previous migration pass assumed sales_reports/sale_items/
+-- stores/permissions only needed the couple of columns already guarded
+-- above, but a live diagnose run turned up psycopg.errors.UndefinedColumn
+-- on stores.status and sales_reports.store_name/sale_out too (the POS
+-- checkout's INSERT failed outright with "Bán hàng thất bại"). Given two
+-- rounds of surprises now, guard every remaining column on every table
+-- instead of continuing to find them one crash at a time.
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='stores' AND column_name='status') THEN
+        ALTER TABLE stores ADD COLUMN status TEXT NOT NULL DEFAULT 'Hoạt động';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='excel_id') THEN
+        ALTER TABLE sales_reports ADD COLUMN excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='store_name') THEN
+        ALTER TABLE sales_reports ADD COLUMN store_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='nu') THEN
+        ALTER TABLE sales_reports ADD COLUMN nu INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='sale_out') THEN
+        ALTER TABLE sales_reports ADD COLUMN sale_out REAL NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='report_month') THEN
+        ALTER TABLE sales_reports ADD COLUMN report_month INTEGER;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='revenue') THEN
+        ALTER TABLE sales_reports ADD COLUMN revenue REAL NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='points') THEN
+        ALTER TABLE sales_reports ADD COLUMN points INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='employee_code') THEN
+        ALTER TABLE sales_reports ADD COLUMN employee_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='created_by') THEN
+        ALTER TABLE sales_reports ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sale_items' AND column_name='excel_id') THEN
+        ALTER TABLE sale_items ADD COLUMN excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sale_items' AND column_name='report_excel_id') THEN
+        ALTER TABLE sale_items ADD COLUMN report_excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sale_items' AND column_name='product_id') THEN
+        ALTER TABLE sale_items ADD COLUMN product_id INTEGER;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sale_items' AND column_name='unit') THEN
+        ALTER TABLE sale_items ADD COLUMN unit TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sale_items' AND column_name='quantity') THEN
+        ALTER TABLE sale_items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sale_items' AND column_name='unit_price') THEN
+        ALTER TABLE sale_items ADD COLUMN unit_price REAL NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sale_items' AND column_name='product_group') THEN
+        ALTER TABLE sale_items ADD COLUMN product_group TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='permissions' AND column_name='description') THEN
+        ALTER TABLE permissions ADD COLUMN description TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='permissions' AND column_name='can_attendance') THEN
+        ALTER TABLE permissions ADD COLUMN can_attendance INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='permissions' AND column_name='can_report') THEN
+        ALTER TABLE permissions ADD COLUMN can_report INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='permissions' AND column_name='can_manage_attendance') THEN
+        ALTER TABLE permissions ADD COLUMN can_manage_attendance INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='permissions' AND column_name='can_employees') THEN
+        ALTER TABLE permissions ADD COLUMN can_employees INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='permissions' AND column_name='can_more') THEN
+        ALTER TABLE permissions ADD COLUMN can_more INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='permissions' AND column_name='can_crud') THEN
+        ALTER TABLE permissions ADD COLUMN can_crud INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='permissions' AND column_name='can_switch_store') THEN
+        ALTER TABLE permissions ADD COLUMN can_switch_store INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='permissions' AND column_name='can_store_list') THEN
+        ALTER TABLE permissions ADD COLUMN can_store_list INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='permissions' AND column_name='can_product_list') THEN
+        ALTER TABLE permissions ADD COLUMN can_product_list INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='excel_id') THEN
+        ALTER TABLE comments ADD COLUMN excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='comment_ref_id') THEN
+        ALTER TABLE comments ADD COLUMN comment_ref_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='post_id') THEN
+        ALTER TABLE comments ADD COLUMN post_id INTEGER REFERENCES community_posts(id) ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='content') THEN
+        ALTER TABLE comments ADD COLUMN content TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='action') THEN
+        ALTER TABLE comments ADD COLUMN action TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='image_url') THEN
+        ALTER TABLE comments ADD COLUMN image_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='video_url') THEN
+        ALTER TABLE comments ADD COLUMN video_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='document_url') THEN
+        ALTER TABLE comments ADD COLUMN document_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='employee_code') THEN
+        ALTER TABLE comments ADD COLUMN employee_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='author_name') THEN
+        ALTER TABLE comments ADD COLUMN author_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='points') THEN
+        ALTER TABLE comments ADD COLUMN points INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='comments' AND column_name='like_count') THEN
+        ALTER TABLE comments ADD COLUMN like_count INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='post_likes' AND column_name='excel_id') THEN
+        ALTER TABLE post_likes ADD COLUMN excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='post_likes' AND column_name='ref_id') THEN
+        ALTER TABLE post_likes ADD COLUMN ref_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='post_likes' AND column_name='employee_code') THEN
+        ALTER TABLE post_likes ADD COLUMN employee_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='post_likes' AND column_name='full_name') THEN
+        ALTER TABLE post_likes ADD COLUMN full_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='post_likes' AND column_name='points') THEN
+        ALTER TABLE post_likes ADD COLUMN points INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='post_likes' AND column_name='post_id') THEN
+        ALTER TABLE post_likes ADD COLUMN post_id INTEGER REFERENCES community_posts(id) ON DELETE CASCADE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='post_likes' AND column_name='user_id') THEN
+        ALTER TABLE post_likes ADD COLUMN user_id INTEGER;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_titles' AND column_name='access_level') THEN
+        ALTER TABLE course_titles ADD COLUMN access_level TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_titles' AND column_name='image_url') THEN
+        ALTER TABLE course_titles ADD COLUMN image_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_titles' AND column_name='description') THEN
+        ALTER TABLE course_titles ADD COLUMN description TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_titles' AND column_name='rating') THEN
+        ALTER TABLE course_titles ADD COLUMN rating REAL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_titles' AND column_name='target_group') THEN
+        ALTER TABLE course_titles ADD COLUMN target_group TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_contents' AND column_name='title_id') THEN
+        ALTER TABLE course_contents ADD COLUMN title_id TEXT REFERENCES course_titles(excel_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_contents' AND column_name='detail_html') THEN
+        ALTER TABLE course_contents ADD COLUMN detail_html TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_contents' AND column_name='points') THEN
+        ALTER TABLE course_contents ADD COLUMN points INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_contents' AND column_name='attachment_type') THEN
+        ALTER TABLE course_contents ADD COLUMN attachment_type TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_contents' AND column_name='image_url') THEN
+        ALTER TABLE course_contents ADD COLUMN image_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_contents' AND column_name='video_url') THEN
+        ALTER TABLE course_contents ADD COLUMN video_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_contents' AND column_name='file_url') THEN
+        ALTER TABLE course_contents ADD COLUMN file_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_contents' AND column_name='embed_code') THEN
+        ALTER TABLE course_contents ADD COLUMN embed_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_contents' AND column_name='status') THEN
+        ALTER TABLE course_contents ADD COLUMN status TEXT DEFAULT 'Đang kiểm tra';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_enrollments' AND column_name='excel_id') THEN
+        ALTER TABLE course_enrollments ADD COLUMN excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_enrollments' AND column_name='title_id') THEN
+        ALTER TABLE course_enrollments ADD COLUMN title_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_enrollments' AND column_name='employee_code') THEN
+        ALTER TABLE course_enrollments ADD COLUMN employee_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_enrollments' AND column_name='full_name') THEN
+        ALTER TABLE course_enrollments ADD COLUMN full_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_enrollments' AND column_name='enrolled_at') THEN
+        ALTER TABLE course_enrollments ADD COLUMN enrolled_at TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_completions' AND column_name='excel_id') THEN
+        ALTER TABLE course_completions ADD COLUMN excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_completions' AND column_name='title_id') THEN
+        ALTER TABLE course_completions ADD COLUMN title_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_completions' AND column_name='content_id') THEN
+        ALTER TABLE course_completions ADD COLUMN content_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_completions' AND column_name='employee_code') THEN
+        ALTER TABLE course_completions ADD COLUMN employee_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_completions' AND column_name='full_name') THEN
+        ALTER TABLE course_completions ADD COLUMN full_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_completions' AND column_name='completed_at') THEN
+        ALTER TABLE course_completions ADD COLUMN completed_at TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_completions' AND column_name='points') THEN
+        ALTER TABLE course_completions ADD COLUMN points INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='course_completions' AND column_name='content_name') THEN
+        ALTER TABLE course_completions ADD COLUMN content_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_questions' AND column_name='question_type') THEN
+        ALTER TABLE quiz_questions ADD COLUMN question_type TEXT DEFAULT 'TN';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_questions' AND column_name='option_a') THEN
+        ALTER TABLE quiz_questions ADD COLUMN option_a TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_questions' AND column_name='option_b') THEN
+        ALTER TABLE quiz_questions ADD COLUMN option_b TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_questions' AND column_name='option_c') THEN
+        ALTER TABLE quiz_questions ADD COLUMN option_c TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_questions' AND column_name='option_d') THEN
+        ALTER TABLE quiz_questions ADD COLUMN option_d TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_questions' AND column_name='correct_answer') THEN
+        ALTER TABLE quiz_questions ADD COLUMN correct_answer TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_questions' AND column_name='points') THEN
+        ALTER TABLE quiz_questions ADD COLUMN points INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_questions' AND column_name='content_id') THEN
+        ALTER TABLE quiz_questions ADD COLUMN content_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_questions' AND column_name='question_number') THEN
+        ALTER TABLE quiz_questions ADD COLUMN question_number INTEGER;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_results' AND column_name='submitted_at') THEN
+        ALTER TABLE quiz_results ADD COLUMN submitted_at TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_results' AND column_name='employee_code') THEN
+        ALTER TABLE quiz_results ADD COLUMN employee_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_results' AND column_name='full_name') THEN
+        ALTER TABLE quiz_results ADD COLUMN full_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_results' AND column_name='store_name') THEN
+        ALTER TABLE quiz_results ADD COLUMN store_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_results' AND column_name='phone') THEN
+        ALTER TABLE quiz_results ADD COLUMN phone TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_results' AND column_name='content_id') THEN
+        ALTER TABLE quiz_results ADD COLUMN content_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_results' AND column_name='score') THEN
+        ALTER TABLE quiz_results ADD COLUMN score TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='quiz_results' AND column_name='answers_json') THEN
+        ALTER TABLE quiz_results ADD COLUMN answers_json TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_schedules' AND column_name='start_date') THEN
+        ALTER TABLE class_schedules ADD COLUMN start_date TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_schedules' AND column_name='start_time') THEN
+        ALTER TABLE class_schedules ADD COLUMN start_time TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_schedules' AND column_name='end_date') THEN
+        ALTER TABLE class_schedules ADD COLUMN end_date TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_schedules' AND column_name='end_time') THEN
+        ALTER TABLE class_schedules ADD COLUMN end_time TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_schedules' AND column_name='content') THEN
+        ALTER TABLE class_schedules ADD COLUMN content TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_schedules' AND column_name='link') THEN
+        ALTER TABLE class_schedules ADD COLUMN link TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_schedules' AND column_name='attendance_file') THEN
+        ALTER TABLE class_schedules ADD COLUMN attendance_file TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_attendances' AND column_name='schedule_id') THEN
+        ALTER TABLE class_attendances ADD COLUMN schedule_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_attendances' AND column_name='attendance_id') THEN
+        ALTER TABLE class_attendances ADD COLUMN attendance_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_attendances' AND column_name='employee_code') THEN
+        ALTER TABLE class_attendances ADD COLUMN employee_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_attendances' AND column_name='full_name') THEN
+        ALTER TABLE class_attendances ADD COLUMN full_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_attendances' AND column_name='store_name') THEN
+        ALTER TABLE class_attendances ADD COLUMN store_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_attendances' AND column_name='content') THEN
+        ALTER TABLE class_attendances ADD COLUMN content TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_attendances' AND column_name='action') THEN
+        ALTER TABLE class_attendances ADD COLUMN action TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_attendances' AND column_name='attend_time') THEN
+        ALTER TABLE class_attendances ADD COLUMN attend_time TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_attendances' AND column_name='attend_date') THEN
+        ALTER TABLE class_attendances ADD COLUMN attend_date TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='class_attendances' AND column_name='link') THEN
+        ALTER TABLE class_attendances ADD COLUMN link TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='ai_tools' AND column_name='link') THEN
+        ALTER TABLE ai_tools ADD COLUMN link TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='ai_usage_logs' AND column_name='excel_id') THEN
+        ALTER TABLE ai_usage_logs ADD COLUMN excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='ai_usage_logs' AND column_name='employee_code') THEN
+        ALTER TABLE ai_usage_logs ADD COLUMN employee_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='ai_usage_logs' AND column_name='full_name') THEN
+        ALTER TABLE ai_usage_logs ADD COLUMN full_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='ai_usage_logs' AND column_name='store_name') THEN
+        ALTER TABLE ai_usage_logs ADD COLUMN store_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='ai_usage_logs' AND column_name='ai_name') THEN
+        ALTER TABLE ai_usage_logs ADD COLUMN ai_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='ai_usage_logs' AND column_name='used_at') THEN
+        ALTER TABLE ai_usage_logs ADD COLUMN used_at TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='ai_usage_logs' AND column_name='points') THEN
+        ALTER TABLE ai_usage_logs ADD COLUMN points INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='lessons' AND column_name='thumbnail_url') THEN
+        ALTER TABLE lessons ADD COLUMN thumbnail_url TEXT NOT NULL DEFAULT '';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='lessons' AND column_name='target_role') THEN
+        ALTER TABLE lessons ADD COLUMN target_role TEXT NOT NULL DEFAULT 'ALL';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='lessons' AND column_name='is_restricted') THEN
+        ALTER TABLE lessons ADD COLUMN is_restricted INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='lessons' AND column_name='video_url') THEN
+        ALTER TABLE lessons ADD COLUMN video_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='training_events' AND column_name='created_by') THEN
+        ALTER TABLE training_events ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+END $$;
