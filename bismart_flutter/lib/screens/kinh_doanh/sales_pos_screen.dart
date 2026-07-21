@@ -106,30 +106,37 @@ class _SalesPosScreenState extends State<SalesPosScreen>
     final products = productProvider.filteredProducts;
     final isWide = MediaQuery.of(context).size.width >= 900;
 
+    final crossAxisCount = isWide ? 5 : (MediaQuery.of(context).size.width >= 420 ? 3 : 2);
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
           child: TextField(
             controller: _searchCtrl,
             onChanged: (v) => productProvider.setSearch(v),
             decoration: const InputDecoration(
               hintText: 'Tìm sản phẩm...',
               prefixIcon: Icon(Icons.search_rounded, size: 20),
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
           ),
         ),
         SizedBox(
-          height: 40,
+          height: 32,
           child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             scrollDirection: Axis.horizontal,
             itemCount: _groups.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            separatorBuilder: (_, __) => const SizedBox(width: 6),
             itemBuilder: (context, i) {
               final group = _groups[i];
               return ChoiceChip(
                 label: Text(group),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 selected: productProvider.selectedGroup == group,
                 selectedColor: AppColors.primaryLight,
                 onSelected: (_) => productProvider.setGroup(group),
@@ -137,7 +144,7 @@ class _SalesPosScreenState extends State<SalesPosScreen>
             },
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Expanded(
           child: productProvider.isLoading && products.isEmpty
               ? const Center(
@@ -156,12 +163,12 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                       ),
                     )
                   : GridView.builder(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: isWide ? 4 : 2,
-                        mainAxisSpacing: 10,
-                        crossAxisSpacing: 10,
-                        childAspectRatio: 0.92,
+                        crossAxisCount: crossAxisCount,
+                        mainAxisSpacing: 8,
+                        crossAxisSpacing: 8,
+                        childAspectRatio: 1.05,
                       ),
                       itemCount: products.length,
                       itemBuilder: (context, i) {
@@ -180,7 +187,7 @@ class _SalesPosScreenState extends State<SalesPosScreen>
         SafeArea(
           top: false,
           child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
             decoration: BoxDecoration(
               color: AppColors.white,
               boxShadow: [
@@ -195,6 +202,7 @@ class _SalesPosScreenState extends State<SalesPosScreen>
               children: [
                 Expanded(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('$_cartCount sản phẩm', style: AppTextStyles.caption),
@@ -211,7 +219,7 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                   icon: const Icon(Icons.shopping_cart_checkout_rounded, size: 18),
                   label: const Text('Thanh toán'),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                   ),
                 ),
               ],
@@ -245,7 +253,7 @@ class _SalesPosScreenState extends State<SalesPosScreen>
               final i = entry.key;
               final item = entry.value;
               return Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
                   children: [
                     Expanded(
@@ -260,10 +268,10 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                       icon: const Icon(Icons.remove_circle_outline_rounded, size: 20),
                       color: AppColors.primary,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
                     ),
                     SizedBox(
-                      width: 24,
+                      width: 22,
                       child: Text('${item.quantity}',
                           textAlign: TextAlign.center, style: AppTextStyles.bodyText),
                     ),
@@ -275,11 +283,11 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                       icon: const Icon(Icons.add_circle_outline_rounded, size: 20),
                       color: AppColors.primary,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     SizedBox(
-                      width: 90,
+                      width: 84,
                       child: Text(
                         CurrencyFormatter.formatVND(item.total),
                         textAlign: TextAlign.end,
@@ -292,10 +300,10 @@ class _SalesPosScreenState extends State<SalesPosScreen>
             }),
             if (_cart.isEmpty)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 6),
                 child: Text('Giỏ hàng trống', style: AppTextStyles.caption),
               ),
-            const Divider(height: 20),
+            const Divider(height: 12),
             Row(
               children: [
                 Expanded(
@@ -310,35 +318,41 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Row(
               children: [
+                Expanded(
+                  child: TextField(
+                    controller: revenueCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration:
+                        const InputDecoration(labelText: 'Doanh thu', suffixText: 'đ', isDense: true),
+                    onChanged: (_) => setDialogState(() {}),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Text('NU', style: AppTextStyles.metricLabel),
-                const Spacer(),
                 IconButton(
                   onPressed:
                       nu > 0 ? () => setDialogState(() => nu--) : null,
                   icon: const Icon(Icons.remove_circle_rounded),
                   color: AppColors.primary,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
                 Text('$nu', style: AppTextStyles.sectionHeader),
                 IconButton(
                   onPressed: () => setDialogState(() => nu++),
                   icon: const Icon(Icons.add_circle_rounded),
                   color: AppColors.primary,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: revenueCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Doanh thu', suffixText: 'đ'),
-              onChanged: (_) => setDialogState(() {}),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 10),
             Text('Phương thức thanh toán', style: AppTextStyles.metricLabel),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Expanded(
@@ -361,15 +375,15 @@ class _SalesPosScreenState extends State<SalesPosScreen>
               ],
             ),
             if (paymentMethod == 'cash') ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               TextField(
                 controller: cashReceivedCtrl,
                 keyboardType: TextInputType.number,
-                decoration:
-                    const InputDecoration(labelText: 'Tiền khách đưa', suffixText: 'đ'),
+                decoration: const InputDecoration(
+                    labelText: 'Tiền khách đưa', suffixText: 'đ', isDense: true),
                 onChanged: (_) => setDialogState(() {}),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Row(
                 children: [
                   Text('Tiền thừa: ', style: AppTextStyles.bodyText),
@@ -489,12 +503,12 @@ class _ProductTile extends StatelessWidget {
     final selected = quantityInCart > 0;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border.withValues(alpha: 0.4),
             width: selected ? 1.5 : 1,
@@ -504,26 +518,15 @@ class _ProductTile extends StatelessWidget {
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.inventory_2_rounded,
-                      color: AppColors.textGrey, size: 20),
-                ),
-                const SizedBox(height: 8),
                 Text(
                   product.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: AppTextStyles.bodyText
-                      .copyWith(fontWeight: FontWeight.w600, fontSize: 13),
+                      .copyWith(fontWeight: FontWeight.w600, fontSize: 12.5, height: 1.2),
                 ),
-                const Spacer(),
                 Wrap(
                   spacing: 4,
                   runSpacing: 2,
@@ -554,7 +557,6 @@ class _ProductTile extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 2),
                 Text(
                   CurrencyFormatter.formatVND(product.priceWithVAT),
                   style: AppTextStyles.bodyText.copyWith(
