@@ -248,7 +248,8 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     return;
                   }
                   setDialogState(() => saving = true);
-                  final ok = await context.read<ProductProvider>().addProduct(Product(
+                  final productProvider = context.read<ProductProvider>();
+                  final ok = await productProvider.addProduct(Product(
                         id: DateTime.now().millisecondsSinceEpoch.toString(),
                         name: nameCtrl.text,
                         unit: unit,
@@ -261,8 +262,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   } else {
                     setDialogState(() => saving = false);
                     ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                        content: Text('Không thể thêm sản phẩm. Vui lòng thử lại.'),
+                      SnackBar(
+                        content: Text(productProvider.error ??
+                            'Không thể thêm sản phẩm. Vui lòng thử lại.'),
                         behavior: SnackBarBehavior.floating,
                       ),
                     );
