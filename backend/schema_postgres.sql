@@ -514,3 +514,148 @@ DO $$ BEGIN
         ALTER TABLE sales_reports ADD COLUMN payment_method TEXT;
     END IF;
 END $$;
+
+-- Migration: guard columns on products / stores / work_shifts /
+-- community_posts / attendances that predate their introduction.
+-- CREATE TABLE IF NOT EXISTS is a no-op on tables that already exist, so
+-- any column only present in the CREATE TABLE statement above never
+-- appeared on production databases created before that column was added,
+-- causing psycopg.errors.UndefinedColumn crashes on GET/POST
+-- /api/products, /api/stores, /api/shifts, /api/posts and attendance
+-- queries. Every column on these five tables is guarded here (not just
+-- the ones already observed crashing) to avoid finding the rest one
+-- production incident at a time.
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='products' AND column_name='product_condition') THEN
+        ALTER TABLE products ADD COLUMN product_condition TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='stores' AND column_name='province') THEN
+        ALTER TABLE stores ADD COLUMN province TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='stores' AND column_name='sup') THEN
+        ALTER TABLE stores ADD COLUMN sup TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='stores' AND column_name='store_type') THEN
+        ALTER TABLE stores ADD COLUMN store_type TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='stores' AND column_name='owner') THEN
+        ALTER TABLE stores ADD COLUMN owner TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='stores' AND column_name='tax_code') THEN
+        ALTER TABLE stores ADD COLUMN tax_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='stores' AND column_name='open_date') THEN
+        ALTER TABLE stores ADD COLUMN open_date TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='stores' AND column_name='close_date') THEN
+        ALTER TABLE stores ADD COLUMN close_date TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='stores' AND column_name='address') THEN
+        ALTER TABLE stores ADD COLUMN address TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='stores' AND column_name='phone') THEN
+        ALTER TABLE stores ADD COLUMN phone TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='work_shifts' AND column_name='shift_code') THEN
+        ALTER TABLE work_shifts ADD COLUMN shift_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='work_shifts' AND column_name='excel_id') THEN
+        ALTER TABLE work_shifts ADD COLUMN excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='work_shifts' AND column_name='store_name') THEN
+        ALTER TABLE work_shifts ADD COLUMN store_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='community_posts' AND column_name='image_url') THEN
+        ALTER TABLE community_posts ADD COLUMN image_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='community_posts' AND column_name='excel_id') THEN
+        ALTER TABLE community_posts ADD COLUMN excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='community_posts' AND column_name='author_id') THEN
+        ALTER TABLE community_posts ADD COLUMN author_id INTEGER;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='community_posts' AND column_name='employee_code') THEN
+        ALTER TABLE community_posts ADD COLUMN employee_code TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='community_posts' AND column_name='content') THEN
+        ALTER TABLE community_posts ADD COLUMN content TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='community_posts' AND column_name='like_count') THEN
+        ALTER TABLE community_posts ADD COLUMN like_count INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='community_posts' AND column_name='comment_count') THEN
+        ALTER TABLE community_posts ADD COLUMN comment_count INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='community_posts' AND column_name='points') THEN
+        ALTER TABLE community_posts ADD COLUMN points INTEGER NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='excel_id') THEN
+        ALTER TABLE attendances ADD COLUMN excel_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='shift_name') THEN
+        ALTER TABLE attendances ADD COLUMN shift_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='shift_time_range') THEN
+        ALTER TABLE attendances ADD COLUMN shift_time_range TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='coordinates') THEN
+        ALTER TABLE attendances ADD COLUMN coordinates TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='distance_in') THEN
+        ALTER TABLE attendances ADD COLUMN distance_in REAL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='check_in_time') THEN
+        ALTER TABLE attendances ADD COLUMN check_in_time TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='check_in_diff') THEN
+        ALTER TABLE attendances ADD COLUMN check_in_diff INTEGER;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='check_in_status') THEN
+        ALTER TABLE attendances ADD COLUMN check_in_status TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='distance_out') THEN
+        ALTER TABLE attendances ADD COLUMN distance_out REAL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='check_out_time') THEN
+        ALTER TABLE attendances ADD COLUMN check_out_time TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='check_out_diff') THEN
+        ALTER TABLE attendances ADD COLUMN check_out_diff INTEGER;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='attendances' AND column_name='check_out_status') THEN
+        ALTER TABLE attendances ADD COLUMN check_out_status TEXT;
+    END IF;
+END $$;
