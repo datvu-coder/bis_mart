@@ -3,13 +3,16 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
+import '../../core/utils/date_formatter.dart';
 import '../../models/product.dart';
 import '../../models/sales_report.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sales_provider.dart';
 import '../../providers/store_provider.dart';
+import '../../widgets/common/add_product_dialog.dart';
 import '../../widgets/common/responsive_form.dart';
+import 'barcode_scanner_screen.dart';
 
 /// POS-style "Bán hàng" tab: tap products to build a cart, then check out.
 /// Submits through the same sales-report API as the manual report form, so
@@ -99,6 +102,148 @@ class _SalesPosScreenState extends State<SalesPosScreen>
     });
   }
 
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()),
+    );
+    if (code == null || !mounted) return;
+    final products = context.read<ProductProvider>().products;
+    Product? match;
+    for (final p in products) {
+      if (p.barcode != null && p.barcode!.trim() == code.trim()) {
+        match = p;
+        break;
+      }
+    }
+    if (match == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Không tìm thấy sản phẩm với mã vạch "$code"'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    _addToCart(match);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Đã thêm "${match.name}" vào giỏ hàng'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.success,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+
+  Future<void> _confirmNewOrder() async {
+    if (_cart.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Tạo đơn hàng mới'),
+        content: const Text('Giỏ hàng hiện tại sẽ bị xóa. Bạn có chắc chắn muốn bắt đầu đơn hàng mới?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Đồng ý')),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      setState(() => _cart.clear());
+    }
+  }
+
+  void _showSalesHistory() {
+    final salesProvider = context.read<SalesProvider>();
+    if (salesProvider.reports.isEmpty && !salesProvider.isLoading) {
+      salesProvider.loadReports();
+    }
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.4,
+        maxChildSize: 0.95,
+        expand: false,
+        builder: (ctx, scrollController) => Consumer<SalesProvider>(
+          builder: (ctx, provider, _) {
+            final reports = provider.reports;
+            return Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Row(
+                    children: [
+                      Text('Lịch sử bán hàng', style: AppTextStyles.sectionHeader),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                if (provider.isLoading && reports.isEmpty)
+                  const Expanded(
+                    child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                  )
+                else if (reports.isEmpty)
+                  Expanded(
+                    child: Center(
+                      child: Text('Chưa có đơn bán hàng nào', style: AppTextStyles.caption),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.separated(
+                      controller: scrollController,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      itemCount: reports.length,
+                      separatorBuilder: (_, __) => const Divider(height: 16),
+                      itemBuilder: (context, i) {
+                        final r = reports[i];
+                        final itemCount = r.products.fold<int>(0, (s, it) => s + it.quantity);
+                        return Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    r.storeName?.isNotEmpty == true ? r.storeName! : r.pgName,
+                                    style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${DateFormatter.formatDateTime(r.date)} · $itemCount sản phẩm',
+                                    style: AppTextStyles.caption,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              CurrencyFormatter.formatVND(r.revenue),
+                              style: AppTextStyles.bodyText
+                                  .copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // required by AutomaticKeepAliveClientMixin
@@ -111,15 +256,51 @@ class _SalesPosScreenState extends State<SalesPosScreen>
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 2),
+          child: Row(
+            children: [
+              Text('${products.length} sản phẩm', style: AppTextStyles.caption),
+              const Spacer(),
+              IconButton(
+                onPressed: _showSalesHistory,
+                icon: const Icon(Icons.history_rounded),
+                tooltip: 'Lịch sử bán hàng',
+                color: AppColors.textSecondary,
+              ),
+              IconButton(
+                onPressed: () => showAddProductDialog(context),
+                icon: const Icon(Icons.add_box_outlined),
+                tooltip: 'Thêm sản phẩm',
+                color: AppColors.textSecondary,
+              ),
+              OutlinedButton.icon(
+                onPressed: _cart.isEmpty ? null : _confirmNewOrder,
+                icon: const Icon(Icons.receipt_long_rounded, size: 16),
+                label: const Text('Đơn mới'),
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 6),
           child: TextField(
             controller: _searchCtrl,
             onChanged: (v) => productProvider.setSearch(v),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Tìm sản phẩm...',
-              prefixIcon: Icon(Icons.search_rounded, size: 20),
+              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
+                tooltip: 'Quét mã vạch',
+                onPressed: _scanBarcode,
+              ),
               isDense: true,
-              contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
           ),
         ),
@@ -132,13 +313,21 @@ class _SalesPosScreenState extends State<SalesPosScreen>
             separatorBuilder: (_, __) => const SizedBox(width: 6),
             itemBuilder: (context, i) {
               final group = _groups[i];
+              final isSelected = productProvider.selectedGroup == group;
               return ChoiceChip(
                 label: Text(group),
                 labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                labelStyle: TextStyle(
+                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                selected: productProvider.selectedGroup == group,
+                selected: isSelected,
                 selectedColor: AppColors.primaryLight,
+                side: BorderSide(
+                  color: isSelected ? AppColors.primary.withValues(alpha: 0.4) : AppColors.border,
+                ),
                 onSelected: (_) => productProvider.setGroup(group),
               );
             },
@@ -358,8 +547,17 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                 Expanded(
                   child: ChoiceChip(
                     label: const Text('Tiền mặt'),
+                    labelStyle: TextStyle(
+                      color: paymentMethod == 'cash' ? AppColors.primary : AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                     selected: paymentMethod == 'cash',
                     selectedColor: AppColors.primaryLight,
+                    side: BorderSide(
+                      color: paymentMethod == 'cash'
+                          ? AppColors.primary.withValues(alpha: 0.4)
+                          : AppColors.border,
+                    ),
                     onSelected: (_) => setDialogState(() => paymentMethod = 'cash'),
                   ),
                 ),
@@ -367,8 +565,17 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                 Expanded(
                   child: ChoiceChip(
                     label: const Text('Chuyển khoản'),
+                    labelStyle: TextStyle(
+                      color: paymentMethod == 'transfer' ? AppColors.primary : AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
                     selected: paymentMethod == 'transfer',
                     selectedColor: AppColors.primaryLight,
+                    side: BorderSide(
+                      color: paymentMethod == 'transfer'
+                          ? AppColors.primary.withValues(alpha: 0.4)
+                          : AppColors.border,
+                    ),
                     onSelected: (_) => setDialogState(() => paymentMethod = 'transfer'),
                   ),
                 ),
@@ -503,16 +710,25 @@ class _ProductTile extends StatelessWidget {
     final selected = quantityInCart > 0;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border.withValues(alpha: 0.4),
+            color: selected ? AppColors.primary : AppColors.border,
             width: selected ? 1.5 : 1,
           ),
+          boxShadow: selected
+              ? null
+              : [
+                  BoxShadow(
+                    color: AppColors.shadow,
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
         ),
         child: Stack(
           children: [

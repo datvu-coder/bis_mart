@@ -4,8 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../providers/product_provider.dart';
-import '../../models/product.dart';
-import '../../widgets/common/responsive_form.dart';
+import '../../widgets/common/add_product_dialog.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -56,7 +55,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ],
           ),
           floatingActionButton: FloatingActionButton(
-            onPressed: () => _showAddProductDialog(),
+            onPressed: () => showAddProductDialog(context),
             backgroundColor: AppColors.primary,
             child: const Icon(Icons.add_rounded, color: AppColors.white),
           ),
@@ -185,94 +184,4 @@ class _ProductListScreenState extends State<ProductListScreen> {
     );
   }
 
-  static const _units = ['Lon', 'Hộp', 'Gói'];
-  static const _groups = ['DELI', 'DELIMIL', 'AUMIL', 'GOODLIFE', 'TP'];
-
-  void _showAddProductDialog() {
-    final nameCtrl = TextEditingController();
-    final priceCtrl = TextEditingController();
-    String unit = _units.first;
-    String group = _groups.first;
-    bool saving = false;
-
-    showResponsiveForm(
-      context: context,
-      title: 'Thêm sản phẩm',
-      contentBuilder: (ctx, setDialogState) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên sản phẩm')),
-          const SizedBox(height: 8),
-          TextField(
-            controller: priceCtrl,
-            decoration: const InputDecoration(labelText: 'Giá'),
-            keyboardType: TextInputType.number,
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: unit,
-            decoration: const InputDecoration(labelText: 'Đơn vị'),
-            items: _units
-                .map((u) => DropdownMenuItem(value: u, child: Text(u)))
-                .toList(),
-            onChanged: (v) => setDialogState(() => unit = v ?? unit),
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: group,
-            decoration: const InputDecoration(labelText: 'Nhóm sản phẩm'),
-            items: _groups
-                .map((g) => DropdownMenuItem(value: g, child: Text(g)))
-                .toList(),
-            onChanged: (v) => setDialogState(() => group = v ?? group),
-          ),
-        ],
-      ),
-      actionsBuilder: (ctx, setDialogState) => [
-        TextButton(
-          onPressed: saving ? null : () => Navigator.pop(ctx),
-          child: const Text('Hủy'),
-        ),
-        ElevatedButton(
-          onPressed: saving
-              ? null
-              : () async {
-                  if (nameCtrl.text.isEmpty) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                        content: Text('Vui lòng nhập tên sản phẩm'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                    return;
-                  }
-                  setDialogState(() => saving = true);
-                  final productProvider = context.read<ProductProvider>();
-                  final ok = await productProvider.addProduct(Product(
-                        id: DateTime.now().millisecondsSinceEpoch.toString(),
-                        name: nameCtrl.text,
-                        unit: unit,
-                        priceWithVAT: double.tryParse(priceCtrl.text) ?? 0,
-                        productGroup: group,
-                      ));
-                  if (!ctx.mounted) return;
-                  if (ok) {
-                    Navigator.pop(ctx);
-                  } else {
-                    setDialogState(() => saving = false);
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(
-                        content: Text(productProvider.error ??
-                            'Không thể thêm sản phẩm. Vui lòng thử lại.'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                },
-          child: Text(saving ? 'Đang lưu...' : 'Thêm'),
-        ),
-      ],
-    );
-  }
 }

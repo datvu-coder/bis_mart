@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS products (
     price_with_vat REAL NOT NULL DEFAULT 0,
     product_condition TEXT,
     product_group TEXT NOT NULL DEFAULT 'DELI',
+    barcode TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -1147,5 +1148,13 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                                  WHERE table_name='training_events' AND column_name='created_by') THEN
         ALTER TABLE training_events ADD COLUMN created_by INTEGER REFERENCES users(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
+-- Migration: barcode field for the Bán hàng POS barcode scanner.
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='products' AND column_name='barcode') THEN
+        ALTER TABLE products ADD COLUMN barcode TEXT;
     END IF;
 END $$;

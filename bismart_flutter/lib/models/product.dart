@@ -5,6 +5,7 @@ class Product {
   final double priceWithVAT;
   final String productGroup; // DELI | DELIMIL | AUMIL | GOODLIFE | TP
   final String? productCondition;
+  final String? barcode;
 
   Product({
     required this.id,
@@ -13,6 +14,7 @@ class Product {
     required this.priceWithVAT,
     required this.productGroup,
     this.productCondition,
+    this.barcode,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -23,6 +25,7 @@ class Product {
       priceWithVAT: (json['priceWithVAT'] as num).toDouble(),
       productGroup: json['productGroup'] as String,
       productCondition: json['productCondition'] as String?,
+      barcode: json['barcode'] as String?,
     );
   }
 
@@ -33,5 +36,6 @@ class Product {
         'priceWithVAT': priceWithVAT,
         'productGroup': productGroup,
         'productCondition': productCondition,
+        'barcode': barcode,
       };
 }
