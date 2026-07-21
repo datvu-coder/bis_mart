@@ -7,7 +7,6 @@ class AppRoutes {
   static const employeeDetail = '/nhan-su/detail';
   static const kinhDoanh = '/kinh-doanh';
   static const createReport = '/kinh-doanh/tao-phieu';
-  static const salesPos = '/kinh-doanh/ban-hang';
   static const taxReport = '/kinh-doanh/bao-cao-thue';
   static const daoTao = '/dao-tao';
   static const caNhan = '/ca-nhan';

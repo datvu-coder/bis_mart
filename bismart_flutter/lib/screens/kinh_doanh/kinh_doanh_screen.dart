@@ -13,6 +13,7 @@ import '../../providers/permission_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/export_service.dart';
+import 'sales_pos_screen.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/weighted_tab_selector.dart';
@@ -33,7 +34,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SalesProvider>().loadReports();
       final storeProv = context.read<StoreProvider>();
@@ -173,7 +174,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
               child: isDesktop
                   ? WeightedTabSelector(
                       controller: _tabController,
-                      labels: const ['Báo cáo', 'Thống kê', 'Bộ lọc'],
+                      labels: const ['Bán hàng', 'Báo cáo', 'Thống kê', 'Bộ lọc'],
                     )
                   : TabBar(
                       controller: _tabController,
@@ -193,6 +194,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                       unselectedLabelStyle: const TextStyle(
                           fontSize: 13, fontWeight: FontWeight.w500),
                       tabs: const [
+                        Tab(text: 'Bán hàng'),
                         Tab(text: 'Báo cáo'),
                         Tab(text: 'Thống kê'),
                         Tab(text: 'Bộ lọc'),
@@ -203,6 +205,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: [
+                  const SalesPosScreen(),
                   SingleChildScrollView(
                     padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
                     child: _buildReportList(provider),
@@ -281,24 +284,11 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     ],
                   ),
                 ),
-                OutlinedButton.icon(
+                ElevatedButton.icon(
                   onPressed: () =>
                       Navigator.pushNamed(context, AppRoutes.createReport),
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text(AppStrings.taoPhieuBaoCao),
-                  style: OutlinedButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    textStyle:
-                        const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: () =>
-                      Navigator.pushNamed(context, AppRoutes.salesPos),
-                  icon: const Icon(Icons.point_of_sale_rounded, size: 18),
-                  label: const Text('Bán hàng'),
                   style: ElevatedButton.styleFrom(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -346,26 +336,11 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 SizedBox(
                   width: 36,
                   height: 36,
-                  child: IconButton.outlined(
+                  child: IconButton.filled(
                     onPressed: () =>
                         Navigator.pushNamed(context, AppRoutes.createReport),
                     icon: const Icon(Icons.add_rounded, size: 18),
                     tooltip: AppStrings.taoPhieuBaoCao,
-                    style: IconButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      padding: EdgeInsets.zero,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 36,
-                  height: 36,
-                  child: IconButton.filled(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, AppRoutes.salesPos),
-                    icon: const Icon(Icons.point_of_sale_rounded, size: 18),
-                    tooltip: 'Bán hàng',
                     style: IconButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: AppColors.white,

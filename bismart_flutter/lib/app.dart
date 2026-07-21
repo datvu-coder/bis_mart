@@ -8,7 +8,6 @@ import 'providers/auth_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/nhan_su/employee_detail_screen.dart';
 import 'screens/kinh_doanh/create_report_screen.dart';
-import 'screens/kinh_doanh/sales_pos_screen.dart';
 import 'screens/kinh_doanh/tax_report_screen.dart';
 import 'screens/ca_nhan/store_list_screen.dart';
 import 'screens/ca_nhan/employee_list_screen.dart';
@@ -59,9 +58,6 @@ class BismartApp extends StatelessWidget {
         break;
       case AppRoutes.createReport:
         page = const CreateReportScreen();
-        break;
-      case AppRoutes.salesPos:
-        page = const SalesPosScreen();
         break;
       case AppRoutes.taxReport:
         page = const TaxReportScreen();
