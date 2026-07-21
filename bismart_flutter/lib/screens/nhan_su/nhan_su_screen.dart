@@ -113,34 +113,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 color: AppColors.surfaceVariant,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: isDesktop
-                  ? WeightedTabSelector(
-                      controller: _tabController,
-                      labels: const ['Chấm công', 'Ca làm', 'Xếp hạng', 'Lịch', 'Giờ công'],
-                    )
-                  : TabBar(
-                      controller: _tabController,
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      labelColor: AppColors.primary,
-                      unselectedLabelColor: AppColors.textGrey,
-                      indicator: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      dividerColor: Colors.transparent,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 14),
-                      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-                      unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-                      tabs: const [
-                        Tab(text: 'Chấm công'),
-                        Tab(text: 'Ca làm'),
-                        Tab(text: 'Xếp hạng'),
-                        Tab(text: 'Lịch'),
-                        Tab(text: 'Giờ công'),
-                      ],
-                    ),
+              child: WeightedTabSelector(
+                controller: _tabController,
+                labels: const ['Chấm công', 'Ca làm', 'Xếp hạng', 'Lịch', 'Giờ công'],
+              ),
             ),
             Expanded(
               child: TabBarView(

@@ -329,6 +329,8 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
         _MenuItem(Icons.admin_panel_settings_rounded, 'Phân quyền hệ thống', 'Cấu hình quyền & phân công cửa hàng', AppRoutes.phanQuyen, AppColors.purpleAccent, AppColors.purpleLight),
       if (permProv.isAdmin)
         _MenuItem(Icons.receipt_long_rounded, 'Cài đặt hóa đơn điện tử', 'Kết nối nhà cung cấp hóa đơn điện tử', AppRoutes.einvoiceSettings, AppColors.info, AppColors.infoLight),
+      if (permProv.canReport)
+        _MenuItem(Icons.print_rounded, 'Cài đặt máy in', 'Kết nối máy in hoá đơn qua WiFi', AppRoutes.printerSettings, AppColors.success, AppColors.successLight),
     ];
 
     return Container(

@@ -9,10 +9,10 @@ import '../../providers/auth_provider.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sales_provider.dart';
 import '../../providers/store_provider.dart';
-import '../../services/receipt_printer_service.dart';
 import '../../widgets/common/add_product_dialog.dart';
 import '../../widgets/common/responsive_form.dart';
 import 'barcode_scanner_screen.dart';
+import 'receipt_preview_screen.dart';
 
 /// Dedicated "Tạo đơn hàng" screen: pick products into a cart, then check
 /// out. Pushed as its own full-screen route from the Bán hàng tab (which
@@ -515,14 +515,27 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                     Navigator.pop(ctx);
                     setState(() => _cart.clear());
                     if (!mounted) return;
-                    await _showSuccessAndOfferPrint(
-                      storeName: storeNameForReceipt,
-                      date: orderDate,
-                      pgName: user?.fullName ?? '',
-                      items: itemsForReceipt,
-                      subtotal: revenue,
-                      paymentMethod: paymentMethod,
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Bán hàng thành công!'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: AppColors.success,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
                     );
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ReceiptPreviewScreen(
+                          storeName: storeNameForReceipt,
+                          date: orderDate,
+                          pgName: user?.fullName ?? '',
+                          items: itemsForReceipt,
+                          subtotal: revenue,
+                          paymentMethod: paymentMethod,
+                        ),
+                      ),
+                    );
+                    if (mounted) Navigator.of(context).pop();
                   } else {
                     setDialogState(() => isSubmitting = false);
                     ScaffoldMessenger.of(ctx).showSnackBar(
@@ -547,76 +560,6 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     );
   }
 
-  Future<void> _showSuccessAndOfferPrint({
-    required String storeName,
-    required DateTime date,
-    required String pgName,
-    required List<SaleItem> items,
-    required double subtotal,
-    required String paymentMethod,
-  }) async {
-    if (!mounted) return;
-    final choice = await showDialog<String>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Bán hàng thành công!'),
-        content: const Text('Đơn hàng đã được lưu. Bạn có muốn in hoá đơn cho khách không?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, 'close'), child: const Text('Đóng')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, 'print'), child: const Text('In hoá đơn')),
-        ],
-      ),
-    );
-    if (choice == 'print') {
-      await _printReceipt(
-        storeName: storeName,
-        date: date,
-        pgName: pgName,
-        items: items,
-        subtotal: subtotal,
-        paymentMethod: paymentMethod,
-      );
-    }
-    if (mounted) Navigator.of(context).pop();
-  }
-
-  Future<void> _printReceipt({
-    required String storeName,
-    required DateTime date,
-    required String pgName,
-    required List<SaleItem> items,
-    required double subtotal,
-    required String paymentMethod,
-  }) async {
-    try {
-      await ReceiptPrinterService.printReceipt(
-        storeName: storeName,
-        date: date,
-        pgName: pgName,
-        items: items,
-        subtotal: subtotal,
-        paymentMethod: paymentMethod,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã gửi lệnh in hoá đơn'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.success,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('In hoá đơn thất bại: $e'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
-  }
 }
 
 class _OrderProductTile extends StatelessWidget {

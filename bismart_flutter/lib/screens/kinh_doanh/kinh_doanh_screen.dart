@@ -171,35 +171,10 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 color: AppColors.surfaceVariant,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: isDesktop
-                  ? WeightedTabSelector(
-                      controller: _tabController,
-                      labels: const ['Bán hàng', 'Báo cáo', 'Thống kê', 'Bộ lọc'],
-                    )
-                  : TabBar(
-                      controller: _tabController,
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.start,
-                      labelColor: AppColors.primary,
-                      unselectedLabelColor: AppColors.textGrey,
-                      indicator: BoxDecoration(
-                        color: AppColors.white,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      dividerColor: Colors.transparent,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 14),
-                      labelStyle: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700),
-                      unselectedLabelStyle: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w500),
-                      tabs: const [
-                        Tab(text: 'Bán hàng'),
-                        Tab(text: 'Báo cáo'),
-                        Tab(text: 'Thống kê'),
-                        Tab(text: 'Bộ lọc'),
-                      ],
-                    ),
+              child: WeightedTabSelector(
+                controller: _tabController,
+                labels: const ['Bán hàng', 'Báo cáo', 'Thống kê', 'Bộ lọc'],
+              ),
             ),
             Expanded(
               child: TabBarView(
