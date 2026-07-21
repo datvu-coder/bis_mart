@@ -1,11 +1,21 @@
 name: VPS Ops
 
-# Manually-triggered maintenance actions for the backend VPS, meant to be
-# run by tapping "Run workflow" from the GitHub app/web on a phone — no
-# terminal or SSH client needed on the operator's device. The workflow
-# itself holds the SSH key (as a repo secret) and does the SSH/DB work.
+# Maintenance actions for the backend VPS. diagnose/restart_backend/
+# set_admin stay manually-triggered (tap "Run workflow" from the GitHub
+# app/web on a phone — no terminal or SSH client needed on the operator's
+# device). deploy_backend also runs automatically on every push to main
+# that touches backend/, so schema/code fixes take effect on production
+# without a separate manual step — this workflow already gates that on a
+# post-deploy healthz check and fails loudly if it doesn't return 200.
+#
+# The workflow itself holds the SSH key (as a repo secret) and does the
+# SSH/DB work.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
   workflow_dispatch:
     inputs:
       action:
@@ -24,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        if: ${{ github.event.inputs.action == 'deploy_backend' }}
+        if: ${{ github.event_name == 'push' || github.event.inputs.action == 'deploy_backend' }}
         uses: actions/checkout@v4
 
       - name: Setup SSH
@@ -69,7 +79,7 @@ jobs:
           '
 
       - name: Deploy backend (build + roll out latest code from this branch)
-        if: ${{ github.event.inputs.action == 'deploy_backend' }}
+        if: ${{ github.event_name == 'push' || github.event.inputs.action == 'deploy_backend' }}
         run: |
           set -e
           IMAGE_TAG="bismart-backend:$(git rev-parse --short HEAD)"
