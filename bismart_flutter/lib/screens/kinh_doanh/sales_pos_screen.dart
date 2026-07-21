@@ -71,8 +71,6 @@ class _SalesPosScreenState extends State<SalesPosScreen>
     super.build(context); // required by AutomaticKeepAliveClientMixin
     final productProvider = context.watch<ProductProvider>();
     final products = productProvider.filteredProducts;
-    final isWide = MediaQuery.of(context).size.width >= 900;
-    final crossAxisCount = isWide ? 5 : (MediaQuery.of(context).size.width >= 420 ? 3 : 2);
 
     return Stack(
       children: [
@@ -154,14 +152,8 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                                         ],
                                       ),
                                     )
-                                  : GridView.builder(
-                                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 84),
-                                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                        crossAxisCount: crossAxisCount,
-                                        mainAxisSpacing: 8,
-                                        crossAxisSpacing: 8,
-                                        childAspectRatio: 1.05,
-                                      ),
+                                  : ListView.builder(
+                                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 84),
                                       itemCount: products.length,
                                       itemBuilder: (context, i) => _ProductDisplayTile(product: products[i]),
                                     ),
@@ -348,6 +340,9 @@ class _SalesHistoryList extends StatelessWidget {
   }
 }
 
+/// Same list-row layout as Danh sách sản phẩm (product_list_screen.dart) —
+/// icon, name, unit/nhóm badges, trailing price — so the two screens that
+/// show the same product catalog actually look like the same catalog.
 class _ProductDisplayTile extends StatelessWidget {
   final Product product;
 
@@ -356,41 +351,67 @@ class _ProductDisplayTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      clipBehavior: Clip.antiAlias,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 6, offset: const Offset(0, 2))],
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Row(
         children: [
-          Container(height: 4, color: AppColors.primary.withValues(alpha: 0.65)),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    product.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600, fontSize: 12.5, height: 1.2),
-                  ),
-                  Text(
-                    '${product.unit} · ${product.productGroup}',
-                    style: AppTextStyles.caption.copyWith(fontSize: 11),
-                  ),
-                  Text(
-                    CurrencyFormatter.formatVND(product.priceWithVAT),
-                    style: AppTextStyles.bodyText.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13.5),
-                  ),
-                ],
-              ),
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: const Icon(Icons.inventory_2_rounded, size: 20, color: AppColors.textGrey),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(product.unit, style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        product.productGroup,
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            CurrencyFormatter.formatVND(product.priceWithVAT),
+            style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600, color: AppColors.primary),
           ),
         ],
       ),
