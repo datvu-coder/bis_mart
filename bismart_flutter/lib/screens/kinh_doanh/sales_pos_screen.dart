@@ -521,7 +521,36 @@ class _ProductTile extends StatelessWidget {
                       .copyWith(fontWeight: FontWeight.w600, fontSize: 13),
                 ),
                 const Spacer(),
-                Text(product.unit, style: AppTextStyles.caption),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariant,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(product.unit,
+                          style: AppTextStyles.caption.copyWith(fontSize: 10)),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryLight,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        product.productGroup,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 2),
                 Text(
                   CurrencyFormatter.formatVND(product.priceWithVAT),
