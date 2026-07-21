@@ -505,3 +505,12 @@ CREATE TABLE IF NOT EXISTS einvoice_settings (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
+
+-- Migration: record how a sale was paid (cash / bank transfer) from the
+-- Bán hàng POS checkout — previously collected in the UI and discarded.
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='payment_method') THEN
+        ALTER TABLE sales_reports ADD COLUMN payment_method TEXT;
+    END IF;
+END $$;

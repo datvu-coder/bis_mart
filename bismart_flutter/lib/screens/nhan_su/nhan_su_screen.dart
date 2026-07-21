@@ -1870,37 +1870,44 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         ),
         ElevatedButton(
           onPressed: () async {
-            if (nameCtrl.text.isNotEmpty) {
-              try {
-                await provider.addShift(WorkShift(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  name: nameCtrl.text,
-                  startTime: startTime,
-                  endTime: endTime,
-                  storeId: selectedStoreId,
-                ));
-                if (ctx.mounted) Navigator.pop(ctx);
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  SnackBar(
-                    content: Text('Đã thêm ca "${nameCtrl.text}"'),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: AppColors.success,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
-              } catch (e) {
-                if (ctx.mounted) Navigator.pop(ctx);
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  SnackBar(
-                    content: Text('Thêm ca thất bại: $e'),
-                    behavior: SnackBarBehavior.floating,
-                    backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
-                );
-              }
+            if (nameCtrl.text.isEmpty) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(
+                  content: Text('Vui lòng nhập tên ca'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              return;
+            }
+            try {
+              await provider.addShift(WorkShift(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                name: nameCtrl.text,
+                startTime: startTime,
+                endTime: endTime,
+                storeId: selectedStoreId,
+              ));
+              if (ctx.mounted) Navigator.pop(ctx);
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text('Đã thêm ca "${nameCtrl.text}"'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.success,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              );
+            } catch (e) {
+              if (ctx.mounted) Navigator.pop(ctx);
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text('Thêm ca thất bại: $e'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: Colors.red,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              );
             }
           },
           child: const Text('Thêm'),

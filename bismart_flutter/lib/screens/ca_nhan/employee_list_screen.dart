@@ -262,31 +262,38 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              if (nameCtrl.text.isNotEmpty && codeCtrl.text.isNotEmpty) {
-                final provider = this.context.read<EmployeeProvider>();
-                final selectedStore = stores.cast<dynamic>().firstWhere(
-                  (s) => s.storeCode == selectedStoreCode,
-                  orElse: () => null,
-                );
-                provider.addEmployee(Employee(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  fullName: nameCtrl.text,
-                  employeeCode: codeCtrl.text,
-                  position: selectedPosition,
-                  workLocation: selectedStore?.name ?? '',
-                  storeCode: selectedStoreCode,
-                  email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
-                ));
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(this.context).showSnackBar(
-                  SnackBar(
-                    content: Text('Đã thêm nhân viên "${nameCtrl.text}"'),
+              if (nameCtrl.text.isEmpty || codeCtrl.text.isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  const SnackBar(
+                    content: Text('Vui lòng nhập họ tên và mã nhân viên'),
                     behavior: SnackBarBehavior.floating,
-                    backgroundColor: AppColors.success,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                 );
+                return;
               }
+              final provider = this.context.read<EmployeeProvider>();
+              final selectedStore = stores.cast<dynamic>().firstWhere(
+                (s) => s.storeCode == selectedStoreCode,
+                orElse: () => null,
+              );
+              provider.addEmployee(Employee(
+                id: DateTime.now().millisecondsSinceEpoch.toString(),
+                fullName: nameCtrl.text,
+                employeeCode: codeCtrl.text,
+                position: selectedPosition,
+                workLocation: selectedStore?.name ?? '',
+                storeCode: selectedStoreCode,
+                email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
+              ));
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text('Đã thêm nhân viên "${nameCtrl.text}"'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.success,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              );
             },
             child: const Text('Thêm'),
           ),

@@ -11,6 +11,7 @@ class SalesReport {
   final String? reportMonth;
   final int points;
   final String? employeeCode;
+  final String? paymentMethod;
 
   SalesReport({
     required this.id,
@@ -25,6 +26,7 @@ class SalesReport {
     this.reportMonth,
     this.points = 0,
     this.employeeCode,
+    this.paymentMethod,
   });
 
   factory SalesReport.fromJson(Map<String, dynamic> json) {
@@ -44,6 +46,7 @@ class SalesReport {
       reportMonth: json['reportMonth'] as String?,
       points: json['points'] as int? ?? 0,
       employeeCode: json['employeeCode'] as String?,
+      paymentMethod: json['paymentMethod'] as String?,
     );
   }
 
@@ -59,6 +62,7 @@ class SalesReport {
         'storeCode': storeCode,
         'reportMonth': reportMonth,
         'employeeCode': employeeCode,
+        'paymentMethod': paymentMethod,
       };
 }
 

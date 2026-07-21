@@ -1719,7 +1719,15 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         ElevatedButton(
           onPressed: () async {
             final text = controller.text.trim();
-            if (text.isEmpty) return;
+            if (text.isEmpty) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(
+                  content: Text('Nội dung bài viết không được để trống'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              return;
+            }
             try {
               await provider.updatePost(
                 post.id,
@@ -2218,7 +2226,15 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             child: const Text('Hủy')),
         ElevatedButton(
           onPressed: () {
-            if (controller.text.trim().isEmpty) return;
+            if (controller.text.trim().isEmpty) {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(
+                  content: Text('Vui lòng nhập tên sự kiện'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              return;
+            }
             provider.addEvent(targetDay, controller.text.trim());
             Navigator.pop(ctx);
           },
