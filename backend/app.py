@@ -184,6 +184,7 @@ def _product_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
         "priceWithVAT": float(row.get("price_with_vat") or 0),
         "productGroup": row.get("product_group") or "DELI",
         "productCondition": row.get("product_condition"),
+        "barcode": row.get("barcode"),
     }
 
 
@@ -1173,7 +1174,7 @@ def api_get_products():
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, name, unit, price_with_vat, product_group, product_condition "
+            "SELECT id, name, unit, price_with_vat, product_group, product_condition, barcode "
             "FROM products ORDER BY id ASC"
         )
         rows = cur.fetchall()
@@ -1189,14 +1190,16 @@ def api_create_product():
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "INSERT INTO products (name, unit, price_with_vat, product_group, product_condition) "
-            "VALUES (%s, %s, %s, %s, %s) RETURNING id, name, unit, price_with_vat, product_group, product_condition",
+            "INSERT INTO products (name, unit, price_with_vat, product_group, product_condition, barcode) "
+            "VALUES (%s, %s, %s, %s, %s, %s) "
+            "RETURNING id, name, unit, price_with_vat, product_group, product_condition, barcode",
             (
                 data.get("name", ""),
                 data.get("unit", "Lon"),
                 data.get("priceWithVAT", 0),
                 data.get("productGroup", "DELI"),
                 data.get("productCondition"),
+                (data.get("barcode") or "").strip() or None,
             ),
         )
         row = cur.fetchone()
@@ -1213,14 +1216,16 @@ def api_update_product(product_id: int):
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "UPDATE products SET name = %s, unit = %s, price_with_vat = %s, product_group = %s, product_condition = %s "
-            "WHERE id = %s RETURNING id, name, unit, price_with_vat, product_group, product_condition",
+            "UPDATE products SET name = %s, unit = %s, price_with_vat = %s, product_group = %s, "
+            "product_condition = %s, barcode = %s "
+            "WHERE id = %s RETURNING id, name, unit, price_with_vat, product_group, product_condition, barcode",
             (
                 data.get("name", ""),
                 data.get("unit", "Lon"),
                 data.get("priceWithVAT", 0),
                 data.get("productGroup", "DELI"),
                 data.get("productCondition"),
+                (data.get("barcode") or "").strip() or None,
                 product_id,
             ),
         )

@@ -36,6 +36,9 @@ dependencies:
   # GPS check-in (mobile)
   geolocator: ^13.0.4
 
+  # Barcode scanning (Bán hàng POS)
+  mobile_scanner: ^5.2.3
+
   # Typography
   google_fonts: ^6.2.1
 
