@@ -425,6 +425,7 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                     storeCode: user?.storeCode,
                     storeName: currentStore?.name ?? user?.workLocation,
                     employeeCode: user?.employeeCode,
+                    paymentMethod: paymentMethod,
                   );
 
                   final success = await context.read<SalesProvider>().createReport(report);

@@ -172,6 +172,7 @@ def _report_to_api_json(report_row: dict[str, Any], products: list[dict[str, Any
         "reportMonth": str(report_row.get("report_month")) if report_row.get("report_month") is not None else None,
         "points": int(report_row.get("points") or 0),
         "employeeCode": report_row.get("employee_code"),
+        "paymentMethod": report_row.get("payment_method"),
     }
 
 
@@ -1549,8 +1550,8 @@ def api_create_report():
         cur.execute(
             "INSERT INTO sales_reports "
             "(report_date, pg_name, store_name, nu, sale_out, store_code, "
-            "report_month, revenue, points, employee_code, created_by) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+            "report_month, revenue, points, employee_code, created_by, payment_method) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
             (
                 report_date,
                 pg_name,
@@ -1563,12 +1564,13 @@ def api_create_report():
                 data.get("points", 0),
                 employee_code,
                 user_id,
+                (data.get("paymentMethod") or "").strip() or None,
             ),
         )
         report = cur.fetchone()
     report_id = report["id"]
     db.commit()
-    
+
     # Insert sale items for THIS exact report_id
     for item in data.get("products", []):
         with db.cursor() as cur:
@@ -1579,10 +1581,10 @@ def api_create_report():
                  item.get("quantity", 0), item.get("unitPrice", 0)),
             )
     db.commit()
-    
+
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code "
+            "SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code, payment_method "
             "FROM sales_reports WHERE id = %s",
             (report_id,),
         )
@@ -1620,7 +1622,7 @@ def api_get_reports():
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            f"SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code "
+            f"SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code, payment_method "
             f"FROM sales_reports {where_clause} ORDER BY report_date DESC, id DESC",
             tuple(params),
         )
@@ -1650,7 +1652,7 @@ def api_update_report(report_id: int):
     with db.cursor() as cur:
         cur.execute(
             "SELECT id, report_date, pg_name, store_name, nu, sale_out, store_code, "
-            "report_month, revenue, points, employee_code, created_by FROM sales_reports WHERE id = %s",
+            "report_month, revenue, points, employee_code, created_by, payment_method FROM sales_reports WHERE id = %s",
             (report_id,),
         )
         existing = cur.fetchone()
@@ -1670,7 +1672,8 @@ def api_update_report(report_id: int):
     with db.cursor() as cur:
         cur.execute(
             "UPDATE sales_reports SET report_date = %s, pg_name = %s, store_name = %s, nu = %s, "
-            "sale_out = %s, store_code = %s, report_month = %s, revenue = %s, points = %s, employee_code = %s "
+            "sale_out = %s, store_code = %s, report_month = %s, revenue = %s, points = %s, employee_code = %s, "
+            "payment_method = %s "
             "WHERE id = %s",
             (
                 report_date,
@@ -1683,6 +1686,7 @@ def api_update_report(report_id: int):
                 data.get("revenue", existing.get("revenue")),
                 data.get("points", existing.get("points")),
                 data.get("employeeCode", existing.get("employee_code")),
+                data.get("paymentMethod", existing.get("payment_method")),
                 report_id,
             ),
         )
@@ -1700,7 +1704,7 @@ def api_update_report(report_id: int):
 
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code "
+            "SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code, payment_method "
             "FROM sales_reports WHERE id = %s",
             (report_id,),
         )
