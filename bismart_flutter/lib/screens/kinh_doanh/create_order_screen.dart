@@ -135,8 +135,6 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
   Widget build(BuildContext context) {
     final productProvider = context.watch<ProductProvider>();
     final products = productProvider.filteredProducts;
-    final isWide = MediaQuery.of(context).size.width >= 900;
-    final crossAxisCount = isWide ? 5 : (MediaQuery.of(context).size.width >= 420 ? 3 : 2);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -157,16 +155,13 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
             child: TextField(
               controller: _searchCtrl,
               onChanged: (v) => productProvider.setSearch(v),
-              decoration: InputDecoration(
-                hintText: 'Tìm sản phẩm...',
-                prefixIcon: const Icon(Icons.search_rounded, size: 20),
+              decoration: AppDecorations.searchField(
+                'Tìm sản phẩm...',
                 suffixIcon: IconButton(
                   icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
                   tooltip: 'Quét mã vạch',
                   onPressed: _scanBarcode,
                 ),
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               ),
             ),
           ),
@@ -214,26 +209,32 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                           ],
                         ),
                       )
-                    : GridView.builder(
+                    : Padding(
                         padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount,
-                          mainAxisSpacing: 8,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 1.05,
+                        child: Container(
+                          decoration: AppDecorations.card,
+                          clipBehavior: Clip.antiAlias,
+                          child: ListView.separated(
+                            itemCount: products.length,
+                            separatorBuilder: (_, __) => const Divider(
+                              height: 1,
+                              indent: 14,
+                              endIndent: 14,
+                              color: AppColors.divider,
+                            ),
+                            itemBuilder: (context, i) {
+                              final product = products[i];
+                              final qtyInCart = _cart
+                                  .where((item) => item.productId == product.id)
+                                  .fold<int>(0, (s, it) => s + it.quantity);
+                              return _OrderProductRow(
+                                product: product,
+                                quantityInCart: qtyInCart,
+                                onTap: () => _addToCart(product),
+                              );
+                            },
+                          ),
                         ),
-                        itemCount: products.length,
-                        itemBuilder: (context, i) {
-                          final product = products[i];
-                          final qtyInCart = _cart
-                              .where((item) => item.productId == product.id)
-                              .fold<int>(0, (s, it) => s + it.quantity);
-                          return _OrderProductTile(
-                            product: product,
-                            quantityInCart: qtyInCart,
-                            onTap: () => _addToCart(product),
-                          );
-                        },
                       ),
           ),
           SafeArea(
@@ -562,12 +563,17 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
 
 }
 
-class _OrderProductTile extends StatelessWidget {
+/// Same list-row layout as Bán hàng/Danh sách sản phẩm (icon, name,
+/// unit/nhóm badges, trailing price) — tapping a row adds one unit to the
+/// cart. A small quantity badge overlays the icon once a product has been
+/// added, and a "+" cue next to the price makes the tap-to-add behavior
+/// discoverable (the previous grid tiles relied on the badge alone).
+class _OrderProductRow extends StatelessWidget {
   final Product product;
   final int quantityInCart;
   final VoidCallback onTap;
 
-  const _OrderProductTile({
+  const _OrderProductRow({
     required this.product,
     required this.quantityInCart,
     required this.onTap,
@@ -578,76 +584,96 @@ class _OrderProductTile extends StatelessWidget {
     final selected = quantityInCart > 0;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? AppColors.primary : AppColors.border,
-            width: selected ? 1.5 : 1,
-          ),
-          boxShadow: selected
-              ? null
-              : [BoxShadow(color: AppColors.shadow, blurRadius: 6, offset: const Offset(0, 2))],
-        ),
-        child: Stack(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                Text(
-                  product.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600, fontSize: 12.5, height: 1.2),
-                ),
-                Wrap(
-                  spacing: 4,
-                  runSpacing: 2,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(product.unit, style: AppTextStyles.caption.copyWith(fontSize: 10)),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryLight,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        product.productGroup,
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary),
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  CurrencyFormatter.formatVND(product.priceWithVAT),
-                  style: AppTextStyles.bodyText.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13),
-                ),
-              ],
-            ),
-            if (selected)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
-                  child: Text(
-                    '$quantityInCart',
-                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.primaryLight : AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(AppRadius.row - 2),
+                  ),
+                  child: Icon(
+                    Icons.inventory_2_rounded,
+                    size: 20,
+                    color: selected ? AppColors.primary : AppColors.textGrey,
                   ),
                 ),
+                if (selected)
+                  Positioned(
+                    top: -4,
+                    right: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        border: Border.all(color: AppColors.cardBg, width: 1.5),
+                      ),
+                      child: Text(
+                        '$quantityInCart',
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    product.name,
+                    style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                        child: Text(product.unit, style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryLight,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                        child: Text(
+                          product.productGroup,
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  CurrencyFormatter.formatVND(product.priceWithVAT),
+                  style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600, color: AppColors.primary),
+                ),
+                const SizedBox(height: 4),
+                const Icon(Icons.add_circle_rounded, size: 22, color: AppColors.primary),
+              ],
+            ),
           ],
         ),
       ),
