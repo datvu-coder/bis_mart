@@ -235,6 +235,29 @@ class AppDecorations {
     color: AppColors.surfaceVariant,
     borderRadius: BorderRadius.circular(AppRadius.row),
   );
+
+  /// Fully-rounded "pill" search bar — one consistent shape for every
+  /// search field in the app instead of each screen picking its own
+  /// radius on the default (14-radius) input field.
+  static InputDecoration searchField(String hint, {Widget? suffixIcon}) => InputDecoration(
+        hintText: hint,
+        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+        suffixIcon: suffixIcon,
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        ),
+      );
 }
 
 class AppTextStyles {

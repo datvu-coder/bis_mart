@@ -78,10 +78,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Tìm cửa hàng...',
-                prefixIcon: Icon(Icons.search_rounded, size: 20),
-              ),
+              decoration: AppDecorations.searchField('Tìm cửa hàng...'),
               onChanged: (v) => provider.setSearch(v),
             ),
           ),
@@ -113,85 +110,96 @@ class _StoreListScreenState extends State<StoreListScreen> {
           Expanded(
             child: provider.isLoading
                 ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-                : ListView.builder(
-              itemCount: stores.length,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemBuilder: (context, index) {
-                final store = stores[index];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: AppDecorations.row,
-                  child: InkWell(
-                    onTap: () => _showStoreDetail(store),
-                    borderRadius: BorderRadius.circular(AppRadius.row),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryLight,
-                              borderRadius: BorderRadius.circular(12),
+                : stores.isEmpty
+                    ? Center(
+                        child: Text('Không có cửa hàng phù hợp', style: AppTextStyles.caption),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Container(
+                          decoration: AppDecorations.card,
+                          clipBehavior: Clip.antiAlias,
+                          child: ListView.separated(
+                            itemCount: stores.length,
+                            separatorBuilder: (_, __) => const Divider(
+                              height: 1,
+                              indent: 14,
+                              endIndent: 14,
+                              color: AppColors.divider,
                             ),
-                            child: Center(
-                              child: Text(
-                                store.storeCode,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  store.name,
-                                  style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
-                                ),
-                                const SizedBox(height: 2),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceVariant,
-                                    borderRadius: BorderRadius.circular(4),
+                            itemBuilder: (context, index) {
+                              final store = stores[index];
+                              return InkWell(
+                                onTap: () => _showStoreDetail(store),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryLight,
+                                          borderRadius: BorderRadius.circular(AppRadius.row - 2),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            store.storeCode,
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              store.name,
+                                              style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.surfaceVariant,
+                                                borderRadius: BorderRadius.circular(AppRadius.pill),
+                                              ),
+                                              child: Text(
+                                                'Nhóm ${store.group}',
+                                                style: AppTextStyles.caption.copyWith(fontSize: 11),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (store.latitude != null)
+                                        IconButton(
+                                          icon: const Icon(Icons.location_on_rounded, size: 20),
+                                          color: AppColors.primary,
+                                          onPressed: () => _openMap(store),
+                                          tooltip: 'Xem bản đồ',
+                                        ),
+                                      if (permProv.canEditStore(store.id))
+                                        IconButton(
+                                          icon: const Icon(Icons.edit_outlined, size: 20),
+                                          color: AppColors.primary,
+                                          onPressed: () => _showStoreFormDialog(initial: store),
+                                          tooltip: 'Sửa',
+                                        ),
+                                      const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 20),
+                                    ],
                                   ),
-                                  child: Text(
-                                    'Nhóm ${store.group}',
-                                    style: AppTextStyles.caption.copyWith(fontSize: 11),
-                                  ),
                                 ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
-                          if (store.latitude != null)
-                            IconButton(
-                              icon: const Icon(Icons.location_on_rounded, size: 20),
-                              color: AppColors.primary,
-                              onPressed: () => _openMap(store),
-                              tooltip: 'Xem bản đồ',
-                            ),
-                          if (permProv.canEditStore(store.id))
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined, size: 20),
-                              color: AppColors.primary,
-                              onPressed: () => _showStoreFormDialog(initial: store),
-                              tooltip: 'Sửa',
-                            ),
-                          const Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 20),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
           ),
         ],
       ),

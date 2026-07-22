@@ -95,16 +95,13 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                           child: TextField(
                             controller: _searchCtrl,
                             onChanged: (v) => productProvider.setSearch(v),
-                            decoration: InputDecoration(
-                              hintText: 'Tìm sản phẩm...',
-                              prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                            decoration: AppDecorations.searchField(
+                              'Tìm sản phẩm...',
                               suffixIcon: IconButton(
                                 icon: const Icon(Icons.add_box_outlined, size: 20),
                                 tooltip: 'Thêm sản phẩm',
                                 onPressed: () => showAddProductDialog(context),
                               ),
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             ),
                           ),
                         ),
@@ -152,10 +149,22 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                                         ],
                                       ),
                                     )
-                                  : ListView.builder(
+                                  : Padding(
                                       padding: const EdgeInsets.fromLTRB(14, 0, 14, 84),
-                                      itemCount: products.length,
-                                      itemBuilder: (context, i) => _ProductDisplayTile(product: products[i]),
+                                      child: Container(
+                                        decoration: AppDecorations.card,
+                                        clipBehavior: Clip.antiAlias,
+                                        child: ListView.separated(
+                                          itemCount: products.length,
+                                          separatorBuilder: (_, __) => const Divider(
+                                            height: 1,
+                                            indent: 14,
+                                            endIndent: 14,
+                                            color: AppColors.divider,
+                                          ),
+                                          itemBuilder: (context, i) => _ProductDisplayTile(product: products[i]),
+                                        ),
+                                      ),
                                     ),
                         ),
                       ],
@@ -215,7 +224,7 @@ class _HistoryToggle extends StatelessWidget {
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Stack(
         children: [
@@ -229,7 +238,7 @@ class _HistoryToggle extends StatelessWidget {
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.white,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(15),
                   boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 4, offset: const Offset(0, 1))],
                 ),
               ),
@@ -253,7 +262,7 @@ class _HistoryToggle extends StatelessWidget {
   Widget _segment(String label, IconData icon, bool selected, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(15),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -301,38 +310,56 @@ class _SalesHistoryList extends StatelessWidget {
         return RefreshIndicator(
           onRefresh: () async => onRefresh(),
           color: AppColors.primary,
-          child: ListView.separated(
+          child: ListView(
             padding: const EdgeInsets.fromLTRB(14, 4, 14, 84),
-            itemCount: reports.length,
-            separatorBuilder: (_, __) => const Divider(height: 16),
-            itemBuilder: (context, i) {
-              final r = reports[i];
-              final itemCount = r.products.fold<int>(0, (s, it) => s + it.quantity);
-              return Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          r.storeName?.isNotEmpty == true ? r.storeName! : r.pgName,
-                          style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${DateFormatter.formatDateTime(r.date)} · $itemCount sản phẩm',
-                          style: AppTextStyles.caption,
-                        ),
-                      ],
-                    ),
+            children: [
+              Container(
+                decoration: AppDecorations.card,
+                clipBehavior: Clip.antiAlias,
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: reports.length,
+                  separatorBuilder: (_, __) => const Divider(
+                    height: 1,
+                    indent: 14,
+                    endIndent: 14,
+                    color: AppColors.divider,
                   ),
-                  Text(
-                    CurrencyFormatter.formatVND(r.revenue),
-                    style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
-                  ),
-                ],
-              );
-            },
+                  itemBuilder: (context, i) {
+                    final r = reports[i];
+                    final itemCount = r.products.fold<int>(0, (s, it) => s + it.quantity);
+                    return Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  r.storeName?.isNotEmpty == true ? r.storeName! : r.pgName,
+                                  style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${DateFormatter.formatDateTime(r.date)} · $itemCount sản phẩm',
+                                  style: AppTextStyles.caption,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            CurrencyFormatter.formatVND(r.revenue),
+                            style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -350,10 +377,8 @@ class _ProductDisplayTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+    return Padding(
       padding: const EdgeInsets.all(14),
-      decoration: AppDecorations.row,
       child: Row(
         children: [
           Container(
@@ -380,19 +405,19 @@ class _ProductDisplayTile extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                       child: Text(product.unit, style: AppTextStyles.caption.copyWith(fontSize: 11)),
                     ),
                     const SizedBox(width: 6),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
                         color: AppColors.primaryLight,
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                       child: Text(
                         product.productGroup,

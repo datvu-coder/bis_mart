@@ -62,10 +62,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Tìm kiếm nhân viên...',
-                    prefixIcon: Icon(Icons.search_rounded, size: 20),
-                  ),
+                  decoration: AppDecorations.searchField('Tìm kiếm nhân viên...'),
                   onChanged: (v) => setState(() => _searchQuery = v),
                 ),
               ),
@@ -104,88 +101,99 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
               ),
               const SizedBox(height: 8),
               Expanded(
-                child: ListView.builder(
-                  itemCount: employees.length,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  itemBuilder: (context, index) {
-                    final emp = employees[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      decoration: AppDecorations.row,
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.pushNamed(
-                            context,
-                            AppRoutes.employeeDetail,
-                            arguments: emp,
-                          );
-                        },
-                        borderRadius: BorderRadius.circular(AppRadius.row),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                child: employees.isEmpty
+                    ? Center(
+                        child: Text('Không có nhân viên phù hợp', style: AppTextStyles.caption),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 0, 10, 16),
+                        child: Container(
+                          decoration: AppDecorations.card,
+                          clipBehavior: Clip.antiAlias,
+                          child: ListView.separated(
+                            itemCount: employees.length,
+                            separatorBuilder: (_, __) => const Divider(
+                              height: 1,
+                              indent: 14,
+                              endIndent: 14,
+                              color: AppColors.divider,
+                            ),
+                            itemBuilder: (context, index) {
+                              final emp = employees[index];
+                              return InkWell(
+                                onTap: () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    AppRoutes.employeeDetail,
+                                    arguments: emp,
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          gradient: const LinearGradient(
+                                            colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                                          ),
+                                          borderRadius: BorderRadius.circular(AppRadius.row - 2),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            emp.fullName.isNotEmpty
+                                                ? emp.fullName[0].toUpperCase()
+                                                : '?',
+                                            style: const TextStyle(
+                                              color: AppColors.white,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              emp.fullName,
+                                              style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${emp.employeeCode} · ${emp.positionLabel}',
+                                              style: AppTextStyles.caption,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primaryLight,
+                                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                                        ),
+                                        child: Text(
+                                          emp.position,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  borderRadius: BorderRadius.circular(12),
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    emp.fullName.isNotEmpty
-                                        ? emp.fullName[0].toUpperCase()
-                                        : '?',
-                                    style: const TextStyle(
-                                      color: AppColors.white,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      emp.fullName,
-                                      style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${emp.employeeCode} · ${emp.positionLabel}',
-                                      style: AppTextStyles.caption,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primaryLight,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  emp.position,
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
+                              );
+                            },
                           ),
                         ),
                       ),
-                    );
-                  },
-                ),
               ),
             ],
           );
