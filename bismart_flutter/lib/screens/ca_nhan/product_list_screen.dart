@@ -5,6 +5,8 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../providers/product_provider.dart';
 import '../../widgets/common/add_product_dialog.dart';
+import '../../widgets/common/screen_header_card.dart';
+import '../../widgets/common/gradient_fab.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -31,36 +33,27 @@ class _ProductListScreenState extends State<ProductListScreen> {
         return Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
-            title: const Text('Danh sách sản phẩm'),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${products.length} sản phẩm',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: const SizedBox.shrink(),
           ),
-          floatingActionButton: FloatingActionButton(
+          floatingActionButton: GradientFab(
+            icon: Icons.add_rounded,
+            tooltip: 'Thêm sản phẩm',
             onPressed: () => showAddProductDialog(context),
-            backgroundColor: AppColors.primary,
-            child: const Icon(Icons.add_rounded, color: AppColors.white),
           ),
           body: Column(
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: ScreenHeaderCard(
+                  icon: Icons.inventory_2_rounded,
+                  iconColor: AppColors.primary,
+                  iconBg: AppColors.primaryLight,
+                  title: 'Danh sách sản phẩm',
+                  subtitle: '${products.length} sản phẩm',
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: TextField(

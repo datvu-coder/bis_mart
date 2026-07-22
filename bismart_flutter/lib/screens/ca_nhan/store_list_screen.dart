@@ -8,6 +8,8 @@ import '../../providers/store_provider.dart';
 import '../../providers/permission_provider.dart';
 import '../../services/location_service.dart';
 import '../../widgets/common/responsive_form.dart';
+import '../../widgets/common/screen_header_card.dart';
+import '../../widgets/common/gradient_fab.dart';
 
 class StoreListScreen extends StatefulWidget {
   const StoreListScreen({super.key});
@@ -42,38 +44,30 @@ class _StoreListScreenState extends State<StoreListScreen> {
         return Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
-            title: const Text('Danh sách cửa hàng'),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${stores.length} cửa hàng',
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: const SizedBox.shrink(),
           ),
           floatingActionButton: canCreate
-              ? FloatingActionButton(
+              ? GradientFab(
+                  icon: Icons.add_rounded,
+                  tooltip: 'Thêm cửa hàng',
                   onPressed: () => _showStoreFormDialog(),
-                  backgroundColor: AppColors.primary,
-                  child: const Icon(Icons.add_rounded, color: AppColors.white),
                 )
               : null,
           body: Column(
         children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+            child: ScreenHeaderCard(
+              icon: Icons.store_rounded,
+              iconColor: AppColors.primary,
+              iconBg: AppColors.primaryLight,
+              title: 'Danh sách cửa hàng',
+              subtitle: '${stores.length} cửa hàng',
+            ),
+          ),
           // Search
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),

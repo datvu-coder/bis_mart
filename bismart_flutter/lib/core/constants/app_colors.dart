@@ -10,7 +10,7 @@ class AppColors {
   static const accent = Color(0xFFFF8A50);
 
   // Surfaces
-  static const background = Color(0xFFF5F6FA);
+  static const background = Color(0xFFEEF0F6);
   static const cardBg = Color(0xFFFFFFFF);
   static const surfaceVariant = Color(0xFFF0F2F7);
   static const surfaceElevated = Color(0xFFFFFFFF);
@@ -56,8 +56,8 @@ class AppColors {
   static const gradientDarkEnd = Color(0xFF1E293B);
 
   // Shadows
-  static const shadow = Color(0x0A000000);
-  static const shadowMedium = Color(0x14000000);
+  static const shadow = Color(0x1F000000);
+  static const shadowMedium = Color(0x33B84A1E);
 
   // Purple — dùng cho Phân quyền (admin)
   static const purpleAccent = Color(0xFF7C3AED);
