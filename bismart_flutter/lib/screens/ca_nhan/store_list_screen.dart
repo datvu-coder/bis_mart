@@ -120,14 +120,10 @@ class _StoreListScreenState extends State<StoreListScreen> {
                 final store = stores[index];
                 return Container(
                   margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.cardBg,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-                  ),
+                  decoration: AppDecorations.row,
                   child: InkWell(
                     onTap: () => _showStoreDetail(store),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadius.row),
                     child: Padding(
                       padding: const EdgeInsets.all(14),
                       child: Row(

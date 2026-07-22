@@ -353,11 +353,7 @@ class _ProductDisplayTile extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.row,
       child: Row(
         children: [
           Container(
@@ -365,7 +361,7 @@ class _ProductDisplayTile extends StatelessWidget {
             height: 44,
             decoration: BoxDecoration(
               color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(AppRadius.row - 2),
             ),
             child: const Icon(Icons.inventory_2_rounded, size: 20, color: AppColors.textGrey),
           ),
