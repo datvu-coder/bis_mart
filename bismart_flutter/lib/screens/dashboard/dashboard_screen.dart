@@ -249,8 +249,50 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
       );
     }
 
-    return Column(
-      children: cards.map((c) => _buildMetricCard(c)).toList(),
+    // Mobile: a compact 2-column grid instead of 3 full-width, tall cards —
+    // the horizontal icon+text layout wasted most of the card's height on
+    // empty padding and left a huge gap of unused screen below it.
+    return LayoutBuilder(builder: (context, constraints) {
+      final tileWidth = (constraints.maxWidth - 12) / 2;
+      final children = <Widget>[];
+      for (var i = 0; i < cards.length; i++) {
+        final isLastOdd = cards.length.isOdd && i == cards.length - 1;
+        children.add(SizedBox(
+          width: isLastOdd ? constraints.maxWidth : tileWidth,
+          child: _buildCompactMetricTile(cards[i]),
+        ));
+      }
+      return Wrap(spacing: 12, runSpacing: 12, children: children);
+    });
+  }
+
+  Widget _buildCompactMetricTile(_MetricData metric) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: AppDecorations.row,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: metric.bgColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(metric.icon, color: metric.color, size: 18),
+          ),
+          const SizedBox(height: 10),
+          Text(metric.label, style: AppTextStyles.metricLabel, maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 4),
+          Text(
+            metric.value,
+            style: AppTextStyles.sectionHeader,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
     );
   }
 
