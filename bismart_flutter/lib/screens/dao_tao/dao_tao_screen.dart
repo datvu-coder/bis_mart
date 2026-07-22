@@ -270,8 +270,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           ? Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 16, color: color),
-                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                      fontSize: 10, color: AppColors.textGrey, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
                 Text(
                   value,
                   maxLines: 1,
