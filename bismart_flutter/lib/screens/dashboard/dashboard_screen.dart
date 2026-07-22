@@ -7,6 +7,7 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../widgets/common/filter_dropdown.dart';
+import '../../widgets/common/screen_header_card.dart';
 import '../../widgets/charts/revenue_bar_chart.dart';
 import '../../widgets/charts/product_h_chart.dart';
 
@@ -195,29 +196,16 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
   }
 
   Widget _buildHeader(DashboardProvider provider, dynamic data) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                AppStrings.dashboard,
-                style: AppTextStyles.appTitle,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                DateFormatter.formatDate(data.date),
-                style: AppTextStyles.caption,
-              ),
-            ],
-          ),
-        ),
-        FilterDropdown(
-          value: provider.filterType,
-          onChanged: provider.setFilter,
-        ),
-      ],
+    return ScreenHeaderCard(
+      icon: Icons.dashboard_rounded,
+      iconColor: AppColors.primary,
+      iconBg: AppColors.primaryLight,
+      title: AppStrings.dashboard,
+      subtitle: DateFormatter.formatDate(data.date),
+      trailing: FilterDropdown(
+        value: provider.filterType,
+        onChanged: provider.setFilter,
+      ),
     );
   }
 

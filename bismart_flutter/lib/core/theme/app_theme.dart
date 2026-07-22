@@ -36,7 +36,7 @@ class AppTheme {
         elevation: 0,
         margin: const EdgeInsets.only(bottom: 12),
         shape: RoundedRectangleBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(20)),
+          borderRadius: BorderRadius.circular(AppRadius.panel),
           side: BorderSide(color: AppColors.border.withValues(alpha: 0.3)),
         ),
       ),
@@ -161,13 +161,32 @@ class AppTheme {
   }
 }
 
+/// Shared border-radius scale so cards, rows, chips, and panels draw from
+/// one set of values instead of each screen picking its own arbitrary
+/// number (an app-wide audit found 2/3/4/6/8/10/12/14/16/18/20/24 all in
+/// use with no consistent rule).
+class AppRadius {
+  AppRadius._();
+  static const chip = 10.0; // filter chips, small pills
+  static const row = 14.0; // list rows, buttons, inputs, leading icon boxes
+  static const panel = 20.0; // section/header cards, top-level panels
+  static const pill = 28.0; // FAB-style floating pill buttons
+}
+
 // --- Box decoration helpers ---
 class AppDecorations {
   AppDecorations._();
 
+  // Every "card" surface combines the same light border with the same
+  // shadow — previously `card`/`cardSubtle` were shadow-only while the
+  // global CardTheme (used by Flutter's Card widget) added a border on
+  // top, so the two "card" systems in the app didn't actually match.
+  static final _cardBorder = Border.all(color: AppColors.border.withValues(alpha: 0.3));
+
   static BoxDecoration get card => BoxDecoration(
     color: AppColors.cardBg,
-    borderRadius: BorderRadius.circular(20),
+    borderRadius: BorderRadius.circular(AppRadius.panel),
+    border: _cardBorder,
     boxShadow: [
       BoxShadow(
         color: AppColors.shadow,
@@ -184,7 +203,8 @@ class AppDecorations {
 
   static BoxDecoration get cardSubtle => BoxDecoration(
     color: AppColors.cardBg,
-    borderRadius: BorderRadius.circular(16),
+    borderRadius: BorderRadius.circular(AppRadius.row + 2),
+    border: _cardBorder,
     boxShadow: [
       BoxShadow(
         color: AppColors.shadow,
@@ -194,9 +214,26 @@ class AppDecorations {
     ],
   );
 
+  /// Same border+shadow language as [card]/[cardSubtle] but sized for a
+  /// single list row (product/store/employee rows, etc.) — the row
+  /// radius from [AppRadius.row] plus a lighter shadow so long lists
+  /// don't look overly heavy.
+  static BoxDecoration get row => BoxDecoration(
+    color: AppColors.cardBg,
+    borderRadius: BorderRadius.circular(AppRadius.row),
+    border: _cardBorder,
+    boxShadow: [
+      BoxShadow(
+        color: AppColors.shadow,
+        blurRadius: 6,
+        offset: const Offset(0, 2),
+      ),
+    ],
+  );
+
   static BoxDecoration get cardFlat => BoxDecoration(
     color: AppColors.surfaceVariant,
-    borderRadius: BorderRadius.circular(14),
+    borderRadius: BorderRadius.circular(AppRadius.row),
   );
 }
 
