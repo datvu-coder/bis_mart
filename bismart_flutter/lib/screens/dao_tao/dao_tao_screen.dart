@@ -157,70 +157,34 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final lessonCount = provider.lessons.length;
     final todayEvents = provider.getEventsForDay(DateTime.now()).length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
+    // Nothing left worth showing on phones once the icon/KPI numbers are
+    // gone — collapse the header entirely instead of an empty bordered card.
+    if (isCompactMobile) return const SizedBox.shrink();
 
     return Container(
       width: double.infinity,
-      padding: isCompactMobile
-          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
-          : EdgeInsets.all(emphasize ? 20 : 14),
+      padding: EdgeInsets.all(emphasize ? 20 : 14),
       decoration: AppDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isCompactMobile) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
-                      const SizedBox(height: 2),
-                      Text('Cộng đồng, bài học & lịch đào tạo',
-                          style: AppTextStyles.caption),
-                    ],
-                  ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
+                    const SizedBox(height: 2),
+                    Text('Cộng đồng, bài học & lịch đào tạo',
+                        style: AppTextStyles.caption),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-          ],
-          if (isCompactMobile)
-            Row(
-              children: [
-                Expanded(
-                  child: _buildKpiChip(
-                    icon: Icons.play_lesson_rounded,
-                    label: 'Bài giảng',
-                    value: '$lessonCount',
-                    color: AppColors.info,
-                    compact: true,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildKpiChip(
-                    icon: Icons.event_rounded,
-                    label: 'Hôm nay',
-                    value: '$todayEvents',
-                    color: AppColors.warning,
-                    compact: true,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildKpiChip(
-                    icon: Icons.people_rounded,
-                    label: 'Bài viết',
-                    value: '${provider.posts.length}',
-                    color: AppColors.primary,
-                    compact: true,
-                  ),
-                ),
-              ],
-            )
-          else
-            Wrap(
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
               spacing: 10,
               runSpacing: 10,
               children: [

@@ -165,72 +165,36 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     final activeShiftCount = provider.shifts.length;
     final memberCount = scopedEmployees.length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
+    // Nothing left worth showing on phones once the icon/KPI numbers are
+    // gone — collapse the header entirely instead of an empty bordered card.
+    if (isCompactMobile) return const SizedBox.shrink();
 
     return Container(
       width: double.infinity,
-      padding: isCompactMobile
-          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
-          : EdgeInsets.all(emphasize ? 20 : 14),
+      padding: EdgeInsets.all(emphasize ? 20 : 14),
       decoration: AppDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isCompactMobile) ...[
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Điều phối chấm công, ca làm và hiệu suất đội ngũ',
-                        style: AppTextStyles.caption,
-                      ),
-                    ],
-                  ),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Điều phối chấm công, ca làm và hiệu suất đội ngũ',
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-          ],
-          if (isCompactMobile)
-            Row(
-              children: [
-                Expanded(
-                  child: _buildHeaderKpiChip(
-                    icon: Icons.badge_rounded,
-                    label: 'Nhân viên',
-                    value: '$memberCount',
-                    color: AppColors.primary,
-                    compact: true,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildHeaderKpiChip(
-                    icon: Icons.login_rounded,
-                    label: 'Đã vào ca',
-                    value: '$checkedInCount',
-                    color: AppColors.success,
-                    compact: true,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildHeaderKpiChip(
-                    icon: Icons.schedule_rounded,
-                    label: 'Ca làm',
-                    value: '$activeShiftCount',
-                    color: AppColors.info,
-                    compact: true,
-                  ),
-                ),
-              ],
-            )
-          else
-            Wrap(
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
               spacing: 10,
               runSpacing: 10,
               children: [
