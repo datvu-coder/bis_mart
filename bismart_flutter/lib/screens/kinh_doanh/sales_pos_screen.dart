@@ -177,26 +177,41 @@ class _SalesPosScreenState extends State<SalesPosScreen>
           bottom: 16,
           child: SafeArea(
             top: false,
-            child: Material(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(28),
-              elevation: 3,
-              shadowColor: AppColors.primary.withValues(alpha: 0.4),
-              child: InkWell(
+            child: Container(
+              decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(28),
-                onTap: _openCreateOrder,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add_shopping_cart_rounded, color: Colors.white, size: 18),
-                      SizedBox(width: 8),
-                      Text(
-                        'Tạo đơn hàng',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
-                      ),
-                    ],
+                gradient: const LinearGradient(
+                  colors: [AppColors.gradientStart, AppColors.gradientEnd],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(28),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(28),
+                  onTap: _openCreateOrder,
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_shopping_cart_rounded, color: Colors.white, size: 18),
+                        SizedBox(width: 8),
+                        Text(
+                          'Tạo đơn hàng',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -190,13 +190,14 @@ class AppDecorations {
     boxShadow: [
       BoxShadow(
         color: AppColors.shadow,
-        blurRadius: 20,
-        offset: const Offset(0, 4),
+        blurRadius: 28,
+        spreadRadius: -4,
+        offset: const Offset(0, 10),
       ),
       BoxShadow(
         color: AppColors.shadowMedium,
-        blurRadius: 6,
-        offset: const Offset(0, 1),
+        blurRadius: 10,
+        offset: const Offset(0, 2),
       ),
     ],
   );
@@ -208,8 +209,9 @@ class AppDecorations {
     boxShadow: [
       BoxShadow(
         color: AppColors.shadow,
-        blurRadius: 10,
-        offset: const Offset(0, 2),
+        blurRadius: 18,
+        spreadRadius: -4,
+        offset: const Offset(0, 6),
       ),
     ],
   );
@@ -225,8 +227,9 @@ class AppDecorations {
     boxShadow: [
       BoxShadow(
         color: AppColors.shadow,
-        blurRadius: 6,
-        offset: const Offset(0, 2),
+        blurRadius: 12,
+        spreadRadius: -2,
+        offset: const Offset(0, 4),
       ),
     ],
   );

@@ -7,6 +7,8 @@ import '../../models/employee.dart';
 import '../../providers/employee_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../widgets/common/responsive_form.dart';
+import '../../widgets/common/screen_header_card.dart';
+import '../../widgets/common/gradient_fab.dart';
 
 class EmployeeListScreen extends StatefulWidget {
   const EmployeeListScreen({super.key});
@@ -33,12 +35,14 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Danh sách nhân viên'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const SizedBox.shrink(),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: GradientFab(
+        icon: Icons.add_rounded,
+        tooltip: 'Thêm nhân viên',
         onPressed: () => _showAddEmployeeDialog(context),
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add_rounded, color: AppColors.white),
       ),
       body: Consumer<EmployeeProvider>(
         builder: (context, provider, _) {
@@ -59,6 +63,16 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
 
           return Column(
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                child: ScreenHeaderCard(
+                  icon: Icons.badge_rounded,
+                  iconColor: AppColors.primary,
+                  iconBg: AppColors.primaryLight,
+                  title: 'Danh sách nhân viên',
+                  subtitle: '${employees.length} nhân viên',
+                ),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: TextField(
