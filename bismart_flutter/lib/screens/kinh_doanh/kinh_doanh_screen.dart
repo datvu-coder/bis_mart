@@ -30,6 +30,13 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   @override
   bool get wantKeepAlive => true;
   late TabController _tabController;
+  // Guards the full-screen loading spinner so it only shows before the
+  // very first reports load ever completes. Without this, every reload
+  // triggered later (e.g. returning from Tạo đơn hàng in Bán hàng, which
+  // refreshes the history list) re-blanks the ENTIRE Kinh doanh screen —
+  // tab bar and all — to a spinner while `reports` is still empty
+  // (e.g. no sales recorded yet today), producing a repeated flicker.
+  bool _hasLoadedReportsOnce = false;
 
   @override
   void initState() {
@@ -147,11 +154,12 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
 
     return Consumer<SalesProvider>(
       builder: (context, provider, _) {
-        if (provider.isLoading && provider.reports.isEmpty) {
+        if (provider.isLoading && provider.reports.isEmpty && !_hasLoadedReportsOnce) {
           return const Center(
             child: CircularProgressIndicator(color: AppColors.primary),
           );
         }
+        if (!provider.isLoading) _hasLoadedReportsOnce = true;
 
         final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
         final contentPad = isWide ? hPad : 16.0;
