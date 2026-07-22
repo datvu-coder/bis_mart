@@ -104,11 +104,67 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
 
               // Menu items
               _buildMenuSection(context),
+              const SizedBox(height: 20),
+
+              // Đăng xuất — no dedicated top bar on mobile anymore, so this
+              // is the only way to log out on that layout (desktop still
+              // has it in the sidebar).
+              _buildLogoutButton(context),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildLogoutButton(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: () => _confirmLogout(context),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.errorLight,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.logout_rounded, color: AppColors.error, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              AppStrings.dangXuat,
+              style: AppTextStyles.bodyTextMedium.copyWith(
+                color: AppColors.error,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Đăng xuất'),
+        content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Hủy')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Đăng xuất'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      context.read<AuthProvider>().logout();
+      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+    }
   }
 
   Widget _buildProfileCard(BuildContext context, Employee? user) {

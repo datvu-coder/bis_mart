@@ -99,58 +99,20 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.white,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        shape: const Border(
-          bottom: BorderSide(color: AppColors.sidebarBorder, width: 1),
-        ),
-        automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.asset('assets/images/logo.png', fit: BoxFit.cover),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              _navItems[_selectedIndex].label,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
-                letterSpacing: -0.3,
-              ),
-            ),
+      body: SafeArea(
+        bottom: false,
+        child: PageView(
+          controller: _pageController,
+          physics: const NeverScrollableScrollPhysics(),
+          onPageChanged: (i) => setState(() => _selectedIndex = i),
+          children: const [
+            DashboardScreen(),
+            NhanSuScreen(),
+            KinhDoanhScreen(),
+            DaoTaoScreen(),
+            CaNhanScreen(),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: AppColors.textHint, size: 22),
-            onPressed: _handleLogout,
-            tooltip: AppStrings.dangXuat,
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        onPageChanged: (i) => setState(() => _selectedIndex = i),
-        children: const [
-          DashboardScreen(),
-          NhanSuScreen(),
-          KinhDoanhScreen(),
-          DaoTaoScreen(),
-          CaNhanScreen(),
-        ],
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
