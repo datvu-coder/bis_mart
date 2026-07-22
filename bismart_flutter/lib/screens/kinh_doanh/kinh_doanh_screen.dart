@@ -236,17 +236,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           if (!isCompactMobile) ...[
             Row(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.successLight,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.bar_chart_rounded,
-                      color: AppColors.success, size: 24),
-                ),
-                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
