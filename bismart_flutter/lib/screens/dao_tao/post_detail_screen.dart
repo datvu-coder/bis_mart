@@ -148,20 +148,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   Widget _postCard(CommunityPost post, TrainingProvider provider) {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      decoration: AppDecorations.row,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.row),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -401,7 +390,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                 contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14, vertical: 12),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                   borderSide: BorderSide.none,
                 ),
               ),

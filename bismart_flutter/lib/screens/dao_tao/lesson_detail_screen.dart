@@ -203,7 +203,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.row),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

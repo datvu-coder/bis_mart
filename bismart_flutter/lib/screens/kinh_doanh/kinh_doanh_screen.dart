@@ -167,11 +167,10 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         // Tab layout for all screen sizes
         final body = Column(
           children: [
-            if (!isCompactMobile)
-              Padding(
-                padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
-                child: _buildScreenHeader(provider, isWide),
-              ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
+              child: _buildScreenHeader(provider, isWide),
+            ),
             Container(
               margin: EdgeInsets.fromLTRB(hPad, isCompactMobile ? 10 : 0, hPad, 0),
               padding: const EdgeInsets.all(4),

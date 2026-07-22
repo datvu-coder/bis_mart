@@ -218,7 +218,7 @@ class _TaxReportScreenState extends State<TaxReportScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.warningLight,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.row),
         border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
       ),
       child: Row(
@@ -244,11 +244,7 @@ class _TaxReportScreenState extends State<TaxReportScreen> {
   Widget _buildPeriodSelector() {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -349,11 +345,7 @@ class _TaxReportScreenState extends State<TaxReportScreen> {
   Widget _buildErrorState() {
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.card,
       child: Center(
         child: Column(
           children: [
@@ -397,11 +389,7 @@ class _TaxReportScreenState extends State<TaxReportScreen> {
   Widget _summaryCard(_SummaryCardData data) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.row,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -423,11 +411,7 @@ class _TaxReportScreenState extends State<TaxReportScreen> {
   Widget _buildBreakdownCard(String title, Map<String, double> data) {
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

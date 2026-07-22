@@ -139,11 +139,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     );
   }
 
-  BoxDecoration get _cardDecoration => BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      );
+  BoxDecoration get _cardDecoration => AppDecorations.card;
 
   Widget _buildInfoCard(dynamic user, dynamic currentStore, double pad,
       {bool showRevenueAndActions = true}) {
@@ -679,10 +675,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                         TextField(
                           controller: searchCtrl,
                           onChanged: (_) => setDialogState(() {}),
-                          decoration: const InputDecoration(
-                            labelText: 'Tìm sản phẩm',
-                            prefixIcon: Icon(Icons.search_rounded, size: 20),
-                          ),
+                          decoration: AppDecorations.searchField('Tìm sản phẩm...'),
                         ),
                         const SizedBox(height: 10),
                         SingleChildScrollView(

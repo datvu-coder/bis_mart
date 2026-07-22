@@ -99,11 +99,7 @@ class _LessonHistoryScreenState extends State<LessonHistoryScreen> {
   Widget _header() {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.row,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -129,11 +125,7 @@ class _LessonHistoryScreenState extends State<LessonHistoryScreen> {
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.row,
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         childrenPadding:

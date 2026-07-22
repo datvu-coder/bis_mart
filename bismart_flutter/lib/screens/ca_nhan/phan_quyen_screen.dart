@@ -259,11 +259,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.row,
       child: Row(
         children: [
           Container(
@@ -353,11 +349,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.row,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -676,18 +668,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
           padding: EdgeInsets.fromLTRB(innerPad, 6, innerPad, 6),
           child: TextField(
             onChanged: (v) => setState(() => _assignmentSearch = v),
-            decoration: InputDecoration(
-              hintText: 'Tìm theo nhân viên / cửa hàng / chức vụ…',
-              prefixIcon: const Icon(Icons.search_rounded, size: 18),
-              isDense: true,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    BorderSide(color: AppColors.border.withValues(alpha: 0.6)),
-              ),
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            ),
+            decoration: AppDecorations.searchField('Tìm theo nhân viên / cửa hàng / chức vụ…'),
           ),
         ),
         Expanded(
@@ -750,11 +731,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
       List<Map<String, dynamic>> entries, bool canManageAssignments) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.row,
       child: Theme(
         data: Theme.of(context)
             .copyWith(dividerColor: Colors.transparent),
