@@ -364,12 +364,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.08),
-            AppColors.accent.withValues(alpha: 0.04),
-          ],
-        ),
+        color: AppColors.primaryLight,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
       ),

@@ -411,9 +411,7 @@ class _DesktopSidebar extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.gradientStart, AppColors.gradientEnd],
-              ),
+              color: AppColors.primary,
               borderRadius: BorderRadius.circular(11),
             ),
             child: Center(

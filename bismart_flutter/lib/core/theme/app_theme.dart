@@ -177,61 +177,29 @@ class AppRadius {
 class AppDecorations {
   AppDecorations._();
 
-  // Every "card" surface combines the same light border with the same
-  // shadow — previously `card`/`cardSubtle` were shadow-only while the
-  // global CardTheme (used by Flutter's Card widget) added a border on
-  // top, so the two "card" systems in the app didn't actually match.
-  static final _cardBorder = Border.all(color: AppColors.border.withValues(alpha: 0.3));
+  // Simple, flat surface: white background + one thin border, no shadow.
+  // Every "card" in the app shares this single, plain look instead of each
+  // screen picking its own gradient/shadow/radius combination.
+  static final _cardBorder = Border.all(color: AppColors.border);
 
   static BoxDecoration get card => BoxDecoration(
     color: AppColors.cardBg,
     borderRadius: BorderRadius.circular(AppRadius.panel),
     border: _cardBorder,
-    boxShadow: [
-      BoxShadow(
-        color: AppColors.shadow,
-        blurRadius: 28,
-        spreadRadius: -4,
-        offset: const Offset(0, 10),
-      ),
-      BoxShadow(
-        color: AppColors.shadowMedium,
-        blurRadius: 10,
-        offset: const Offset(0, 2),
-      ),
-    ],
   );
 
   static BoxDecoration get cardSubtle => BoxDecoration(
     color: AppColors.cardBg,
     borderRadius: BorderRadius.circular(AppRadius.row + 2),
     border: _cardBorder,
-    boxShadow: [
-      BoxShadow(
-        color: AppColors.shadow,
-        blurRadius: 18,
-        spreadRadius: -4,
-        offset: const Offset(0, 6),
-      ),
-    ],
   );
 
-  /// Same border+shadow language as [card]/[cardSubtle] but sized for a
-  /// single list row (product/store/employee rows, etc.) — the row
-  /// radius from [AppRadius.row] plus a lighter shadow so long lists
-  /// don't look overly heavy.
+  /// Same flat border language as [card]/[cardSubtle] but sized for a
+  /// single list row (product/store/employee rows, etc.).
   static BoxDecoration get row => BoxDecoration(
     color: AppColors.cardBg,
     borderRadius: BorderRadius.circular(AppRadius.row),
     border: _cardBorder,
-    boxShadow: [
-      BoxShadow(
-        color: AppColors.shadow,
-        blurRadius: 12,
-        spreadRadius: -2,
-        offset: const Offset(0, 4),
-      ),
-    ],
   );
 
   static BoxDecoration get cardFlat => BoxDecoration(

@@ -171,19 +171,8 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.gradientStart, AppColors.gradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppColors.primary,
         borderRadius: BorderRadius.circular(AppRadius.panel),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.2),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -63,11 +63,7 @@ class LessonCard extends StatelessWidget {
         width: 84,
         height: 84,
         decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.primaryLight, AppColors.surfaceVariant],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: AppColors.surfaceVariant,
         ),
         child: Stack(
           fit: StackFit.expand,

@@ -177,28 +177,13 @@ class _SalesPosScreenState extends State<SalesPosScreen>
           bottom: 16,
           child: SafeArea(
             top: false,
-            child: Container(
-              decoration: BoxDecoration(
+            child: Material(
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(28),
+              elevation: 2,
+              child: InkWell(
                 borderRadius: BorderRadius.circular(28),
-                gradient: const LinearGradient(
-                  colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withValues(alpha: 0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(28),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(28),
-                  onTap: _openCreateOrder,
+                onTap: _openCreateOrder,
                   child: const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 18, vertical: 13),
                     child: Row(
@@ -217,7 +202,6 @@ class _SalesPosScreenState extends State<SalesPosScreen>
               ),
             ),
           ),
-        ),
       ],
     );
   }

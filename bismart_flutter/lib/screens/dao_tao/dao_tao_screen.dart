@@ -163,15 +163,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       padding: isCompactMobile
           ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
           : EdgeInsets.all(emphasize ? 20 : 14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFEFF6FF), Color(0xFFFFFFFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
+      decoration: AppDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -346,12 +338,8 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF7C3AED), Color(0xFF4F46E5)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(14),
+                    color: AppColors.purpleAccent,
+                    borderRadius: BorderRadius.circular(AppRadius.row),
                   ),
                   child: Material(
                     color: Colors.transparent,
@@ -1586,14 +1574,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                             width: 38,
                             height: 38,
                             decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppColors.gradientStart,
-                                  AppColors.gradientEnd
-                                ],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
+                              color: AppColors.primary,
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(Icons.send_rounded,
@@ -2344,11 +2325,7 @@ class _CommunityAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.gradientStart, AppColors.gradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppColors.primary,
         shape: BoxShape.circle,
       ),
       child: Center(

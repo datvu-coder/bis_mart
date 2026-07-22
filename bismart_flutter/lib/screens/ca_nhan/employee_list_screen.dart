@@ -150,9 +150,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                                         width: 44,
                                         height: 44,
                                         decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [AppColors.gradientStart, AppColors.gradientEnd],
-                                          ),
+                                          color: AppColors.primary,
                                           borderRadius: BorderRadius.circular(AppRadius.row - 2),
                                         ),
                                         child: Center(
