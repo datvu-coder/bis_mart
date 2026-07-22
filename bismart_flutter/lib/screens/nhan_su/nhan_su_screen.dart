@@ -178,17 +178,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           if (!isCompactMobile) ...[
             Row(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.groups_2_rounded,
-                      color: AppColors.primary, size: 24),
-                ),
-                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
