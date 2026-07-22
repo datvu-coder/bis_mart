@@ -15,7 +15,6 @@ import '../../providers/lms_provider.dart';
 import '../../providers/training_provider.dart';
 import '../../services/api_service.dart';
 import '../../widgets/common/desktop_layout.dart';
-import '../../widgets/common/weighted_tab_selector.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/responsive_form.dart';
 import '../../widgets/cards/lesson_card.dart';
@@ -110,15 +109,29 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 child: _buildScreenHeader(provider, isWide),
               ),
               Container(
-                margin: EdgeInsets.fromLTRB(hPad, isCompactMobile ? 10 : 0, hPad, 0),
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceVariant,
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: WeightedTabSelector(
+                color: AppColors.white,
+                child: TabBar(
                   controller: _tabController,
-                  labels: const ['Cộng đồng', 'Bài giảng', 'Lịch học', 'Trợ lý AI'],
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: AppColors.textHint,
+                  indicatorColor: AppColors.primary,
+                  indicatorWeight: 3,
+                  labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+                  tabs: [
+                    isCompactMobile
+                        ? const Tab(icon: Icon(Icons.forum_rounded, size: 18))
+                        : const Tab(text: 'Cộng đồng'),
+                    isCompactMobile
+                        ? const Tab(icon: Icon(Icons.play_lesson_rounded, size: 18))
+                        : const Tab(text: 'Bài giảng'),
+                    isCompactMobile
+                        ? const Tab(icon: Icon(Icons.calendar_today_rounded, size: 18))
+                        : const Tab(text: 'Lịch học'),
+                    isCompactMobile
+                        ? const Tab(icon: Icon(Icons.auto_awesome_rounded, size: 18))
+                        : const Tab(text: 'Trợ lý AI'),
+                  ],
                 ),
               ),
               Expanded(
