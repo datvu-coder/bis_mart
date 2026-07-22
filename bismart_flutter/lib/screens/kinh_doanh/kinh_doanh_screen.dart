@@ -223,12 +223,15 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     final reportCount = provider.salesReportCount;
     final pgCount = provider.filteredReports.map((r) => r.pgName).toSet().length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
+    // On phones there's nothing left worth showing here once the icon/KPI
+    // numbers are gone — the create-report action already lives inside the
+    // Báo cáo tab, so just collapse the header entirely instead of leaving
+    // an empty bordered card.
+    if (isCompactMobile) return const SizedBox.shrink();
 
     return Container(
       width: double.infinity,
-      padding: isCompactMobile
-          ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
-          : EdgeInsets.all(emphasize ? 20 : 14),
+      padding: EdgeInsets.all(emphasize ? 20 : 14),
       decoration: AppDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,58 +266,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
             ),
             const SizedBox(height: 12),
           ],
-          if (isCompactMobile)
-            Row(
-              children: [
-                Expanded(
-                  child: _buildKpiChip(
-                    icon: Icons.description_rounded,
-                    label: 'Báo cáo',
-                    value: '$reportCount',
-                    color: AppColors.info,
-                    compact: true,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildKpiChip(
-                    icon: Icons.account_balance_wallet_rounded,
-                    label: 'Doanh thu',
-                    value: CurrencyFormatter.formatVND(totalRev),
-                    color: AppColors.success,
-                    compact: true,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildKpiChip(
-                    icon: Icons.person_rounded,
-                    label: 'PG',
-                    value: '$pgCount',
-                    color: AppColors.primary,
-                    compact: true,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 36,
-                  height: 36,
-                  child: IconButton.filled(
-                    onPressed: () =>
-                        Navigator.pushNamed(context, AppRoutes.createReport),
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    tooltip: AppStrings.taoPhieuBaoCao,
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: AppColors.white,
-                      padding: EdgeInsets.zero,
-                    ),
-                  ),
-                ),
-              ],
-            )
-          else
-            Wrap(
+          Wrap(
               spacing: 10,
               runSpacing: 10,
               children: [
