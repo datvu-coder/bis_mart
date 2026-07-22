@@ -82,7 +82,9 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
-    final isCompactMobile = screenWidth < 430;
+    // Matches Tổng quan's own threshold for its TabBar's icon-only fallback,
+    // so both screens switch between text/icon tabs at the same width.
+    final isCompactMobile = screenWidth < 390;
     final isWide = isDesktop || isTablet;
     final canManage = context.watch<PermissionProvider>().canManageAttendance;
 
