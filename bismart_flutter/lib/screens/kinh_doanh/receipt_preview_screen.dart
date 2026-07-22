@@ -89,7 +89,7 @@ class _ReceiptPreviewScreenState extends State<ReceiptPreviewScreen> {
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     color: AppColors.white,
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius: BorderRadius.circular(AppRadius.chip),
                     boxShadow: [
                       BoxShadow(color: AppColors.shadowMedium, blurRadius: 16, offset: const Offset(0, 4)),
                     ],

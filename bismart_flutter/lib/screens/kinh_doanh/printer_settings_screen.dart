@@ -107,7 +107,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: AppColors.infoLight,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.row),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,

@@ -160,11 +160,7 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
                   ],
                   Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-                    ),
+                    decoration: AppDecorations.card,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -258,7 +254,7 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.warningLight,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.row),
         border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
       ),
       child: Row(

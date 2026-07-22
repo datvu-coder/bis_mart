@@ -118,11 +118,7 @@ class _LessonQuizScreenState extends State<LessonQuizScreen> {
     final selected = _answers[qid];
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-      ),
+      decoration: AppDecorations.row,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -222,11 +218,7 @@ class _LessonQuizScreenState extends State<LessonQuizScreen> {
           padding: const EdgeInsets.all(20),
           child: Container(
             padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColors.cardBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-            ),
+            decoration: AppDecorations.card,
             child: Column(
               children: [
                 Container(

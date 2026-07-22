@@ -101,11 +101,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         // Tab layout for all screen sizes
         final body = Column(
           children: [
-            if (!isCompactMobile)
-              Padding(
-                padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
-                child: _buildScreenHeader(provider, canManage, isWide),
-              ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
+              child: _buildScreenHeader(provider, canManage, isWide),
+            ),
             Container(
               margin: EdgeInsets.fromLTRB(hPad, isCompactMobile ? 10 : 0, hPad, 0),
               padding: const EdgeInsets.all(4),

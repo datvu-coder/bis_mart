@@ -61,7 +61,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.panel),
               ),
               child: Column(
                 children: [
@@ -70,7 +70,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                     height: 80,
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(AppRadius.panel),
                       border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
                     ),
                     child: Center(
@@ -129,11 +129,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.cardBg,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
-              ),
+              decoration: AppDecorations.card,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
