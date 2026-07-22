@@ -47,11 +47,19 @@ class WeightedTabSelector extends StatelessWidget {
         final left = starts[i] + (starts[nextI] - starts[i]) * frac;
         final width = (f[i] / totalFlex) + ((f[nextI] / totalFlex) - (f[i] / totalFlex)) * frac;
 
+        // With 5+ equal-width segments, long Vietnamese labels ("Chấm công",
+        // "Giờ công"...) don't fit on one line at the default size — shrink
+        // the font and let them wrap to a 2nd line instead of silently
+        // ellipsizing into unreadable "Chấm ...", "Giờ cô..." fragments.
+        final isDense = labels.length >= 5;
+        final fontSize = isDense ? 11.5 : 13.0;
+        final height = isDense ? 44.0 : 40.0;
+
         return LayoutBuilder(
           builder: (context, constraints) {
             final totalWidth = constraints.maxWidth;
             return SizedBox(
-              height: 40,
+              height: height,
               child: Stack(
                 children: [
                   Positioned(
@@ -86,12 +94,15 @@ class WeightedTabSelector extends StatelessWidget {
                           onTap: () => controller.animateTo(idx),
                           child: Container(
                             alignment: Alignment.center,
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
                             child: Text(
                               labels[idx],
+                              textAlign: TextAlign.center,
+                              maxLines: isDense ? 2 : 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontSize: 13,
+                                fontSize: fontSize,
+                                height: 1.1,
                                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                                 color: selected ? AppColors.primary : AppColors.textGrey,
                               ),

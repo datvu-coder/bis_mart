@@ -417,6 +417,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     final reports = provider.filteredReports;
     final isMobile = MediaQuery.of(context).size.width < 900;
     return DataPanel(
+      title: 'Danh sách báo cáo (${reports.length})',
       padding: isMobile
           ? const EdgeInsets.fromLTRB(0, 14, 0, 18)
           : null,
