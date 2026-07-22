@@ -110,7 +110,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
               child: WeightedTabSelector(
                 controller: _tabController,

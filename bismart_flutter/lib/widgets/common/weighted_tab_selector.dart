@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/theme/app_theme.dart';
 
 /// App-wide pill-style tab selector with equal-width segments and a
 /// sliding highlight. Used at every screen size (not just desktop) so the
@@ -72,7 +73,7 @@ class WeightedTabSelector extends StatelessWidget {
                       child: Container(
                         decoration: BoxDecoration(
                           color: AppColors.white,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
                           boxShadow: [
                             BoxShadow(
                               color: AppColors.shadow,
@@ -90,7 +91,7 @@ class WeightedTabSelector extends StatelessWidget {
                       return Expanded(
                         flex: idx < f.length ? f[idx] : 1,
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
                           onTap: () => controller.animateTo(idx),
                           child: Container(
                             alignment: Alignment.center,
