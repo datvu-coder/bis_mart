@@ -16,7 +16,6 @@ import '../../services/export_service.dart';
 import 'sales_pos_screen.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
-import '../../widgets/common/weighted_tab_selector.dart';
 
 class KinhDoanhScreen extends StatefulWidget {
   const KinhDoanhScreen({super.key});
@@ -172,15 +171,29 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
               child: _buildScreenHeader(provider, isWide),
             ),
             Container(
-              margin: EdgeInsets.fromLTRB(hPad, isCompactMobile ? 10 : 0, hPad, 0),
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-              child: WeightedTabSelector(
+              color: AppColors.white,
+              child: TabBar(
                 controller: _tabController,
-                labels: const ['Bán hàng', 'Báo cáo', 'Thống kê', 'Bộ lọc'],
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textHint,
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+                tabs: [
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.point_of_sale_rounded, size: 18))
+                      : const Tab(text: 'Bán hàng'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.description_rounded, size: 18))
+                      : const Tab(text: 'Báo cáo'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.bar_chart_rounded, size: 18))
+                      : const Tab(text: 'Thống kê'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.tune_rounded, size: 18))
+                      : const Tab(text: 'Bộ lọc'),
+                ],
               ),
             ),
             Expanded(

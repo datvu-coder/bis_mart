@@ -17,7 +17,6 @@ import '../../services/location_service.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/responsive_form.dart';
-import '../../widgets/common/weighted_tab_selector.dart';
 import '../../widgets/cards/rank_list_tile.dart';
 
 class NhanSuScreen extends StatefulWidget {
@@ -106,15 +105,32 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               child: _buildScreenHeader(provider, canManage, isWide),
             ),
             Container(
-              margin: EdgeInsets.fromLTRB(hPad, isCompactMobile ? 10 : 0, hPad, 0),
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-              child: WeightedTabSelector(
+              color: AppColors.white,
+              child: TabBar(
                 controller: _tabController,
-                labels: const ['Chấm công', 'Ca làm', 'Xếp hạng', 'Lịch', 'Giờ công'],
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textHint,
+                indicatorColor: AppColors.primary,
+                indicatorWeight: 3,
+                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+                tabs: [
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.fingerprint_rounded, size: 18))
+                      : const Tab(text: 'Chấm công'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.schedule_rounded, size: 18))
+                      : const Tab(text: 'Ca làm'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.emoji_events_rounded, size: 18))
+                      : const Tab(text: 'Xếp hạng'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.calendar_month_rounded, size: 18))
+                      : const Tab(text: 'Lịch'),
+                  isCompactMobile
+                      ? const Tab(icon: Icon(Icons.access_time_rounded, size: 18))
+                      : const Tab(text: 'Giờ công'),
+                ],
               ),
             ),
             Expanded(
