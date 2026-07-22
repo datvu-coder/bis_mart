@@ -195,14 +195,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.08),
-            AppColors.primaryLight,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppColors.primaryLight,
         borderRadius: BorderRadius.circular(AppRadius.row),
       ),
       child: Column(

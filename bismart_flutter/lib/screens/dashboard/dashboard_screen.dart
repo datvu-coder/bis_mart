@@ -337,12 +337,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.06),
-            AppColors.accent.withValues(alpha: 0.03),
-          ],
-        ),
+        color: AppColors.primaryLight,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
       ),

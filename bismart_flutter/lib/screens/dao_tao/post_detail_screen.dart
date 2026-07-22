@@ -345,11 +345,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       width: size,
       height: size,
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.gradientStart, AppColors.gradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: AppColors.primary,
         shape: BoxShape.circle,
       ),
       child: Center(

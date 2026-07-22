@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 
-/// Shared "gradient chrome" header used at the top of a tab's content:
-/// icon avatar + title + subtitle, with an optional trailing action.
-/// Already the de-facto pattern in Nhân sự/Kinh doanh/Đào tạo (each with
-/// its own hand-rolled copy); this gives every tab that wants a boxed
-/// header the same look instead of picking its own gradient/radius/icon
-/// treatment.
+/// Shared plain header used at the top of a tab's content: icon avatar +
+/// title + subtitle, with an optional trailing action. A flat white card
+/// with a thin border — no gradient — so every tab that wants a boxed
+/// header looks the same simple way.
 class ScreenHeaderCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -31,15 +29,7 @@ class ScreenHeaderCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFEBF8F0), Color(0xFFFFFFFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.panel),
-        border: Border.all(color: AppColors.border),
-      ),
+      decoration: AppDecorations.card,
       child: Row(
         children: [
           Container(

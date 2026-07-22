@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 
-/// Gradient floating action button — same warm orange gradient + lifted
-/// shadow as the "Tạo đơn hàng" pill in Bán hàng, so every screen's primary
-/// add action reads as one consistent, premium-feeling control instead of
-/// a flat solid-color circle.
+/// Plain solid-color floating action button — one flat circle used as the
+/// primary add action across the app instead of each screen's own FAB
+/// styling.
 class GradientFab extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
@@ -19,32 +18,16 @@ class GradientFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final button = Container(
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [AppColors.gradientStart, AppColors.gradientEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Icon(icon, color: AppColors.white, size: 24),
-          ),
+    final button = Material(
+      color: AppColors.primary,
+      shape: const CircleBorder(),
+      elevation: 2,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Icon(icon, color: AppColors.white, size: 24),
         ),
       ),
     );

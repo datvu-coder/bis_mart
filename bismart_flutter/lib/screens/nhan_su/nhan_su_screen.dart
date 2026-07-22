@@ -171,15 +171,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       padding: isCompactMobile
           ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
           : EdgeInsets.all(emphasize ? 20 : 14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFFF2EB), Color(0xFFFFFFFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
+      decoration: AppDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
