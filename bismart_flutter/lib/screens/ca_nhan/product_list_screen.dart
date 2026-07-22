@@ -64,10 +64,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Tìm sản phẩm...',
-                    prefixIcon: Icon(Icons.search_rounded, size: 20),
-                  ),
+                  decoration: AppDecorations.searchField('Tìm sản phẩm...'),
                   onChanged: (v) => provider.setSearch(v),
                 ),
               ),
@@ -94,84 +91,101 @@ class _ProductListScreenState extends State<ProductListScreen> {
               Expanded(
                 child: provider.isLoading
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-                    : ListView.builder(
-                        itemCount: products.length,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemBuilder: (context, index) {
-                          final product = products[index];
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(14),
-                            decoration: AppDecorations.row,
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    color: AppColors.surfaceVariant,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(Icons.inventory_2_rounded,
-                                      size: 20, color: AppColors.textGrey),
+                    : products.isEmpty
+                        ? Center(
+                            child: Text('Không có sản phẩm phù hợp', style: AppTextStyles.caption),
+                          )
+                        : Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            child: Container(
+                              decoration: AppDecorations.card,
+                              clipBehavior: Clip.antiAlias,
+                              child: ListView.separated(
+                                itemCount: products.length,
+                                separatorBuilder: (_, __) => const Divider(
+                                  height: 1,
+                                  indent: 14,
+                                  endIndent: 14,
+                                  color: AppColors.divider,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        product.name,
-                                        style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w500),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.surfaceVariant,
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(product.unit,
-                                                style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                                itemBuilder: (context, index) {
+                                  final product = products[index];
+                                  return Padding(
+                                    padding: const EdgeInsets.all(14),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 44,
+                                          height: 44,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.surfaceVariant,
+                                            borderRadius: BorderRadius.circular(AppRadius.row - 2),
                                           ),
-                                          const SizedBox(width: 6),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: AppColors.primaryLight,
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              product.productGroup,
-                                              style: const TextStyle(
-                                                fontSize: 10,
-                                                fontWeight: FontWeight.w600,
-                                                color: AppColors.primary,
+                                          child: const Icon(Icons.inventory_2_rounded,
+                                              size: 20, color: AppColors.textGrey),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                product.name,
+                                                style: AppTextStyles.bodyText
+                                                    .copyWith(fontWeight: FontWeight.w500),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
                                               ),
-                                            ),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                        horizontal: 8, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: AppColors.surfaceVariant,
+                                                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                                                    ),
+                                                    child: Text(product.unit,
+                                                        style: AppTextStyles.caption.copyWith(fontSize: 11)),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(
+                                                        horizontal: 8, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: AppColors.primaryLight,
+                                                      borderRadius: BorderRadius.circular(AppRadius.pill),
+                                                    ),
+                                                    child: Text(
+                                                      product.productGroup,
+                                                      style: const TextStyle(
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.w600,
+                                                        color: AppColors.primary,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  CurrencyFormatter.formatVND(product.priceWithVAT),
-                                  style: AppTextStyles.bodyText.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                              ],
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          CurrencyFormatter.formatVND(product.priceWithVAT),
+                                          style: AppTextStyles.bodyText.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
                             ),
-                          );
-                        },
-                      ),
+                          ),
               ),
             ],
           ),
