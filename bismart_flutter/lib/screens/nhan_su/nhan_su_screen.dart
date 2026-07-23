@@ -292,14 +292,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     return DataPanel(
       title: AppStrings.chamCong,
       padding: isMobile ? const EdgeInsets.all(10) : const EdgeInsets.all(22),
-      trailing: HeaderActionCluster(
-        actions: [
-          HeaderAction(
-            icon: Icons.history_rounded,
-            label: 'Lịch sử chấm công',
-            onPressed: () => _showAttendanceHistory(provider, canManage: canManage),
-          ),
-        ],
+      trailing: IconButton(
+        onPressed: () => _showAttendanceHistory(provider, canManage: canManage),
+        icon: const Icon(Icons.history_rounded),
+        tooltip: 'Lịch sử chấm công',
       ),
       child: Column(
         children: [
@@ -1363,14 +1359,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
 
     return DataPanel(
       title: AppStrings.caLamViec,
-      trailing: HeaderActionCluster(
-        actions: [
-          HeaderAction(
-            icon: Icons.add_rounded,
-            label: 'Thêm ca',
-            onPressed: () => _showAddShiftDialog(provider),
-          ),
-        ],
+      trailing: IconButton(
+        onPressed: () => _showAddShiftDialog(provider),
+        icon: const Icon(Icons.add_rounded),
+        tooltip: 'Thêm ca',
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

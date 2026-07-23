@@ -3,7 +3,6 @@ import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../models/community_post.dart';
-import '../common/header_action_cluster.dart';
 
 /// A polished social post card. The card has a soft shadow + rounded corners
 /// and renders any combination of text / images (1, 2, 3 or 4+ in a grid) /
@@ -159,23 +158,19 @@ class SocialPostCard extends StatelessWidget {
               ],
             ),
           ),
-          if (onEdit != null || onDelete != null)
-            HeaderActionCluster(
-              actions: [
-                if (onEdit != null)
-                  HeaderAction(
-                    icon: Icons.edit_rounded,
-                    label: 'Sửa bài viết',
-                    onPressed: onEdit!,
-                  ),
-                if (onDelete != null)
-                  HeaderAction(
-                    icon: Icons.delete_rounded,
-                    label: 'Xóa bài viết',
-                    color: AppColors.error,
-                    onPressed: onDelete!,
-                  ),
-              ],
+          if (onEdit != null)
+            IconButton(
+              icon: const Icon(Icons.edit_rounded, size: 20),
+              tooltip: 'Sửa bài viết',
+              visualDensity: VisualDensity.compact,
+              onPressed: onEdit,
+            ),
+          if (onDelete != null)
+            IconButton(
+              icon: const Icon(Icons.delete_rounded, size: 20, color: AppColors.error),
+              tooltip: 'Xóa bài viết',
+              visualDensity: VisualDensity.compact,
+              onPressed: onDelete,
             ),
         ],
       ),

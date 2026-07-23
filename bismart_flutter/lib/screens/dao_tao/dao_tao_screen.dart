@@ -283,14 +283,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
           : null,
       trailing: canManageAi
-          ? HeaderActionCluster(
-              actions: [
-                HeaderAction(
-                  icon: Icons.add_rounded,
-                  label: 'Thêm AI',
-                  onPressed: _showAddAiAssistantDialog,
-                ),
-              ],
+          ? IconButton(
+              onPressed: _showAddAiAssistantDialog,
+              icon: const Icon(Icons.add_rounded),
+              tooltip: 'Thêm AI',
             )
           : null,
       child: aiTools.isEmpty
@@ -523,14 +519,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       title: 'Bài giảng',
       padding: panelPadding,
       trailing: isAdmin
-          ? HeaderActionCluster(
-              actions: [
-                HeaderAction(
-                  icon: Icons.add_rounded,
-                  label: 'Thêm bài giảng',
-                  onPressed: () => _showCreateLessonDialog(provider),
-                ),
-              ],
+          ? IconButton(
+              onPressed: () => _showCreateLessonDialog(provider),
+              icon: const Icon(Icons.add_rounded),
+              tooltip: 'Thêm bài giảng',
             )
           : null,
       child: provider.lessons.isEmpty
@@ -588,14 +580,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       padding: isMobile
           ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
           : null,
-      trailing: HeaderActionCluster(
-        actions: [
-          HeaderAction(
-            icon: Icons.add_rounded,
-            label: 'Thêm sự kiện',
-            onPressed: () => _showAddEventDialog(provider),
-          ),
-        ],
+      trailing: IconButton(
+        onPressed: () => _showAddEventDialog(provider),
+        icon: const Icon(Icons.add_rounded),
+        tooltip: 'Thêm sự kiện',
       ),
       child: Column(
         children: [

@@ -488,14 +488,10 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                HeaderActionCluster(
-                  actions: [
-                    HeaderAction(
-                      icon: Icons.tune_rounded,
-                      label: 'Điều chỉnh',
-                      onPressed: () => _openFilterSheet(provider),
-                    ),
-                  ],
+                IconButton(
+                  onPressed: () => _openFilterSheet(provider),
+                  icon: const Icon(Icons.tune_rounded),
+                  tooltip: 'Điều chỉnh',
                 ),
               ],
             ),
