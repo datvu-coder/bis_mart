@@ -40,7 +40,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SalesProvider>().loadReports();
       final storeProv = context.read<StoreProvider>();
@@ -189,12 +189,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                   isCompactMobile
                       ? const Tab(icon: Icon(Icons.description_rounded, size: 18))
                       : const Tab(text: 'Báo cáo'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.bar_chart_rounded, size: 18))
-                      : const Tab(text: 'Thống kê'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.tune_rounded, size: 18))
-                      : const Tab(text: 'Bộ lọc'),
                 ],
               ),
             ),
@@ -205,21 +199,16 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                   const SalesPosScreen(),
                   SingleChildScrollView(
                     padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                    child: _buildReportList(provider),
-                  ),
-                  SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
                     child: Column(
                       children: [
+                        _buildFilterPanel(provider),
+                        const SizedBox(height: 16),
+                        _buildReportList(provider),
                         _buildTopPgPanel(provider),
                         const SizedBox(height: 12),
                         _buildStoreRevenuePanel(provider),
                       ],
                     ),
-                  ),
-                  SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                    child: _buildFilterPanel(provider),
                   ),
                 ],
               ),
@@ -593,62 +582,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
               ),
             ),
           ),
-
-          // ── Báo cáo gần đây ────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-            child: filteredReports.isEmpty
-                ? _emptyState()
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: Row(
-                          children: [
-                            Text('Báo cáo gần đây',
-                                style: AppTextStyles.bodyText.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: AppColors.textPrimary)),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 7, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceVariant,
-                                borderRadius:
-                                    BorderRadius.circular(8),
-                              ),
-                              child: Text('${filteredReports.length}',
-                                  style: AppTextStyles.caption.copyWith(
-                                      color: AppColors.textGrey,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 11)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      ...List.generate(
-                        filteredReports.take(8).length,
-                        (i) {
-                          final r = filteredReports[i];
-                          final isLast = i ==
-                              (filteredReports.take(8).length - 1);
-                          return _recentRow(r, isLast: isLast);
-                        },
-                      ),
-                      if (filteredReports.length > 8)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                              '… và ${filteredReports.length - 8} báo cáo khác',
-                              style: AppTextStyles.caption.copyWith(
-                                  color: AppColors.textHint,
-                                  fontStyle: FontStyle.italic)),
-                        ),
-                    ],
-                  ),
-          ),
+          const SizedBox(height: 6),
         ],
       ),
     );
@@ -749,103 +683,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   }
 
   // ── Helper: trạng thái rỗng ───────────────────────────────────────────
-  Widget _emptyState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.inbox_outlined,
-              size: 28, color: AppColors.textHint),
-          const SizedBox(height: 10),
-          Text('Không có báo cáo phù hợp với bộ lọc.',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.caption.copyWith(
-                  color: AppColors.textGrey,
-                  fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-
-  // ── Helper: 1 dòng báo cáo gần đây ────────────────────────────────────
-  Widget _recentRow(SalesReport r, {required bool isLast}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        border: isLast
-            ? null
-            : const Border(
-                bottom: BorderSide(color: AppColors.borderLight),
-              ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              DateFormatter.formatDate(r.date),
-              style: AppTextStyles.caption.copyWith(
-                color: AppColors.textGrey,
-                fontWeight: FontWeight.w800,
-                fontSize: 11,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  r.pgName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.bodyText.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.5,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                if ((r.storeCode ?? '').isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 1),
-                    child: Text(
-                      r.storeCode!,
-                      style: AppTextStyles.caption.copyWith(
-                        color: AppColors.textHint,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            CurrencyFormatter.formatVND(r.revenue),
-            style: AppTextStyles.bodyText.copyWith(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w800,
-              fontSize: 13.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Trường chọn cửa hàng hiển thị bên trong bottom-sheet — danh sách lấy
   /// trực tiếp từ phân quyền của tài khoản (`_resolvePermittedStores`).
   ///
