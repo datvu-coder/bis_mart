@@ -6,6 +6,7 @@ import '../../models/employee.dart';
 import '../../providers/employee_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../widgets/common/responsive_form.dart';
+import '../../widgets/common/header_action_cluster.dart';
 
 class EmployeeDetailScreen extends StatefulWidget {
   final Employee employee;
@@ -37,13 +38,23 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_rounded),
-            onPressed: () => _showEditDialog(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
-            onPressed: () => _confirmDelete(),
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: HeaderActionCluster(
+              actions: [
+                HeaderAction(
+                  icon: Icons.edit_rounded,
+                  tooltip: 'Sửa',
+                  onPressed: () => _showEditDialog(),
+                ),
+                HeaderAction(
+                  icon: Icons.delete_outline_rounded,
+                  tooltip: 'Xóa',
+                  color: AppColors.error,
+                  onPressed: () => _confirmDelete(),
+                ),
+              ],
+            ),
           ),
         ],
       ),

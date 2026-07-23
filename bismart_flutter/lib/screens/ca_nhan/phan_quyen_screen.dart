@@ -15,6 +15,7 @@ import '../../services/api_service.dart';
 import '../../services/export_service_stub.dart'
     if (dart.library.html) '../../services/export_service_web.dart';
 import '../../widgets/common/responsive_form.dart';
+import '../../widgets/common/header_action_cluster.dart';
 
 class PhanQuyenScreen extends StatefulWidget {
   const PhanQuyenScreen({super.key});
@@ -376,28 +377,22 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                icon: const Icon(Icons.edit_outlined,
-                    size: 17, color: AppColors.primary),
-                tooltip: 'Sửa',
-                onPressed: canEditPermissions
-                    ? () => _showEditPermissionDialog(perm)
-                    : null,
-              ),
-              IconButton(
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                icon: const Icon(Icons.delete_outline_rounded,
-                    size: 17, color: AppColors.error),
-                tooltip: 'Xoá',
-                onPressed: canEditPermissions
-                    ? () => _deletePermission(perm.position)
-                    : null,
-              ),
+              if (canEditPermissions)
+                HeaderActionCluster(
+                  actions: [
+                    HeaderAction(
+                      icon: Icons.edit_outlined,
+                      tooltip: 'Sửa',
+                      onPressed: () => _showEditPermissionDialog(perm),
+                    ),
+                    HeaderAction(
+                      icon: Icons.delete_outline_rounded,
+                      tooltip: 'Xoá',
+                      color: AppColors.error,
+                      onPressed: () => _deletePermission(perm.position),
+                    ),
+                  ],
+                ),
             ],
           ),
           const SizedBox(height: 8),
