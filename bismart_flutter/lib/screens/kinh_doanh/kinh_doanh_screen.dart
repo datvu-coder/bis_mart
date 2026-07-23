@@ -17,6 +17,7 @@ import 'sales_pos_screen.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/gradient_fab.dart';
+import '../../widgets/common/header_action_cluster.dart';
 
 class KinhDoanhScreen extends StatefulWidget {
   const KinhDoanhScreen({super.key});
@@ -26,22 +27,20 @@ class KinhDoanhScreen extends StatefulWidget {
 }
 
 class _KinhDoanhScreenState extends State<KinhDoanhScreen>
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  late TabController _tabController;
   // Guards the full-screen loading spinner so it only shows before the
   // very first reports load ever completes. Without this, every reload
   // triggered later (e.g. returning from Tạo đơn hàng in Bán hàng, which
-  // refreshes the history list) re-blanks the ENTIRE Kinh doanh screen —
-  // tab bar and all — to a spinner while `reports` is still empty
-  // (e.g. no sales recorded yet today), producing a repeated flicker.
+  // refreshes the history list) re-blanks the ENTIRE Kinh doanh screen to
+  // a spinner while `reports` is still empty (e.g. no sales recorded yet
+  // today), producing a repeated flicker.
   bool _hasLoadedReportsOnce = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SalesProvider>().loadReports();
       final storeProv = context.read<StoreProvider>();
@@ -54,12 +53,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         permProv.resolveForUser(user);
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   /// Tập mã cửa hàng người dùng được phân quyền truy cập — đồng bộ với
@@ -140,9 +133,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
-    // Matches Tổng quan's own threshold for its TabBar's icon-only fallback,
-    // so both screens switch between text/icon tabs at the same width.
-    final isCompactMobile = screenWidth < 390;
     final isWide = isDesktop || isTablet;
 
     // Đồng bộ phạm vi cửa hàng theo phân quyền (đợi tới sau frame để tránh
@@ -166,75 +156,65 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
         final contentPad = isWide ? hPad : 16.0;
 
-        // Tab layout for all screen sizes
         final body = Column(
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
               child: _buildScreenHeader(provider, isWide),
             ),
-            Container(
-              color: AppColors.white,
-              child: TabBar(
-                controller: _tabController,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textHint,
-                indicatorColor: AppColors.primary,
-                indicatorWeight: 3,
-                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
-                tabs: [
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.point_of_sale_rounded, size: 18))
-                      : const Tab(text: 'Bán hàng'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.description_rounded, size: 18))
-                      : const Tab(text: 'Báo cáo'),
-                ],
-              ),
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  const SalesPosScreen(),
-                  Stack(
-                    children: [
-                      SingleChildScrollView(
-                        padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 84),
-                        child: Column(
-                          children: [
-                            _buildFilterPanel(provider),
-                            const SizedBox(height: 16),
-                            _buildReportList(provider),
-                            _buildTopPgPanel(provider),
-                            const SizedBox(height: 12),
-                            _buildStoreRevenuePanel(provider),
-                          ],
-                        ),
-                      ),
-                      Positioned(
-                        right: 16,
-                        bottom: 16,
-                        child: SafeArea(
-                          top: false,
-                          child: GradientFab(
-                            icon: Icons.add_rounded,
-                            tooltip: AppStrings.taoPhieuBaoCao,
-                            onPressed: () => Navigator.pushNamed(
-                                context, AppRoutes.createReport),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+            const Expanded(child: SalesPosScreen()),
           ],
         );
         return isDesktop ? DesktopMaxWidth(child: body) : body;
       },
+    );
+  }
+
+  void _openReportsScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Báo cáo')),
+          body: Consumer<SalesProvider>(
+            builder: (context, provider, _) {
+              final isWide = MediaQuery.of(context).size.width >= 900;
+              final contentPad = isWide ? 24.0 : 16.0;
+              return Stack(
+                children: [
+                  SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 84),
+                    child: Column(
+                      children: [
+                        _buildFilterPanel(provider),
+                        const SizedBox(height: 16),
+                        _buildReportList(provider),
+                        _buildTopPgPanel(provider),
+                        const SizedBox(height: 12),
+                        _buildStoreRevenuePanel(provider),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    right: 16,
+                    bottom: 16,
+                    child: SafeArea(
+                      top: false,
+                      child: GradientFab(
+                        icon: Icons.add_rounded,
+                        tooltip: AppStrings.taoPhieuBaoCao,
+                        onPressed: () => Navigator.pushNamed(
+                            context, AppRoutes.createReport),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
     );
   }
 
@@ -245,11 +225,28 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     final reportCount = provider.salesReportCount;
     final pgCount = provider.filteredReports.map((r) => r.pgName).toSet().length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
-    // On phones there's nothing left worth showing here once the icon/KPI
-    // numbers are gone — the create-report action already lives inside the
-    // Báo cáo tab, so just collapse the header entirely instead of leaving
-    // an empty bordered card.
-    if (isCompactMobile) return const SizedBox.shrink();
+    final reportsAction = HeaderActionCluster(
+      actions: [
+        HeaderAction(
+          icon: Icons.description_rounded,
+          tooltip: 'Báo cáo',
+          onPressed: _openReportsScreen,
+        ),
+      ],
+    );
+
+    // Phones keep just the title + reports action — the KPI chips already
+    // dropped their icons/numbers there, so a full card adds nothing.
+    if (isCompactMobile) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
+          ),
+          reportsAction,
+        ],
+      );
+    }
 
     return Container(
       width: double.infinity,
@@ -258,18 +255,23 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!isCompactMobile) ...[
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
-                const SizedBox(height: 2),
-                Text('Báo cáo bán hàng & thống kê doanh thu',
-                    style: AppTextStyles.caption),
-              ],
-            ),
-            const SizedBox(height: 12),
-          ],
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
+                    const SizedBox(height: 2),
+                    Text('Báo cáo bán hàng & thống kê doanh thu',
+                        style: AppTextStyles.caption),
+                  ],
+                ),
+              ),
+              reportsAction,
+            ],
+          ),
+          const SizedBox(height: 12),
           Wrap(
               spacing: 10,
               runSpacing: 10,

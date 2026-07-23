@@ -8,6 +8,7 @@ import '../../core/utils/date_formatter.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../widgets/common/filter_dropdown.dart';
 import '../../widgets/common/screen_header_card.dart';
+import '../../widgets/common/header_action_cluster.dart';
 import '../../widgets/charts/revenue_bar_chart.dart';
 import '../../widgets/charts/product_h_chart.dart';
 
@@ -18,22 +19,13 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-
+class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DashboardProvider>().loadDashboard();
     });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   @override
@@ -41,7 +33,6 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1100;
     final isWide = screenWidth > 800;
-    final isCompactMobile = screenWidth < 390;
 
     return Consumer<DashboardProvider>(
       builder: (context, provider, _) {
@@ -75,7 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(provider, data),
+                _buildHeader(provider, data, showSecondaryActions: false),
                 const SizedBox(height: 20),
                 _buildMetricCards(data, true),
                 const SizedBox(height: 20),
@@ -124,87 +115,101 @@ class _DashboardScreenState extends State<DashboardScreen> with SingleTickerProv
           );
         }
 
-        // Tab layout for mobile/tablet
-        return Column(
-          children: [
-            Container(
-              color: AppColors.white,
-              child: TabBar(
-                controller: _tabController,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textHint,
-                indicatorColor: AppColors.primary,
-                indicatorWeight: 3,
-                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
-                tabs: [
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.dashboard_rounded, size: 18))
-                      : const Tab(text: 'Tổng quan'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.bar_chart_rounded, size: 18))
-                      : const Tab(text: 'Biểu đồ'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.emoji_events_rounded, size: 18))
-                      : const Tab(text: 'Xếp hạng'),
-                ],
-              ),
-            ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  SingleChildScrollView(
-                    padding: EdgeInsets.all(contentPad),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeader(provider, data),
-                        const SizedBox(height: 16),
-                        _buildMetricCards(data, isWide),
-                        const SizedBox(height: 16),
-                        _buildAnnouncementBanner(data),
-                      ],
-                    ),
-                  ),
-                  SingleChildScrollView(
-                    padding: EdgeInsets.all(contentPad),
-                    child: Column(
-                      children: [
-                        _buildChartCard(AppStrings.bieuDoDoanhSo, Icons.bar_chart_rounded, RevenueBarChart(data: data.revenueChart)),
-                        const SizedBox(height: 16),
-                        _buildChartCard(AppStrings.bieuDoSanPham, Icons.pie_chart_rounded, ProductHChart(data: data.productChart)),
-                      ],
-                    ),
-                  ),
-                  SingleChildScrollView(
-                    padding: EdgeInsets.all(contentPad),
-                    child: Column(
-                      children: [
-                        if (data.featuredPrograms.isNotEmpty) _buildFeaturedPrograms(data),
-                        _buildTopEmployees(data),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        // Single-view layout for mobile/tablet — Biểu đồ and Xếp hạng move
+        // into header action buttons instead of separate tabs.
+        return SingleChildScrollView(
+          padding: EdgeInsets.all(contentPad),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(provider, data),
+              const SizedBox(height: 16),
+              _buildMetricCards(data, isWide),
+              const SizedBox(height: 16),
+              _buildAnnouncementBanner(data),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildHeader(DashboardProvider provider, dynamic data) {
+  void _openChartsScreen(dynamic data) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Biểu đồ')),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                _buildChartCard(AppStrings.bieuDoDoanhSo, Icons.bar_chart_rounded, RevenueBarChart(data: data.revenueChart)),
+                const SizedBox(height: 16),
+                _buildChartCard(AppStrings.bieuDoSanPham, Icons.pie_chart_rounded, ProductHChart(data: data.productChart)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openRankingScreen(dynamic data) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Xếp hạng')),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                if (data.featuredPrograms.isNotEmpty) _buildFeaturedPrograms(data),
+                _buildTopEmployees(data),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(DashboardProvider provider, dynamic data,
+      {bool showSecondaryActions = true}) {
     return ScreenHeaderCard(
       icon: Icons.dashboard_rounded,
       iconColor: AppColors.primary,
       iconBg: AppColors.primaryLight,
       title: AppStrings.dashboard,
       subtitle: DateFormatter.formatDate(data.date),
-      trailing: FilterDropdown(
-        value: provider.filterType,
-        onChanged: provider.setFilter,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FilterDropdown(
+            value: provider.filterType,
+            onChanged: provider.setFilter,
+          ),
+          if (showSecondaryActions) ...[
+            const SizedBox(width: 8),
+            HeaderActionCluster(
+              actions: [
+                HeaderAction(
+                  icon: Icons.bar_chart_rounded,
+                  tooltip: 'Biểu đồ',
+                  onPressed: () => _openChartsScreen(data),
+                ),
+                HeaderAction(
+                  icon: Icons.emoji_events_rounded,
+                  tooltip: 'Xếp hạng',
+                  onPressed: () => _openRankingScreen(data),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

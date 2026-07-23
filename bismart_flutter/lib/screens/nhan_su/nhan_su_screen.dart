@@ -17,6 +17,7 @@ import '../../services/location_service.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/responsive_form.dart';
+import '../../widgets/common/header_action_cluster.dart';
 import '../../widgets/cards/rank_list_tile.dart';
 
 class NhanSuScreen extends StatefulWidget {
@@ -27,18 +28,16 @@ class NhanSuScreen extends StatefulWidget {
 }
 
 class _NhanSuScreenState extends State<NhanSuScreen>
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   bool _isCheckingIn = false;
   String? _locationError;
   double? _lastDistance;
-  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<EmployeeProvider>();
       final currentUser = context.read<AuthProvider>().currentUser;
@@ -71,20 +70,11 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     super.build(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
-    // Matches Tổng quan's own threshold for its TabBar's icon-only fallback,
-    // so both screens switch between text/icon tabs at the same width.
-    final isCompactMobile = screenWidth < 390;
     final isWide = isDesktop || isTablet;
     final canManage = context.watch<PermissionProvider>().canManageAttendance;
 
@@ -99,59 +89,47 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
         final contentPad = isWide ? hPad : 10.0;
 
-        // Tab layout for all screen sizes
         final body = Column(
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
               child: _buildScreenHeader(provider, canManage, isWide),
             ),
-            Container(
-              color: AppColors.white,
-              child: TabBar(
-                controller: _tabController,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textHint,
-                indicatorColor: AppColors.primary,
-                indicatorWeight: 3,
-                labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
-                tabs: [
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.fingerprint_rounded, size: 18))
-                      : const Tab(text: 'Chấm công'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.emoji_events_rounded, size: 18))
-                      : const Tab(text: 'Xếp hạng'),
-                ],
-              ),
-            ),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                    child: Column(
-                      children: [
-                        _buildAttendancePanel(provider, canManage),
-                        _buildShiftPanel(provider),
-                        _buildSchedulePanel(provider, canManage),
-                        _buildHoursReportPanel(provider, canManage),
-                      ],
-                    ),
-                  ),
-                  SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                    child: _buildRankPanel(provider),
-                  ),
-                ],
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(contentPad, 2, contentPad, 12),
+                child: Column(
+                  children: [
+                    _buildAttendancePanel(provider, canManage),
+                    _buildShiftPanel(provider),
+                    _buildSchedulePanel(provider, canManage),
+                    _buildHoursReportPanel(provider, canManage),
+                  ],
+                ),
               ),
             ),
           ],
         );
         return isDesktop ? DesktopMaxWidth(child: body) : body;
       },
+    );
+  }
+
+  void _openRankingScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Bảng xếp hạng')),
+          body: Consumer<EmployeeProvider>(
+            builder: (context, provider, _) => SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _buildRankPanel(provider),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -169,9 +147,28 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     final activeShiftCount = provider.shifts.length;
     final memberCount = scopedEmployees.length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
-    // Nothing left worth showing on phones once the icon/KPI numbers are
-    // gone — collapse the header entirely instead of an empty bordered card.
-    if (isCompactMobile) return const SizedBox.shrink();
+    final rankingAction = HeaderActionCluster(
+      actions: [
+        HeaderAction(
+          icon: Icons.emoji_events_rounded,
+          tooltip: 'Bảng xếp hạng',
+          onPressed: _openRankingScreen,
+        ),
+      ],
+    );
+
+    // Phones keep just the title + ranking action — the KPI chips already
+    // dropped their icons/numbers there, so a full card adds nothing.
+    if (isCompactMobile) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
+          ),
+          rankingAction,
+        ],
+      );
+    }
 
     return Container(
       width: double.infinity,
@@ -195,6 +192,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   ],
                 ),
               ),
+              rankingAction,
             ],
           ),
           const SizedBox(height: 12),
