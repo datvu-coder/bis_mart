@@ -382,12 +382,12 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                   actions: [
                     HeaderAction(
                       icon: Icons.edit_outlined,
-                      tooltip: 'Sửa',
+                      label: 'Sửa',
                       onPressed: () => _showEditPermissionDialog(perm),
                     ),
                     HeaderAction(
                       icon: Icons.delete_outline_rounded,
-                      tooltip: 'Xoá',
+                      label: 'Xoá',
                       color: AppColors.error,
                       onPressed: () => _deletePermission(perm.position),
                     ),

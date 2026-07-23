@@ -151,7 +151,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       actions: [
         HeaderAction(
           icon: Icons.emoji_events_rounded,
-          tooltip: 'Bảng xếp hạng',
+          label: 'Bảng xếp hạng',
           onPressed: _openRankingScreen,
         ),
       ],

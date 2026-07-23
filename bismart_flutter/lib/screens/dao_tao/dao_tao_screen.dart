@@ -146,7 +146,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       actions: [
         HeaderAction(
           icon: Icons.forum_rounded,
-          tooltip: 'Cộng đồng',
+          label: 'Cộng đồng',
           onPressed: _openCommunityScreen,
         ),
       ],
