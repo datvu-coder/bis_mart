@@ -38,7 +38,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<EmployeeProvider>();
       final currentUser = context.read<AuthProvider>().currentUser;
@@ -121,17 +121,8 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                       ? const Tab(icon: Icon(Icons.fingerprint_rounded, size: 18))
                       : const Tab(text: 'Chấm công'),
                   isCompactMobile
-                      ? const Tab(icon: Icon(Icons.schedule_rounded, size: 18))
-                      : const Tab(text: 'Ca làm'),
-                  isCompactMobile
                       ? const Tab(icon: Icon(Icons.emoji_events_rounded, size: 18))
                       : const Tab(text: 'Xếp hạng'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.calendar_month_rounded, size: 18))
-                      : const Tab(text: 'Lịch'),
-                  isCompactMobile
-                      ? const Tab(icon: Icon(Icons.access_time_rounded, size: 18))
-                      : const Tab(text: 'Giờ công'),
                 ],
               ),
             ),
@@ -141,23 +132,18 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 children: [
                   SingleChildScrollView(
                     padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                    child: _buildAttendancePanel(provider, canManage),
-                  ),
-                  SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                    child: _buildShiftPanel(provider),
+                    child: Column(
+                      children: [
+                        _buildAttendancePanel(provider, canManage),
+                        _buildShiftPanel(provider),
+                        _buildSchedulePanel(provider, canManage),
+                        _buildHoursReportPanel(provider, canManage),
+                      ],
+                    ),
                   ),
                   SingleChildScrollView(
                     padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
                     child: _buildRankPanel(provider),
-                  ),
-                  SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                    child: _buildSchedulePanel(provider, canManage),
-                  ),
-                  SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                    child: _buildHoursReportPanel(provider, canManage),
                   ),
                 ],
               ),
@@ -738,48 +724,23 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   }
 
   Widget _buildHoursReportPanel(EmployeeProvider provider, bool canManage) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _buildHoursReportSection(provider, canManage),
-      ],
+    final now = DateTime.now();
+    final monthLabel = 'Tháng ${now.month}/${now.year}';
+    final title = canManage
+        ? 'Bảng giờ công nhân viên · $monthLabel'
+        : 'Giờ công của tôi · $monthLabel';
+    return DataPanel(
+      title: title,
+      child: _buildHoursReportSection(provider, canManage),
     );
   }
 
   Widget _buildHoursReportSection(EmployeeProvider provider, bool canManage) {
     final rows = provider.hoursReportRows;
     final isMobile = MediaQuery.of(context).size.width < 600;
-    final now = DateTime.now();
-    final monthLabel = 'Tháng ${now.month}/${now.year}';
-    final title = canManage
-        ? 'Bảng giờ công nhân viên · $monthLabel'
-        : 'Giờ công của tôi · $monthLabel';
 
     if (rows.isEmpty) {
-      return Container(
-        padding: EdgeInsets.all(isMobile ? 10 : 14),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.access_time_filled_rounded, size: 18, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(title,
-                      style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text('Chưa có dữ liệu trong tháng', style: AppTextStyles.caption),
-          ],
-        ),
-      );
+      return Text('Chưa có dữ liệu trong tháng', style: AppTextStyles.caption);
     }
 
     Widget headerCell(String text, {double? width, TextAlign align = TextAlign.left}) {
@@ -806,50 +767,30 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       );
     }
 
-    return Container(
-      padding: EdgeInsets.all(isMobile ? 10 : 14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    if (isMobile) {
+      return Column(
+        children: rows.map((r) => _buildHoursReportMobileCard(r)).toList(),
+      );
+    }
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              const Icon(Icons.access_time_filled_rounded, size: 18, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(title,
-                    style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700)),
-              ),
-            ],
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                headerCell('Nhân viên', width: 150),
+                headerCell('Ngày', width: 50, align: TextAlign.center),
+                headerCell('Giờ', width: 60, align: TextAlign.center),
+                headerCell('Muộn', width: 70, align: TextAlign.center),
+                headerCell('Về sớm', width: 80, align: TextAlign.center),
+                headerCell('OT', width: 60, align: TextAlign.center),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
-          if (isMobile)
-            Column(
-              children: rows.map((r) => _buildHoursReportMobileCard(r)).toList(),
-            )
-          else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      children: [
-                        headerCell('Nhân viên', width: 150),
-                        headerCell('Ngày', width: 50, align: TextAlign.center),
-                        headerCell('Giờ', width: 60, align: TextAlign.center),
-                        headerCell('Muộn', width: 70, align: TextAlign.center),
-                        headerCell('Về sớm', width: 80, align: TextAlign.center),
-                        headerCell('OT', width: 60, align: TextAlign.center),
-                      ],
-                    ),
-                  ),
-                  ...rows.map((r) {
+          ...rows.map((r) {
                     final name = (r['fullName'] ?? '').toString();
                     final daysWorked = (r['daysWorked'] ?? 0).toString();
                     final totalHours = (r['totalHours'] ?? 0).toString();
@@ -862,7 +803,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                       margin: const EdgeInsets.only(bottom: 4),
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.white,
+                        color: AppColors.surfaceVariant,
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -892,10 +833,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   }),
                 ],
               ),
-            ),
-        ],
-      ),
-    );
+            );
   }
 
   Widget _buildHoursReportMobileCard(Map<String, dynamic> r) {
@@ -930,7 +868,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.white,
+        color: AppColors.surfaceVariant,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
