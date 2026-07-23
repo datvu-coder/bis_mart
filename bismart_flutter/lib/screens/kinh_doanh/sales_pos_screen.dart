@@ -17,8 +17,9 @@ import 'create_order_screen.dart';
 /// Máy in (printer) settings live under Cá nhân, not this tab.
 ///
 /// Embedded directly as a tab inside Kinh doanh's TabBarView (no own
-/// Scaffold/AppBar) — keeps search text and the Sản phẩm/Lịch sử toggle
-/// alive across tab switches via AutomaticKeepAliveClientMixin.
+/// Scaffold/AppBar) — keeps search text alive across tab switches via
+/// AutomaticKeepAliveClientMixin. Sales history is reached via the history
+/// action button next to search rather than its own toggle/tab.
 class SalesPosScreen extends StatefulWidget {
   const SalesPosScreen({super.key});
 
@@ -33,7 +34,6 @@ class _SalesPosScreenState extends State<SalesPosScreen>
 
   static const _groups = ['Tất cả', 'DELI', 'DELIMIL', 'AUMIL', 'GOODLIFE', 'TP'];
 
-  bool _showHistory = false;
   final _searchCtrl = TextEditingController();
 
   @override
@@ -66,6 +66,39 @@ class _SalesPosScreenState extends State<SalesPosScreen>
     if (mounted) context.read<SalesProvider>().loadReports();
   }
 
+  void _showSalesHistory() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final mq = MediaQuery.of(ctx);
+        final isMobile = mq.size.width < 600;
+        final dialogWidth = isMobile ? mq.size.width - 4 : 500.0;
+        final dialogHeight = isMobile ? mq.size.height * 0.75 : 500.0;
+        return AlertDialog(
+          insetPadding: const EdgeInsets.all(2),
+          contentPadding:
+              EdgeInsets.fromLTRB(isMobile ? 4 : 16, 12, isMobile ? 4 : 16, 8),
+          titlePadding: EdgeInsets.fromLTRB(
+              isMobile ? 16 : 24, 14, isMobile ? 16 : 24, 0),
+          title: const Text('Lịch sử bán hàng'),
+          content: SizedBox(
+            width: dialogWidth,
+            height: dialogHeight,
+            child: _SalesHistoryList(
+              onRefresh: () => context.read<SalesProvider>().loadReports(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đóng'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // required by AutomaticKeepAliveClientMixin
@@ -77,98 +110,91 @@ class _SalesPosScreenState extends State<SalesPosScreen>
         Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-              child: _HistoryToggle(
-                showHistory: _showHistory,
-                onChanged: (v) => setState(() => _showHistory = v),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) => productProvider.setSearch(v),
+                decoration: AppDecorations.searchField(
+                  'Tìm sản phẩm...',
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.history_rounded, size: 20),
+                        tooltip: 'Lịch sử bán hàng',
+                        onPressed: _showSalesHistory,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.add_box_outlined, size: 20),
+                        tooltip: 'Thêm sản phẩm',
+                        onPressed: () => showAddProductDialog(context),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
+            SizedBox(
+              height: 32,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                scrollDirection: Axis.horizontal,
+                itemCount: _groups.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (context, i) {
+                  final group = _groups[i];
+                  final isSelected = productProvider.selectedGroup == group;
+                  return ChoiceChip(
+                    label: Text(group),
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                    labelStyle: TextStyle(
+                      color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    selected: isSelected,
+                    selectedColor: AppColors.primaryLight,
+                    side: BorderSide(
+                      color: isSelected ? AppColors.primary.withValues(alpha: 0.4) : AppColors.border,
+                    ),
+                    onSelected: (_) => productProvider.setGroup(group),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 6),
             Expanded(
-              child: _showHistory
-                  ? _SalesHistoryList(
-                      onRefresh: () => context.read<SalesProvider>().loadReports(),
-                    )
-                  : Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-                          child: TextField(
-                            controller: _searchCtrl,
-                            onChanged: (v) => productProvider.setSearch(v),
-                            decoration: AppDecorations.searchField(
-                              'Tìm sản phẩm...',
-                              suffixIcon: IconButton(
-                                icon: const Icon(Icons.add_box_outlined, size: 20),
-                                tooltip: 'Thêm sản phẩm',
-                                onPressed: () => showAddProductDialog(context),
+              child: productProvider.isLoading && products.isEmpty
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                  : products.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.inventory_2_outlined, size: 40, color: AppColors.textHint),
+                              const SizedBox(height: 8),
+                              Text('Không có sản phẩm phù hợp', style: AppTextStyles.caption),
+                            ],
+                          ),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 84),
+                          child: Container(
+                            decoration: AppDecorations.card,
+                            clipBehavior: Clip.antiAlias,
+                            child: ListView.separated(
+                              itemCount: products.length,
+                              separatorBuilder: (_, __) => const Divider(
+                                height: 1,
+                                indent: 14,
+                                endIndent: 14,
+                                color: AppColors.divider,
                               ),
+                              itemBuilder: (context, i) => _ProductDisplayTile(product: products[i]),
                             ),
                           ),
                         ),
-                        SizedBox(
-                          height: 32,
-                          child: ListView.separated(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _groups.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 6),
-                            itemBuilder: (context, i) {
-                              final group = _groups[i];
-                              final isSelected = productProvider.selectedGroup == group;
-                              return ChoiceChip(
-                                label: Text(group),
-                                labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                                labelStyle: TextStyle(
-                                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                visualDensity: VisualDensity.compact,
-                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                selected: isSelected,
-                                selectedColor: AppColors.primaryLight,
-                                side: BorderSide(
-                                  color: isSelected ? AppColors.primary.withValues(alpha: 0.4) : AppColors.border,
-                                ),
-                                onSelected: (_) => productProvider.setGroup(group),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Expanded(
-                          child: productProvider.isLoading && products.isEmpty
-                              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-                              : products.isEmpty
-                                  ? Center(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.inventory_2_outlined, size: 40, color: AppColors.textHint),
-                                          const SizedBox(height: 8),
-                                          Text('Không có sản phẩm phù hợp', style: AppTextStyles.caption),
-                                        ],
-                                      ),
-                                    )
-                                  : Padding(
-                                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 84),
-                                      child: Container(
-                                        decoration: AppDecorations.card,
-                                        clipBehavior: Clip.antiAlias,
-                                        child: ListView.separated(
-                                          itemCount: products.length,
-                                          separatorBuilder: (_, __) => const Divider(
-                                            height: 1,
-                                            indent: 14,
-                                            endIndent: 14,
-                                            color: AppColors.divider,
-                                          ),
-                                          itemBuilder: (context, i) => _ProductDisplayTile(product: products[i]),
-                                        ),
-                                      ),
-                                    ),
-                        ),
-                      ],
-                    ),
             ),
           ],
         ),
@@ -203,80 +229,6 @@ class _SalesPosScreenState extends State<SalesPosScreen>
             ),
           ),
       ],
-    );
-  }
-}
-
-/// Compact sliding segmented control, matching the pill style used for the
-/// tab selector elsewhere in the app (see WeightedTabSelector) so this
-/// secondary toggle still reads as "the same app".
-class _HistoryToggle extends StatelessWidget {
-  final bool showHistory;
-  final ValueChanged<bool> onChanged;
-
-  const _HistoryToggle({required this.showHistory, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 36,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Stack(
-        children: [
-          AnimatedAlign(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            alignment: showHistory ? Alignment.centerRight : Alignment.centerLeft,
-            child: FractionallySizedBox(
-              widthFactor: 0.5,
-              heightFactor: 1,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 4, offset: const Offset(0, 1))],
-                ),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              Expanded(
-                child: _segment('Sản phẩm', Icons.inventory_2_outlined, !showHistory, () => onChanged(false)),
-              ),
-              Expanded(
-                child: _segment('Lịch sử', Icons.history_rounded, showHistory, () => onChanged(true)),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _segment(String label, IconData icon, bool selected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(15),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 15, color: selected ? AppColors.primary : AppColors.textSecondary),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: selected ? AppColors.primary : AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
