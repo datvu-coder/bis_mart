@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/lesson.dart';
-import '../common/header_action_cluster.dart';
 
 /// Compact, mobile-first lesson card with progress bar.
 /// - Whole card is tappable (Tham gia học).
@@ -120,23 +119,19 @@ class LessonCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (onEdit != null || onDelete != null)
-              HeaderActionCluster(
-                actions: [
-                  if (onEdit != null)
-                    HeaderAction(
-                      icon: Icons.edit_rounded,
-                      label: 'Sửa',
-                      onPressed: onEdit!,
-                    ),
-                  if (onDelete != null)
-                    HeaderAction(
-                      icon: Icons.delete_rounded,
-                      label: 'Xoá',
-                      color: AppColors.error,
-                      onPressed: onDelete!,
-                    ),
-                ],
+            if (onEdit != null)
+              IconButton(
+                icon: const Icon(Icons.edit_rounded, size: 18),
+                tooltip: 'Sửa',
+                visualDensity: VisualDensity.compact,
+                onPressed: onEdit,
+              ),
+            if (onDelete != null)
+              IconButton(
+                icon: const Icon(Icons.delete_rounded, size: 18, color: AppColors.error),
+                tooltip: 'Xoá',
+                visualDensity: VisualDensity.compact,
+                onPressed: onDelete,
               ),
           ],
         ),

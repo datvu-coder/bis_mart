@@ -8,7 +8,6 @@ import '../../models/lesson.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/training_provider.dart';
 import '../../services/api_service.dart';
-import '../../widgets/common/header_action_cluster.dart';
 import 'lesson_quiz_screen.dart';
 import 'lesson_history_screen.dart';
 import 'lesson_video_player.dart';
@@ -316,17 +315,20 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
                     ),
                   ),
                   if (_isAdmin)
-                    HeaderActionCluster(
-                      actions: [
-                        HeaderAction(
-                          icon: Icons.edit_rounded,
-                          label: 'Sửa phần',
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit_rounded, size: 18),
+                          tooltip: 'Sửa phần',
+                          visualDensity: VisualDensity.compact,
                           onPressed: () => _editPart(part),
                         ),
-                        HeaderAction(
-                          icon: Icons.delete_rounded,
-                          label: 'Xoá phần',
-                          color: AppColors.error,
+                        IconButton(
+                          icon: const Icon(Icons.delete_rounded,
+                              size: 18, color: AppColors.error),
+                          tooltip: 'Xoá phần',
+                          visualDensity: VisualDensity.compact,
                           onPressed: () => _deletePart(part),
                         ),
                       ],

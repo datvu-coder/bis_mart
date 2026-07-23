@@ -15,7 +15,6 @@ import '../../services/api_service.dart';
 import '../../services/export_service_stub.dart'
     if (dart.library.html) '../../services/export_service_web.dart';
 import '../../widgets/common/responsive_form.dart';
-import '../../widgets/common/header_action_cluster.dart';
 
 class PhanQuyenScreen extends StatefulWidget {
   const PhanQuyenScreen({super.key});
@@ -377,22 +376,26 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis),
               ),
-              if (canEditPermissions)
-                HeaderActionCluster(
-                  actions: [
-                    HeaderAction(
-                      icon: Icons.edit_outlined,
-                      label: 'Sửa',
-                      onPressed: () => _showEditPermissionDialog(perm),
-                    ),
-                    HeaderAction(
-                      icon: Icons.delete_outline_rounded,
-                      label: 'Xoá',
-                      color: AppColors.error,
-                      onPressed: () => _deletePermission(perm.position),
-                    ),
-                  ],
+              if (canEditPermissions) ...[
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  icon: const Icon(Icons.edit_outlined,
+                      size: 17, color: AppColors.primary),
+                  tooltip: 'Sửa',
+                  onPressed: () => _showEditPermissionDialog(perm),
                 ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      size: 17, color: AppColors.error),
+                  tooltip: 'Xoá',
+                  onPressed: () => _deletePermission(perm.position),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 8),
@@ -824,38 +827,40 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                   fontSize: 11),
             ),
           ),
-          if (canManageAssignments)
-            HeaderActionCluster(
-              actions: [
-                HeaderAction(
-                  icon: Icons.edit_rounded,
-                  label: 'Đổi chức vụ',
-                  onPressed: () => _showEditRoleDialog(a),
-                ),
-                HeaderAction(
-                  icon: Icons.delete_rounded,
-                  label: 'Xoá phân công',
-                  color: AppColors.error,
-                  onPressed: () async {
-                    try {
-                      await _api.deleteStoreManager(a['id'] as int);
-                      await _loadAssignments();
-                      await _refreshCurrentUserPermissions();
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                          content: Text('Xoá phân công thất bại: $e'),
-                          behavior: SnackBarBehavior.floating,
-                          backgroundColor: AppColors.error,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ));
-                      }
-                    }
-                  },
-                ),
-              ],
+          if (canManageAssignments) ...[
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              icon: const Icon(Icons.edit_rounded, size: 16, color: AppColors.primary),
+              tooltip: 'Đổi chức vụ',
+              onPressed: () => _showEditRoleDialog(a),
             ),
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              icon: const Icon(Icons.delete_rounded, size: 16, color: AppColors.error),
+              tooltip: 'Xoá phân công',
+              onPressed: () async {
+                try {
+                  await _api.deleteStoreManager(a['id'] as int);
+                  await _loadAssignments();
+                  await _refreshCurrentUserPermissions();
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Xoá phân công thất bại: $e'),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: AppColors.error,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                    ));
+                  }
+                }
+              },
+            ),
+          ],
         ],
       ),
     );
