@@ -44,12 +44,12 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
               actions: [
                 HeaderAction(
                   icon: Icons.edit_rounded,
-                  tooltip: 'Sửa',
+                  label: 'Sửa',
                   onPressed: () => _showEditDialog(),
                 ),
                 HeaderAction(
                   icon: Icons.delete_outline_rounded,
-                  tooltip: 'Xóa',
+                  label: 'Xóa',
                   color: AppColors.error,
                   onPressed: () => _confirmDelete(),
                 ),

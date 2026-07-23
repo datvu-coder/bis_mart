@@ -198,12 +198,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
               actions: [
                 HeaderAction(
                   icon: Icons.bar_chart_rounded,
-                  tooltip: 'Biểu đồ',
+                  label: 'Biểu đồ',
                   onPressed: () => _openChartsScreen(data),
                 ),
                 HeaderAction(
                   icon: Icons.emoji_events_rounded,
-                  tooltip: 'Xếp hạng',
+                  label: 'Xếp hạng',
                   onPressed: () => _openRankingScreen(data),
                 ),
               ],

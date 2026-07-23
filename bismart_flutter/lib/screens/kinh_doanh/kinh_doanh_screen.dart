@@ -229,7 +229,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       actions: [
         HeaderAction(
           icon: Icons.description_rounded,
-          tooltip: 'Báo cáo',
+          label: 'Báo cáo',
           onPressed: _openReportsScreen,
         ),
       ],
