@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/lesson.dart';
+import '../common/header_action_cluster.dart';
 
 /// Compact, mobile-first lesson card with progress bar.
 /// - Whole card is tappable (Tham gia học).
@@ -120,34 +121,20 @@ class LessonCard extends StatelessWidget {
               ),
             ),
             if (onEdit != null || onDelete != null)
-              PopupMenuButton<String>(
-                padding: EdgeInsets.zero,
-                icon: const Icon(Icons.more_horiz_rounded,
-                    size: 18, color: AppColors.textGrey),
-                onSelected: (v) {
-                  if (v == 'edit') onEdit?.call();
-                  if (v == 'delete') onDelete?.call();
-                },
-                itemBuilder: (_) => [
+              HeaderActionCluster(
+                actions: [
                   if (onEdit != null)
-                    const PopupMenuItem(
-                      value: 'edit',
-                      height: 36,
-                      child: Row(children: [
-                        Icon(Icons.edit_rounded, size: 16),
-                        SizedBox(width: 8),
-                        Text('Sửa'),
-                      ]),
+                    HeaderAction(
+                      icon: Icons.edit_rounded,
+                      label: 'Sửa',
+                      onPressed: onEdit!,
                     ),
                   if (onDelete != null)
-                    const PopupMenuItem(
-                      value: 'delete',
-                      height: 36,
-                      child: Row(children: [
-                        Icon(Icons.delete_rounded, size: 16, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('Xoá', style: TextStyle(color: Colors.red)),
-                      ]),
+                    HeaderAction(
+                      icon: Icons.delete_rounded,
+                      label: 'Xoá',
+                      color: AppColors.error,
+                      onPressed: onDelete!,
                     ),
                 ],
               ),

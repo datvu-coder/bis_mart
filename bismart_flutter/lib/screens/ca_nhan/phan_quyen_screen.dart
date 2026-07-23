@@ -825,34 +825,35 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
             ),
           ),
           if (canManageAssignments)
-            PopupMenuButton<String>(
-              padding: EdgeInsets.zero,
-              icon: const Icon(Icons.more_vert_rounded,
-                  size: 16, color: AppColors.textGrey),
-              onSelected: (v) async {
-                if (v == 'edit') {
-                  _showEditRoleDialog(a);
-                } else if (v == 'delete') {
-                  try {
-                    await _api.deleteStoreManager(a['id'] as int);
-                    await _loadAssignments();
-                    await _refreshCurrentUserPermissions();
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text('Xoá phân công thất bại: $e'),
-                        behavior: SnackBarBehavior.floating,
-                        backgroundColor: AppColors.error,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ));
+            HeaderActionCluster(
+              actions: [
+                HeaderAction(
+                  icon: Icons.edit_rounded,
+                  label: 'Đổi chức vụ',
+                  onPressed: () => _showEditRoleDialog(a),
+                ),
+                HeaderAction(
+                  icon: Icons.delete_rounded,
+                  label: 'Xoá phân công',
+                  color: AppColors.error,
+                  onPressed: () async {
+                    try {
+                      await _api.deleteStoreManager(a['id'] as int);
+                      await _loadAssignments();
+                      await _refreshCurrentUserPermissions();
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                          content: Text('Xoá phân công thất bại: $e'),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: AppColors.error,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ));
+                      }
                     }
-                  }
-                }
-              },
-              itemBuilder: (ctx) => const [
-                PopupMenuItem(value: 'edit', child: Text('Đổi chức vụ')),
-                PopupMenuItem(value: 'delete', child: Text('Xoá phân công')),
+                  },
+                ),
               ],
             ),
         ],

@@ -283,10 +283,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
           : null,
       trailing: canManageAi
-          ? TextButton.icon(
-              onPressed: _showAddAiAssistantDialog,
-              icon: const Icon(Icons.add_rounded, size: 16),
-              label: const Text('Thêm AI'),
+          ? HeaderActionCluster(
+              actions: [
+                HeaderAction(
+                  icon: Icons.add_rounded,
+                  label: 'Thêm AI',
+                  onPressed: _showAddAiAssistantDialog,
+                ),
+              ],
             )
           : null,
       child: aiTools.isEmpty
@@ -519,10 +523,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       title: 'Bài giảng',
       padding: panelPadding,
       trailing: isAdmin
-          ? TextButton.icon(
-              onPressed: () => _showCreateLessonDialog(provider),
-              icon: const Icon(Icons.add_rounded, size: 16),
-              label: const Text('Thêm bài giảng'),
+          ? HeaderActionCluster(
+              actions: [
+                HeaderAction(
+                  icon: Icons.add_rounded,
+                  label: 'Thêm bài giảng',
+                  onPressed: () => _showCreateLessonDialog(provider),
+                ),
+              ],
             )
           : null,
       child: provider.lessons.isEmpty
@@ -580,10 +588,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       padding: isMobile
           ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
           : null,
-      trailing: TextButton.icon(
-        onPressed: () => _showAddEventDialog(provider),
-        icon: const Icon(Icons.add_rounded, size: 16),
-        label: const Text('Thêm'),
+      trailing: HeaderActionCluster(
+        actions: [
+          HeaderAction(
+            icon: Icons.add_rounded,
+            label: 'Thêm sự kiện',
+            onPressed: () => _showAddEventDialog(provider),
+          ),
+        ],
       ),
       child: Column(
         children: [
