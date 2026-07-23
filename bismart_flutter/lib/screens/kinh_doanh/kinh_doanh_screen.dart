@@ -16,6 +16,7 @@ import '../../services/export_service.dart';
 import 'sales_pos_screen.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
+import '../../widgets/common/gradient_fab.dart';
 
 class KinhDoanhScreen extends StatefulWidget {
   const KinhDoanhScreen({super.key});
@@ -197,18 +198,35 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 controller: _tabController,
                 children: [
                   const SalesPosScreen(),
-                  SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                    child: Column(
-                      children: [
-                        _buildFilterPanel(provider),
-                        const SizedBox(height: 16),
-                        _buildReportList(provider),
-                        _buildTopPgPanel(provider),
-                        const SizedBox(height: 12),
-                        _buildStoreRevenuePanel(provider),
-                      ],
-                    ),
+                  Stack(
+                    children: [
+                      SingleChildScrollView(
+                        padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 84),
+                        child: Column(
+                          children: [
+                            _buildFilterPanel(provider),
+                            const SizedBox(height: 16),
+                            _buildReportList(provider),
+                            _buildTopPgPanel(provider),
+                            const SizedBox(height: 12),
+                            _buildStoreRevenuePanel(provider),
+                          ],
+                        ),
+                      ),
+                      Positioned(
+                        right: 16,
+                        bottom: 16,
+                        child: SafeArea(
+                          top: false,
+                          child: GradientFab(
+                            icon: Icons.add_rounded,
+                            tooltip: AppStrings.taoPhieuBaoCao,
+                            onPressed: () => Navigator.pushNamed(
+                                context, AppRoutes.createReport),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -241,31 +259,13 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isCompactMobile) ...[
-            Row(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
-                      const SizedBox(height: 2),
-                      Text('Báo cáo bán hàng & thống kê doanh thu',
-                          style: AppTextStyles.caption),
-                    ],
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () =>
-                      Navigator.pushNamed(context, AppRoutes.createReport),
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text(AppStrings.taoPhieuBaoCao),
-                  style: ElevatedButton.styleFrom(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    textStyle:
-                        const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                  ),
-                ),
+                Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
+                const SizedBox(height: 2),
+                Text('Báo cáo bán hàng & thống kê doanh thu',
+                    style: AppTextStyles.caption),
               ],
             ),
             const SizedBox(height: 12),
@@ -363,20 +363,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       padding: isMobile
           ? const EdgeInsets.fromLTRB(0, 14, 0, 18)
           : null,
-      trailing: TextButton.icon(
-        onPressed: () =>
-            Navigator.pushNamed(context, AppRoutes.createReport),
-        icon: const Icon(Icons.add_rounded, size: 16),
-        label: const Text(AppStrings.taoPhieuBaoCao),
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          textStyle: const TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w700),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
-        ),
-      ),
       child: reports.isEmpty
           ? Padding(
               padding: const EdgeInsets.all(20),
