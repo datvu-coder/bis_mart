@@ -3,6 +3,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../models/community_post.dart';
+import '../common/header_action_cluster.dart';
 
 /// A polished social post card. The card has a soft shadow + rounded corners
 /// and renders any combination of text / images (1, 2, 3 or 4+ in a grid) /
@@ -159,42 +160,22 @@ class SocialPostCard extends StatelessWidget {
             ),
           ),
           if (onEdit != null || onDelete != null)
-            PopupMenuButton<String>(
-              tooltip: 'Tùy chọn',
-              icon: const Icon(Icons.more_horiz_rounded,
-                  color: AppColors.textGrey, size: 22),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              onSelected: (value) {
-                if (value == 'edit') onEdit?.call();
-                if (value == 'delete') onDelete?.call();
-              },
-              itemBuilder: (context) {
-                final items = <PopupMenuEntry<String>>[];
-                if (onEdit != null) {
-                  items.add(const PopupMenuItem<String>(
-                    value: 'edit',
-                    child: Row(children: [
-                      Icon(Icons.edit_rounded, size: 18),
-                      SizedBox(width: 10),
-                      Text('Sửa bài viết'),
-                    ]),
-                  ));
-                }
-                if (onDelete != null) {
-                  items.add(const PopupMenuItem<String>(
-                    value: 'delete',
-                    child: Row(children: [
-                      Icon(Icons.delete_rounded,
-                          size: 18, color: AppColors.error),
-                      SizedBox(width: 10),
-                      Text('Xóa bài viết',
-                          style: TextStyle(color: AppColors.error)),
-                    ]),
-                  ));
-                }
-                return items;
-              },
+            HeaderActionCluster(
+              actions: [
+                if (onEdit != null)
+                  HeaderAction(
+                    icon: Icons.edit_rounded,
+                    label: 'Sửa bài viết',
+                    onPressed: onEdit!,
+                  ),
+                if (onDelete != null)
+                  HeaderAction(
+                    icon: Icons.delete_rounded,
+                    label: 'Xóa bài viết',
+                    color: AppColors.error,
+                    onPressed: onDelete!,
+                  ),
+              ],
             ),
         ],
       ),

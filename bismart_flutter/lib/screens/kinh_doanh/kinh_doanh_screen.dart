@@ -488,19 +488,14 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                   ),
                 ),
                 const SizedBox(width: 8),
-                TextButton.icon(
-                  onPressed: () => _openFilterSheet(provider),
-                  icon: const Icon(Icons.tune_rounded, size: 16),
-                  label: const Text('Điều chỉnh'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 8),
-                    textStyle: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w700),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                  ),
+                HeaderActionCluster(
+                  actions: [
+                    HeaderAction(
+                      icon: Icons.tune_rounded,
+                      label: 'Điều chỉnh',
+                      onPressed: () => _openFilterSheet(provider),
+                    ),
+                  ],
                 ),
               ],
             ),

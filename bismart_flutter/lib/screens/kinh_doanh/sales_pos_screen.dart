@@ -120,14 +120,14 @@ class _SalesPosScreenState extends State<SalesPosScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.history_rounded, size: 20),
-                        tooltip: 'Lịch sử bán hàng',
-                        onPressed: _showSalesHistory,
-                      ),
-                      IconButton(
                         icon: const Icon(Icons.add_box_outlined, size: 20),
                         tooltip: 'Thêm sản phẩm',
                         onPressed: () => showAddProductDialog(context),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.history_rounded, size: 20),
+                        tooltip: 'Lịch sử bán hàng',
+                        onPressed: _showSalesHistory,
                       ),
                     ],
                   ),

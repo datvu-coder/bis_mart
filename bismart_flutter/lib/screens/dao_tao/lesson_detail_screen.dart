@@ -8,6 +8,7 @@ import '../../models/lesson.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/training_provider.dart';
 import '../../services/api_service.dart';
+import '../../widgets/common/header_action_cluster.dart';
 import 'lesson_quiz_screen.dart';
 import 'lesson_history_screen.dart';
 import 'lesson_video_player.dart';
@@ -315,19 +316,19 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
                     ),
                   ),
                   if (_isAdmin)
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_horiz_rounded,
-                          color: AppColors.textGrey),
-                      onSelected: (v) {
-                        if (v == 'edit') _editPart(part);
-                        if (v == 'delete') _deletePart(part);
-                      },
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(value: 'edit', child: Text('Sửa phần')),
-                        PopupMenuItem(
-                            value: 'delete',
-                            child: Text('Xoá phần',
-                                style: TextStyle(color: Colors.red))),
+                    HeaderActionCluster(
+                      actions: [
+                        HeaderAction(
+                          icon: Icons.edit_rounded,
+                          label: 'Sửa phần',
+                          onPressed: () => _editPart(part),
+                        ),
+                        HeaderAction(
+                          icon: Icons.delete_rounded,
+                          label: 'Xoá phần',
+                          color: AppColors.error,
+                          onPressed: () => _deletePart(part),
+                        ),
                       ],
                     )
                   else
