@@ -17,6 +17,7 @@ import '../../services/api_service.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/responsive_form.dart';
+import '../../widgets/common/header_action_cluster.dart';
 import '../../widgets/cards/lesson_card.dart';
 import '../../widgets/cards/social_post_card.dart';
 import 'package:bismart_flutter/models/community_post.dart';
@@ -55,28 +56,20 @@ class DaoTaoScreen extends StatefulWidget {
 }
 
 class _DaoTaoScreenState extends State<DaoTaoScreen>
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TrainingProvider>().loadTrainingData();
       context.read<LmsProvider>().loadAiTools();
     });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   @override
@@ -85,9 +78,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
-    // Matches Tổng quan's own threshold for its TabBar's icon-only fallback,
-    // so both screens switch between text/icon tabs at the same width.
-    final isCompactMobile = screenWidth < 390;
     final isWide = isDesktop || isTablet;
     final authProvider = context.watch<AuthProvider>();
     final canManageAi = _isTmkAccount(authProvider.currentUser?.position);
@@ -103,52 +93,22 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         final hPad = isWide ? (isDesktop ? 32.0 : 24.0) : 16.0;
         final contentPad = isWide ? hPad : 16.0;
 
-        // Tab layout for all screen sizes
         final body = Column(
             children: [
               Padding(
                 padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
                 child: _buildScreenHeader(provider, isWide),
               ),
-              Container(
-                color: AppColors.white,
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: AppColors.primary,
-                  unselectedLabelColor: AppColors.textHint,
-                  indicatorColor: AppColors.primary,
-                  indicatorWeight: 3,
-                  labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-                  unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
-                  tabs: [
-                    isCompactMobile
-                        ? const Tab(icon: Icon(Icons.forum_rounded, size: 18))
-                        : const Tab(text: 'Cộng đồng'),
-                    isCompactMobile
-                        ? const Tab(icon: Icon(Icons.play_lesson_rounded, size: 18))
-                        : const Tab(text: 'Bài giảng'),
-                  ],
-                ),
-              ),
               Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                      child: _buildCommunityPanel(provider),
-                    ),
-                    SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(contentPad, 12, contentPad, 12),
-                      child: Column(
-                        children: [
-                          _buildLessonPanel(provider),
-                          _buildSchedulePanel(provider),
-                          _buildAiAssistantPanel(canManageAi),
-                        ],
-                      ),
-                    ),
-                  ],
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(contentPad, 2, contentPad, 12),
+                  child: Column(
+                    children: [
+                      _buildLessonPanel(provider),
+                      _buildSchedulePanel(provider),
+                      _buildAiAssistantPanel(canManageAi),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -158,15 +118,52 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     );
   }
 
+  void _openCommunityScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Cộng đồng')),
+          body: Consumer<TrainingProvider>(
+            builder: (context, provider, _) => SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _buildCommunityPanel(provider),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Header ────────────────────────────────────────────────────────────────
 
   Widget _buildScreenHeader(TrainingProvider provider, bool emphasize) {
     final lessonCount = provider.lessons.length;
     final todayEvents = provider.getEventsForDay(DateTime.now()).length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
-    // Nothing left worth showing on phones once the icon/KPI numbers are
-    // gone — collapse the header entirely instead of an empty bordered card.
-    if (isCompactMobile) return const SizedBox.shrink();
+    final communityAction = HeaderActionCluster(
+      actions: [
+        HeaderAction(
+          icon: Icons.forum_rounded,
+          tooltip: 'Cộng đồng',
+          onPressed: _openCommunityScreen,
+        ),
+      ],
+    );
+
+    // Phones keep just the title + community action — the KPI chips already
+    // dropped their icons/numbers there, so a full card adds nothing.
+    if (isCompactMobile) {
+      return Row(
+        children: [
+          Expanded(
+            child: Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
+          ),
+          communityAction,
+        ],
+      );
+    }
 
     return Container(
       width: double.infinity,
@@ -188,6 +185,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   ],
                 ),
               ),
+              communityAction,
             ],
           ),
           const SizedBox(height: 12),
