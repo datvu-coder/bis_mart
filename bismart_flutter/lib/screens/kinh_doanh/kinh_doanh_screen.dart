@@ -14,6 +14,7 @@ import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/export_service.dart';
 import 'sales_pos_screen.dart';
+import 'create_order_screen.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/gradient_fab.dart';
@@ -170,6 +171,15 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     );
   }
 
+  Future<void> _openCreateOrder() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const CreateOrderScreen()),
+    );
+    // A new order may have been saved while Bán hàng wasn't visible;
+    // refresh the history list on return.
+    if (mounted) context.read<SalesProvider>().loadReports();
+  }
+
   void _openReportsScreen() {
     Navigator.push(
       context,
@@ -234,8 +244,13 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
         ),
       ],
     );
+    final createOrderAction = IconButton(
+      onPressed: _openCreateOrder,
+      icon: const Icon(Icons.add_shopping_cart_rounded),
+      tooltip: 'Tạo đơn hàng',
+    );
 
-    // Phones keep just the title + reports action — the KPI chips already
+    // Phones keep just the title + actions — the KPI chips already
     // dropped their icons/numbers there, so a full card adds nothing.
     if (isCompactMobile) {
       return Row(
@@ -243,6 +258,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           Expanded(
             child: Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
           ),
+          createOrderAction,
           reportsAction,
         ],
       );
@@ -268,6 +284,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                   ],
                 ),
               ),
+              createOrderAction,
               reportsAction,
             ],
           ),
