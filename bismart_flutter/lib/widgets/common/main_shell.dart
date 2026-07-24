@@ -129,7 +129,7 @@ class _FloatingNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 64,
+      height: 58,
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(28),
@@ -177,7 +177,7 @@ class _FloatingNavItem extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primary.withValues(alpha: 0.16) : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
@@ -189,10 +189,10 @@ class _FloatingNavItem extends StatelessWidget {
                 // Always the bold/filled glyph — inactive tabs differ only
                 // by color, not by a thinner outline icon.
                 item.selectedIcon,
-                size: 21,
+                size: 25,
                 color: isSelected ? AppColors.primary : AppColors.textDark,
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 1),
               Text(
                 item.label,
                 maxLines: 1,
