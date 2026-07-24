@@ -86,12 +86,61 @@ Widget _lookupTile({required IconData icon, required String label, required Void
         padding: const EdgeInsets.symmetric(vertical: 14),
         child: Column(
           children: [
-            Icon(icon, color: AppColors.primary, size: 22),
-            const SizedBox(height: 6),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
+              child: Icon(icon, color: AppColors.primary, size: 18),
+            ),
+            const SizedBox(height: 8),
             Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
           ],
         ),
       ),
+    ),
+  );
+}
+
+/// Compact circular photo picker — docked beside the name/price fields
+/// instead of sitting alone in its own full-width section, so the "Thông
+/// tin sản phẩm" card reads as one balanced block instead of a near-empty
+/// photo card stacked on top of a dense field card.
+Widget _photoPicker({required String? imageDataUrl, required VoidCallback onTap}) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Container(
+          width: 84,
+          height: 84,
+          decoration: BoxDecoration(
+            color: AppColors.surfaceVariant,
+            borderRadius: BorderRadius.circular(AppRadius.row),
+            border: Border.all(color: AppColors.borderLight),
+            image: imageDataUrl != null
+                ? DecorationImage(image: MemoryImage(_decodeDataUrl(imageDataUrl)), fit: BoxFit.cover)
+                : null,
+          ),
+          child: imageDataUrl == null
+              ? const Icon(Icons.inventory_2_outlined, color: AppColors.textHint, size: 26)
+              : null,
+        ),
+        Positioned(
+          right: -4,
+          bottom: -4,
+          child: Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: AppColors.primary,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.white, width: 2.5),
+            ),
+            child: const Icon(Icons.camera_alt_rounded, color: AppColors.white, size: 13),
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -266,6 +315,7 @@ void showAddProductDialog(BuildContext context) {
   showResponsiveForm(
     context: context,
     title: 'Thêm sản phẩm',
+    desktopWidth: 520,
     contentBuilder: (ctx, setDialogState) => Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -322,57 +372,31 @@ void showAddProductDialog(BuildContext context) {
           ),
         ),
         _formSection(
-          title: 'Ảnh sản phẩm',
-          child: Center(
-            child: GestureDetector(
-              onTap: () => showImageSourceSheet(ctx, setDialogState),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 108,
-                    height: 108,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant,
-                      borderRadius: BorderRadius.circular(AppRadius.panel),
-                      border: Border.all(color: AppColors.borderLight),
-                      image: imageDataUrl != null
-                          ? DecorationImage(image: MemoryImage(_decodeDataUrl(imageDataUrl!)), fit: BoxFit.cover)
-                          : null,
-                    ),
-                    child: imageDataUrl == null
-                        ? const Icon(Icons.inventory_2_outlined, color: AppColors.textHint, size: 32)
-                        : null,
-                  ),
-                  Positioned(
-                    right: -4,
-                    bottom: -4,
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.white, width: 2.5),
-                      ),
-                      child: const Icon(Icons.camera_alt_rounded, color: AppColors.white, size: 15),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        _formSection(
           title: 'Thông tin sản phẩm',
           child: Column(
             children: [
-              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên sản phẩm')),
-              const SizedBox(height: 10),
-              TextField(
-                controller: priceCtrl,
-                decoration: const InputDecoration(labelText: 'Giá'),
-                keyboardType: TextInputType.number,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _photoPicker(
+                    imageDataUrl: imageDataUrl,
+                    onTap: () => showImageSourceSheet(ctx, setDialogState),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên sản phẩm')),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: priceCtrl,
+                          decoration: const InputDecoration(labelText: 'Giá'),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
               TextField(
@@ -381,18 +405,26 @@ void showAddProductDialog(BuildContext context) {
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: unit,
-                decoration: const InputDecoration(labelText: 'Đơn vị (đơn vị chuẩn)'),
-                items: _kProductUnits.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                onChanged: (v) => setDialogState(() => unit = v ?? unit),
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: group,
-                decoration: const InputDecoration(labelText: 'Nhóm sản phẩm'),
-                items: _kProductGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                onChanged: (v) => setDialogState(() => group = v ?? group),
+              Row(
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: unit,
+                      decoration: const InputDecoration(labelText: 'Đơn vị chuẩn'),
+                      items: _kProductUnits.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                      onChanged: (v) => setDialogState(() => unit = v ?? unit),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      initialValue: group,
+                      decoration: const InputDecoration(labelText: 'Nhóm'),
+                      items: _kProductGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                      onChanged: (v) => setDialogState(() => group = v ?? group),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
