@@ -34,6 +34,28 @@ Uint8List _decodeDataUrl(String dataUrl) {
 
 String _trimNumber(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
+/// White fill + solid black border, standing out against the Quy đổi
+/// cards' tinted gray background (the app-wide default fill is the same
+/// gray as that card, so a plain TextField there would be invisible).
+InputDecoration _conversionFieldDecoration(String label) => InputDecoration(
+      labelText: label,
+      isDense: true,
+      filled: true,
+      fillColor: AppColors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadius.row),
+        borderSide: const BorderSide(color: Colors.black, width: 1),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadius.row),
+        borderSide: const BorderSide(color: Colors.black, width: 1),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppRadius.row),
+        borderSide: const BorderSide(color: Colors.black, width: 1.5),
+      ),
+    );
+
 /// A titled card grouping one part of the form (lookup, photo, basic info,
 /// quy đổi) so the dialog reads as clear sections instead of one long list
 /// of fields.
@@ -477,15 +499,23 @@ void showAddProductDialog(BuildContext context) {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            TextField(
-                              controller: conversions[i].unitCtrl,
-                              decoration: const InputDecoration(labelText: 'Đơn vị mới', isDense: true),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: conversions[i].priceCtrl,
-                              decoration: const InputDecoration(labelText: 'Giá bán', isDense: true),
-                              keyboardType: TextInputType.number,
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: conversions[i].unitCtrl,
+                                    decoration: _conversionFieldDecoration('Đơn vị mới'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: TextField(
+                                    controller: conversions[i].priceCtrl,
+                                    decoration: _conversionFieldDecoration('Giá bán'),
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
