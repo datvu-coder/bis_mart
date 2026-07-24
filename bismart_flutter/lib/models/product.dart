@@ -1,30 +1,25 @@
-/// One level of a product's "Quy đổi" (unit conversion) chain, e.g.
-/// 6 Hộp = 1 Lốc, 24 Lốc = 1 Thùng. `quantity` is how many of the
-/// *previous* level (the base unit for the first entry) make up one of
-/// this `unit`. `price` is fully custom per level, not derived from the
-/// base price.
+/// One level of a product's "Quy đổi" (unit conversion) chain. The
+/// product's base `unit` is its largest sale unit (e.g. Thùng); each
+/// conversion level is a progressively smaller sale unit (e.g. Lốc, then
+/// Hộp), with its own independently set selling price.
 class ProductConversion {
   final String unit;
-  final double quantity;
   final double price;
 
   const ProductConversion({
     required this.unit,
-    required this.quantity,
     required this.price,
   });
 
   factory ProductConversion.fromJson(Map<String, dynamic> json) {
     return ProductConversion(
       unit: json['unit'] as String? ?? '',
-      quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
       price: (json['price'] as num?)?.toDouble() ?? 0,
     );
   }
 
   Map<String, dynamic> toJson() => {
         'unit': unit,
-        'quantity': quantity,
         'price': price,
       };
 }
