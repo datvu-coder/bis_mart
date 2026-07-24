@@ -8,13 +8,13 @@ import '../../models/product.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sales_provider.dart';
 import '../../widgets/common/add_product_dialog.dart';
-import 'create_order_screen.dart';
 
 /// "Bán hàng" tab: a browsing surface only — the product catalog and recent
 /// sales history. Order composition itself lives in its own dedicated
-/// screen (CreateOrderScreen), reached via the floating "Tạo đơn hàng"
-/// button, so building a cart doesn't compete for space with browsing here.
-/// Máy in (printer) settings live under Cá nhân, not this tab.
+/// screen (CreateOrderScreen), reached via the "Tạo đơn hàng" button in
+/// Kinh doanh's screen header (top-right), so building a cart doesn't
+/// compete for space with browsing here. Máy in (printer) settings live
+/// under Cá nhân, not this tab.
 ///
 /// Embedded directly as a tab inside Kinh doanh's TabBarView (no own
 /// Scaffold/AppBar) — keeps search text alive across tab switches via
@@ -57,15 +57,6 @@ class _SalesPosScreenState extends State<SalesPosScreen>
     super.dispose();
   }
 
-  Future<void> _openCreateOrder() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CreateOrderScreen()),
-    );
-    // A new order may have been saved while this tab wasn't visible;
-    // refresh the history list on return.
-    if (mounted) context.read<SalesProvider>().loadReports();
-  }
-
   void _showSalesHistory() {
     showDialog(
       context: context,
@@ -105,129 +96,95 @@ class _SalesPosScreenState extends State<SalesPosScreen>
     final productProvider = context.watch<ProductProvider>();
     final products = productProvider.filteredProducts;
 
-    return Stack(
+    return Column(
       children: [
-        Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (v) => productProvider.setSearch(v),
-                decoration: AppDecorations.searchField(
-                  'Tìm sản phẩm...',
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.add_box_outlined, size: 20),
-                        tooltip: 'Thêm sản phẩm',
-                        onPressed: () => showAddProductDialog(context),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.history_rounded, size: 20),
-                        tooltip: 'Lịch sử bán hàng',
-                        onPressed: _showSalesHistory,
-                      ),
-                    ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+          child: TextField(
+            controller: _searchCtrl,
+            onChanged: (v) => productProvider.setSearch(v),
+            decoration: AppDecorations.searchField(
+              'Tìm sản phẩm...',
+              suffixIcon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.add_box_outlined, size: 20),
+                    tooltip: 'Thêm sản phẩm',
+                    onPressed: () => showAddProductDialog(context),
                   ),
-                ),
-              ),
-            ),
-            SizedBox(
-              height: 32,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                scrollDirection: Axis.horizontal,
-                itemCount: _groups.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (context, i) {
-                  final group = _groups[i];
-                  final isSelected = productProvider.selectedGroup == group;
-                  return ChoiceChip(
-                    label: Text(group),
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                    labelStyle: TextStyle(
-                      color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    selected: isSelected,
-                    selectedColor: AppColors.primaryLight,
-                    side: BorderSide(
-                      color: isSelected ? AppColors.primary.withValues(alpha: 0.4) : AppColors.border,
-                    ),
-                    onSelected: (_) => productProvider.setGroup(group),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 6),
-            Expanded(
-              child: productProvider.isLoading && products.isEmpty
-                  ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-                  : products.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.inventory_2_outlined, size: 40, color: AppColors.textHint),
-                              const SizedBox(height: 8),
-                              Text('Không có sản phẩm phù hợp', style: AppTextStyles.caption),
-                            ],
-                          ),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.fromLTRB(14, 0, 14, 84),
-                          child: Container(
-                            decoration: AppDecorations.card,
-                            clipBehavior: Clip.antiAlias,
-                            child: ListView.separated(
-                              itemCount: products.length,
-                              separatorBuilder: (_, __) => const Divider(
-                                height: 1,
-                                indent: 14,
-                                endIndent: 14,
-                                color: AppColors.divider,
-                              ),
-                              itemBuilder: (context, i) => _ProductDisplayTile(product: products[i]),
-                            ),
-                          ),
-                        ),
-            ),
-          ],
-        ),
-        Positioned(
-          right: 16,
-          bottom: 16,
-          child: SafeArea(
-            top: false,
-            child: Material(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(28),
-              elevation: 2,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(28),
-                onTap: _openCreateOrder,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 13),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_shopping_cart_rounded, color: Colors.white, size: 18),
-                        SizedBox(width: 8),
-                        Text(
-                          'Tạo đơn hàng',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
-                        ),
-                      ],
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.history_rounded, size: 20),
+                    tooltip: 'Lịch sử bán hàng',
+                    onPressed: _showSalesHistory,
                   ),
-                ),
+                ],
               ),
             ),
           ),
+        ),
+        SizedBox(
+          height: 32,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            scrollDirection: Axis.horizontal,
+            itemCount: _groups.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 6),
+            itemBuilder: (context, i) {
+              final group = _groups[i];
+              final isSelected = productProvider.selectedGroup == group;
+              return ChoiceChip(
+                label: Text(group),
+                labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                labelStyle: TextStyle(
+                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                selected: isSelected,
+                selectedColor: AppColors.primaryLight,
+                side: BorderSide(
+                  color: isSelected ? AppColors.primary.withValues(alpha: 0.4) : AppColors.border,
+                ),
+                onSelected: (_) => productProvider.setGroup(group),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        Expanded(
+          child: productProvider.isLoading && products.isEmpty
+              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+              : products.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.inventory_2_outlined, size: 40, color: AppColors.textHint),
+                          const SizedBox(height: 8),
+                          Text('Không có sản phẩm phù hợp', style: AppTextStyles.caption),
+                        ],
+                      ),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                      child: Container(
+                        decoration: AppDecorations.card,
+                        clipBehavior: Clip.antiAlias,
+                        child: ListView.separated(
+                          itemCount: products.length,
+                          separatorBuilder: (_, __) => const Divider(
+                            height: 1,
+                            indent: 14,
+                            endIndent: 14,
+                            color: AppColors.divider,
+                          ),
+                          itemBuilder: (context, i) => _ProductDisplayTile(product: products[i]),
+                        ),
+                      ),
+                    ),
+        ),
       ],
     );
   }
