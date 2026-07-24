@@ -104,7 +104,7 @@ class _MainShellState extends State<MainShell> {
         top: false,
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
           child: _FloatingNavBar(
             items: _navItems,
             selectedIndex: _selectedIndex,
