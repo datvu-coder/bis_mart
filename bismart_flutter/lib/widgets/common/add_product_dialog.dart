@@ -34,6 +34,68 @@ Uint8List _decodeDataUrl(String dataUrl) {
 
 String _trimNumber(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
 
+/// A titled card grouping one part of the form (lookup, photo, basic info,
+/// quy đổi) so the dialog reads as clear sections instead of one long list
+/// of fields.
+Widget _formSection({
+  required String title,
+  String? subtitle,
+  Widget? trailing,
+  required Widget child,
+}) {
+  return Container(
+    margin: const EdgeInsets.only(bottom: 14),
+    padding: const EdgeInsets.all(14),
+    decoration: AppDecorations.card,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textDark),
+              ),
+            ),
+            if (trailing != null) trailing,
+          ],
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 3),
+          Text(subtitle, style: AppTextStyles.caption),
+        ],
+        const SizedBox(height: 12),
+        child,
+      ],
+    ),
+  );
+}
+
+/// One of the two square "lookup" tiles (scan / search) inside the lookup
+/// section — a tappable tinted tile instead of a full-width outlined
+/// button, so the two actions read as a matched pair.
+Widget _lookupTile({required IconData icon, required String label, required VoidCallback onTap}) {
+  return Material(
+    color: AppColors.surfaceVariant,
+    borderRadius: BorderRadius.circular(AppRadius.row),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(AppRadius.row),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 22),
+            const SizedBox(height: 6),
+            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 /// One editable "Quy đổi" row: how many of the previous level (the base
 /// unit for the first row) make up one of `unitCtrl`, plus its own custom
 /// price — not derived from the base price.
@@ -210,11 +272,12 @@ void showAddProductDialog(BuildContext context) {
       children: [
         if (loadedProduct != null)
           Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadius.row),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
             ),
             child: Row(
               children: [
@@ -235,154 +298,212 @@ void showAddProductDialog(BuildContext context) {
               ],
             ),
           ),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => scanExisting(ctx, setDialogState),
-                icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                label: const Text('Quét mã vạch'),
+        _formSection(
+          title: 'Lấy sản phẩm có sẵn',
+          subtitle: 'Quét mã vạch hoặc tìm kiếm để lấy sản phẩm có sẵn từ Danh sách sản phẩm.',
+          child: Row(
+            children: [
+              Expanded(
+                child: _lookupTile(
+                  icon: Icons.qr_code_scanner_rounded,
+                  label: 'Quét mã vạch',
+                  onTap: () => scanExisting(ctx, setDialogState),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => searchExisting(ctx, setDialogState),
-                icon: const Icon(Icons.search_rounded, size: 18),
-                label: const Text('Tìm sản phẩm'),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _lookupTile(
+                  icon: Icons.search_rounded,
+                  label: 'Tìm sản phẩm',
+                  onTap: () => searchExisting(ctx, setDialogState),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          'Quét mã vạch hoặc tìm kiếm để lấy sản phẩm có sẵn từ Danh sách sản phẩm.',
-          style: AppTextStyles.caption,
-        ),
-        const SizedBox(height: 14),
-        Center(
-          child: GestureDetector(
-            onTap: () => showImageSourceSheet(ctx, setDialogState),
-            child: Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.borderLight),
-                image: imageDataUrl != null
-                    ? DecorationImage(image: MemoryImage(_decodeDataUrl(imageDataUrl!)), fit: BoxFit.cover)
-                    : null,
-              ),
-              child: imageDataUrl == null
-                  ? const Icon(Icons.add_a_photo_rounded, color: AppColors.textHint, size: 28)
-                  : Align(
-                      alignment: Alignment.bottomRight,
-                      child: Container(
-                        margin: const EdgeInsets.all(4),
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                        child: const Icon(Icons.edit_rounded, color: AppColors.white, size: 14),
+        _formSection(
+          title: 'Ảnh sản phẩm',
+          child: Center(
+            child: GestureDetector(
+              onTap: () => showImageSourceSheet(ctx, setDialogState),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 108,
+                    height: 108,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(AppRadius.panel),
+                      border: Border.all(color: AppColors.borderLight),
+                      image: imageDataUrl != null
+                          ? DecorationImage(image: MemoryImage(_decodeDataUrl(imageDataUrl!)), fit: BoxFit.cover)
+                          : null,
+                    ),
+                    child: imageDataUrl == null
+                        ? const Icon(Icons.inventory_2_outlined, color: AppColors.textHint, size: 32)
+                        : null,
+                  ),
+                  Positioned(
+                    right: -4,
+                    bottom: -4,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.white, width: 2.5),
                       ),
+                      child: const Icon(Icons.camera_alt_rounded, color: AppColors.white, size: 15),
                     ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 14),
-        TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên sản phẩm')),
-        const SizedBox(height: 8),
-        TextField(
-          controller: priceCtrl,
-          decoration: const InputDecoration(labelText: 'Giá'),
-          keyboardType: TextInputType.number,
-        ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: barcodeCtrl,
-          decoration: const InputDecoration(labelText: 'Mã vạch (tùy chọn)'),
-          keyboardType: TextInputType.number,
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: unit,
-          decoration: const InputDecoration(labelText: 'Đơn vị (đơn vị chuẩn)'),
-          items: _kProductUnits.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-          onChanged: (v) => setDialogState(() => unit = v ?? unit),
-        ),
-        const SizedBox(height: 8),
-        DropdownButtonFormField<String>(
-          initialValue: group,
-          decoration: const InputDecoration(labelText: 'Nhóm sản phẩm'),
-          items: _kProductGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-          onChanged: (v) => setDialogState(() => group = v ?? group),
-        ),
-        const SizedBox(height: 18),
-        Row(
-          children: [
-            Expanded(child: Text('Quy đổi đơn vị', style: AppTextStyles.sectionHeader)),
-            TextButton.icon(
-              onPressed: () => setDialogState(() => conversions.add(_ConversionRow())),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Thêm'),
-            ),
-          ],
-        ),
-        Text(
-          'Ví dụ: đơn vị chuẩn Hộp — 6 Hộp = 1 Lốc, 24 Lốc = 1 Thùng. Mỗi quy đổi có giá riêng.',
-          style: AppTextStyles.caption,
-        ),
-        const SizedBox(height: 8),
-        for (var i = 0; i < conversions.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    controller: conversions[i].qtyCtrl,
-                    decoration: InputDecoration(
-                      labelText: i == 0 ? 'SL $unit' : 'SL ${conversions[i - 1].unitCtrl.text.isEmpty ? 'trước' : conversions[i - 1].unitCtrl.text}',
-                      isDense: true,
-                    ),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                const Padding(
-                  padding: EdgeInsets.only(top: 14),
-                  child: Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.textHint),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 3,
-                  child: TextField(
-                    controller: conversions[i].unitCtrl,
-                    decoration: const InputDecoration(labelText: 'Đơn vị mới', isDense: true),
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  flex: 4,
-                  child: TextField(
-                    controller: conversions[i].priceCtrl,
-                    decoration: const InputDecoration(labelText: 'Giá riêng', isDense: true),
-                    keyboardType: TextInputType.number,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.remove_circle_outline_rounded, size: 20, color: AppColors.error),
-                  visualDensity: VisualDensity.compact,
-                  onPressed: () => setDialogState(() {
-                    conversions[i].dispose();
-                    conversions.removeAt(i);
-                  }),
-                ),
-              ],
-            ),
+        _formSection(
+          title: 'Thông tin sản phẩm',
+          child: Column(
+            children: [
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên sản phẩm')),
+              const SizedBox(height: 10),
+              TextField(
+                controller: priceCtrl,
+                decoration: const InputDecoration(labelText: 'Giá'),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: barcodeCtrl,
+                decoration: const InputDecoration(labelText: 'Mã vạch (tùy chọn)'),
+                keyboardType: TextInputType.number,
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: unit,
+                decoration: const InputDecoration(labelText: 'Đơn vị (đơn vị chuẩn)'),
+                items: _kProductUnits.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                onChanged: (v) => setDialogState(() => unit = v ?? unit),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: group,
+                decoration: const InputDecoration(labelText: 'Nhóm sản phẩm'),
+                items: _kProductGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                onChanged: (v) => setDialogState(() => group = v ?? group),
+              ),
+            ],
           ),
+        ),
+        _formSection(
+          title: 'Quy đổi đơn vị',
+          subtitle: 'Ví dụ: đơn vị chuẩn Hộp — 6 Hộp = 1 Lốc, 24 Lốc = 1 Thùng. Mỗi quy đổi có giá riêng.',
+          trailing: TextButton.icon(
+            onPressed: () => setDialogState(() => conversions.add(_ConversionRow())),
+            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Thêm'),
+          ),
+          child: conversions.isEmpty
+              ? Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariant,
+                    borderRadius: BorderRadius.circular(AppRadius.row),
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: Text(
+                    'Chưa có quy đổi nào',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.caption,
+                  ),
+                )
+              : Column(
+                  children: [
+                    for (var i = 0; i < conversions.length; i++)
+                      Container(
+                        margin: EdgeInsets.only(bottom: i == conversions.length - 1 ? 0 : 10),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceVariant,
+                          borderRadius: BorderRadius.circular(AppRadius.row),
+                          border: Border.all(color: AppColors.borderLight),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: const BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
+                                  child: Center(
+                                    child: Text(
+                                      '${i + 1}',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Cấp quy đổi ${i + 1}',
+                                    style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.error),
+                                  visualDensity: VisualDensity.compact,
+                                  onPressed: () => setDialogState(() {
+                                    conversions[i].dispose();
+                                    conversions.removeAt(i);
+                                  }),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: conversions[i].qtyCtrl,
+                                    decoration: InputDecoration(
+                                      labelText: i == 0 ? 'SL $unit' : 'SL ${conversions[i - 1].unitCtrl.text.isEmpty ? 'trước' : conversions[i - 1].unitCtrl.text}',
+                                      isDense: true,
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                  ),
+                                ),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 8),
+                                  child: Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.textHint),
+                                ),
+                                Expanded(
+                                  child: TextField(
+                                    controller: conversions[i].unitCtrl,
+                                    decoration: const InputDecoration(labelText: 'Đơn vị mới', isDense: true),
+                                    onChanged: (_) => setDialogState(() {}),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            TextField(
+                              controller: conversions[i].priceCtrl,
+                              decoration: const InputDecoration(labelText: 'Giá riêng cho đơn vị này', isDense: true),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+        ),
       ],
     ),
     actionsBuilder: (ctx, setDialogState) => [
