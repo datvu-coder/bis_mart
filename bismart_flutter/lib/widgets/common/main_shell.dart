@@ -114,16 +114,111 @@ class _MainShellState extends State<MainShell> {
           ],
         ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onNavTap,
-        destinations: _navItems
-            .map((item) => NavigationDestination(
-                  icon: Icon(item.icon),
-                  selectedIcon: Icon(item.selectedIcon),
-                  label: item.label,
-                ))
-            .toList(),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+          child: _FloatingNavBar(
+            items: _navItems,
+            selectedIndex: _selectedIndex,
+            onTap: _onNavTap,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Bottom nav as a floating rounded card with a gap from the screen edges,
+/// the active item's icon+label wrapped in one tinted pill — instead of a
+/// full-width bar flush with the edges.
+class _FloatingNavBar extends StatelessWidget {
+  final List<_NavItem> items;
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  const _FloatingNavBar({
+    required this.items,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 68,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < items.length; i++)
+            Expanded(
+              child: _FloatingNavItem(
+                item: items[i],
+                isSelected: i == selectedIndex,
+                onTap: () => onTap(i),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FloatingNavItem extends StatelessWidget {
+  final _NavItem item;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _FloatingNavItem({
+    required this.item,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(30),
+      child: Center(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primaryLight : Colors.transparent,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                isSelected ? item.selectedIcon : item.icon,
+                size: 22,
+                color: isSelected ? AppColors.primary : AppColors.textGrey,
+              ),
+              const SizedBox(height: 3),
+              Text(
+                item.label,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? AppColors.primary : AppColors.textGrey,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
