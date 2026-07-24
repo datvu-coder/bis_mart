@@ -269,8 +269,18 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     final reportCount = provider.salesReportCount;
     final pgCount = provider.filteredReports.map((r) => r.pgName).toSet().length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
-    final reportsAction = HeaderActionCluster(
+    final moreActions = HeaderActionCluster(
       actions: [
+        HeaderAction(
+          icon: Icons.add_box_outlined,
+          label: 'Thêm sản phẩm',
+          onPressed: () => showAddProductDialog(context),
+        ),
+        HeaderAction(
+          icon: Icons.history_rounded,
+          label: 'Lịch sử bán hàng',
+          onPressed: _showSalesHistory,
+        ),
         HeaderAction(
           icon: Icons.description_rounded,
           label: 'Báo cáo',
@@ -284,18 +294,6 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       tooltip: 'Tạo đơn hàng',
       visualDensity: VisualDensity.compact,
     );
-    final addProductAction = IconButton(
-      onPressed: () => showAddProductDialog(context),
-      icon: const Icon(Icons.add_box_outlined),
-      tooltip: 'Thêm sản phẩm',
-      visualDensity: VisualDensity.compact,
-    );
-    final salesHistoryAction = IconButton(
-      onPressed: _showSalesHistory,
-      icon: const Icon(Icons.history_rounded),
-      tooltip: 'Lịch sử bán hàng',
-      visualDensity: VisualDensity.compact,
-    );
 
     // Phones keep just the title + actions — the KPI chips already
     // dropped their icons/numbers there, so a full card adds nothing.
@@ -306,9 +304,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
             child: Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
           ),
           createOrderAction,
-          addProductAction,
-          salesHistoryAction,
-          reportsAction,
+          moreActions,
         ],
       );
     }
@@ -334,9 +330,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 ),
               ),
               createOrderAction,
-              addProductAction,
-              salesHistoryAction,
-              reportsAction,
+              moreActions,
             ],
           ),
           const SizedBox(height: 12),
