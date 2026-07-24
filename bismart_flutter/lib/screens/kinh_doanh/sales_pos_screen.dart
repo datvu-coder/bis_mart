@@ -7,7 +7,6 @@ import '../../core/utils/date_formatter.dart';
 import '../../models/product.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sales_provider.dart';
-import '../../widgets/common/add_product_dialog.dart';
 
 /// "Bán hàng" tab: a browsing surface only — the product catalog and recent
 /// sales history. Order composition itself lives in its own dedicated
@@ -18,8 +17,9 @@ import '../../widgets/common/add_product_dialog.dart';
 ///
 /// Embedded directly as a tab inside Kinh doanh's TabBarView (no own
 /// Scaffold/AppBar) — keeps search text alive across tab switches via
-/// AutomaticKeepAliveClientMixin. Sales history is reached via the history
-/// action button next to search rather than its own toggle/tab.
+/// AutomaticKeepAliveClientMixin. "Thêm sản phẩm" and "Lịch sử bán hàng"
+/// live in Kinh doanh's screen header instead of this search bar, so the
+/// search field's own suffix icon is just the product group filter.
 class SalesPosScreen extends StatefulWidget {
   const SalesPosScreen({super.key});
 
@@ -57,36 +57,36 @@ class _SalesPosScreenState extends State<SalesPosScreen>
     super.dispose();
   }
 
-  void _showSalesHistory() {
-    showDialog(
+  void _openGroupFilterSheet(ProductProvider productProvider) {
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) {
-        final mq = MediaQuery.of(ctx);
-        final isMobile = mq.size.width < 600;
-        final dialogWidth = isMobile ? mq.size.width - 4 : 500.0;
-        final dialogHeight = isMobile ? mq.size.height * 0.75 : 500.0;
-        return AlertDialog(
-          insetPadding: const EdgeInsets.all(2),
-          contentPadding:
-              EdgeInsets.fromLTRB(isMobile ? 4 : 16, 12, isMobile ? 4 : 16, 8),
-          titlePadding: EdgeInsets.fromLTRB(
-              isMobile ? 16 : 24, 14, isMobile ? 16 : 24, 0),
-          title: const Text('Lịch sử bán hàng'),
-          content: SizedBox(
-            width: dialogWidth,
-            height: dialogHeight,
-            child: _SalesHistoryList(
-              onRefresh: () => context.read<SalesProvider>().loadReports(),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text('Lọc theo nhóm sản phẩm',
+                  style: AppTextStyles.sectionHeader),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Đóng'),
-            ),
+            for (final group in _groups)
+              RadioListTile<String>(
+                value: group,
+                groupValue: productProvider.selectedGroup,
+                title: Text(group),
+                activeColor: AppColors.primary,
+                onChanged: (v) {
+                  if (v != null) productProvider.setGroup(v);
+                  Navigator.pop(ctx);
+                },
+              ),
+            const SizedBox(height: 8),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -105,20 +105,10 @@ class _SalesPosScreenState extends State<SalesPosScreen>
             onChanged: (v) => productProvider.setSearch(v),
             decoration: AppDecorations.searchField(
               'Tìm sản phẩm...',
-              suffixIcon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.add_box_outlined, size: 20),
-                    tooltip: 'Thêm sản phẩm',
-                    onPressed: () => showAddProductDialog(context),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.history_rounded, size: 20),
-                    tooltip: 'Lịch sử bán hàng',
-                    onPressed: _showSalesHistory,
-                  ),
-                ],
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.tune_rounded, size: 20),
+                tooltip: 'Lọc theo nhóm',
+                onPressed: () => _openGroupFilterSheet(productProvider),
               ),
             ),
           ),
@@ -190,10 +180,12 @@ class _SalesPosScreenState extends State<SalesPosScreen>
   }
 }
 
-class _SalesHistoryList extends StatelessWidget {
+/// Public so Kinh doanh's screen header (which now owns the "Lịch sử bán
+/// hàng" action) can show this list inside its own dialog.
+class SalesHistoryList extends StatelessWidget {
   final VoidCallback onRefresh;
 
-  const _SalesHistoryList({required this.onRefresh});
+  const SalesHistoryList({super.key, required this.onRefresh});
 
   @override
   Widget build(BuildContext context) {

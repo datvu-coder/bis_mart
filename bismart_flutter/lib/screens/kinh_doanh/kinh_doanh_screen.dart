@@ -15,6 +15,7 @@ import '../../providers/auth_provider.dart';
 import '../../services/export_service.dart';
 import 'sales_pos_screen.dart';
 import 'create_order_screen.dart';
+import '../../widgets/common/add_product_dialog.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/gradient_fab.dart';
@@ -180,6 +181,39 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     if (mounted) context.read<SalesProvider>().loadReports();
   }
 
+  void _showSalesHistory() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final mq = MediaQuery.of(ctx);
+        final isMobile = mq.size.width < 600;
+        final dialogWidth = isMobile ? mq.size.width - 4 : 500.0;
+        final dialogHeight = isMobile ? mq.size.height * 0.75 : 500.0;
+        return AlertDialog(
+          insetPadding: const EdgeInsets.all(2),
+          contentPadding:
+              EdgeInsets.fromLTRB(isMobile ? 4 : 16, 12, isMobile ? 4 : 16, 8),
+          titlePadding: EdgeInsets.fromLTRB(
+              isMobile ? 16 : 24, 14, isMobile ? 16 : 24, 0),
+          title: const Text('Lịch sử bán hàng'),
+          content: SizedBox(
+            width: dialogWidth,
+            height: dialogHeight,
+            child: SalesHistoryList(
+              onRefresh: () => context.read<SalesProvider>().loadReports(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đóng'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void _openReportsScreen() {
     Navigator.push(
       context,
@@ -248,6 +282,19 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       onPressed: _openCreateOrder,
       icon: const Icon(Icons.add_shopping_cart_rounded),
       tooltip: 'Tạo đơn hàng',
+      visualDensity: VisualDensity.compact,
+    );
+    final addProductAction = IconButton(
+      onPressed: () => showAddProductDialog(context),
+      icon: const Icon(Icons.add_box_outlined),
+      tooltip: 'Thêm sản phẩm',
+      visualDensity: VisualDensity.compact,
+    );
+    final salesHistoryAction = IconButton(
+      onPressed: _showSalesHistory,
+      icon: const Icon(Icons.history_rounded),
+      tooltip: 'Lịch sử bán hàng',
+      visualDensity: VisualDensity.compact,
     );
 
     // Phones keep just the title + actions — the KPI chips already
@@ -259,6 +306,8 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
             child: Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
           ),
           createOrderAction,
+          addProductAction,
+          salesHistoryAction,
           reportsAction,
         ],
       );
@@ -285,6 +334,8 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                 ),
               ),
               createOrderAction,
+              addProductAction,
+              salesHistoryAction,
               reportsAction,
             ],
           ),
