@@ -93,6 +93,8 @@ CREATE TABLE IF NOT EXISTS products (
     product_condition TEXT,
     product_group TEXT NOT NULL DEFAULT 'DELI',
     barcode TEXT,
+    image_url TEXT,
+    conversions_json TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -530,6 +532,14 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                                  WHERE table_name='products' AND column_name='product_condition') THEN
         ALTER TABLE products ADD COLUMN product_condition TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='products' AND column_name='image_url') THEN
+        ALTER TABLE products ADD COLUMN image_url TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='products' AND column_name='conversions_json') THEN
+        ALTER TABLE products ADD COLUMN conversions_json TEXT;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                                  WHERE table_name='stores' AND column_name='province') THEN

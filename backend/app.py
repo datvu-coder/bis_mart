@@ -176,6 +176,17 @@ def _report_to_api_json(report_row: dict[str, Any], products: list[dict[str, Any
     }
 
 
+def _product_conversions_from_row(row: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = row.get("conversions_json") if row else None
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    return parsed if isinstance(parsed, list) else []
+
+
 def _product_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": str(row.get("id") or ""),
@@ -185,6 +196,8 @@ def _product_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
         "productGroup": row.get("product_group") or "DELI",
         "productCondition": row.get("product_condition"),
         "barcode": row.get("barcode"),
+        "imageUrl": row.get("image_url"),
+        "conversions": _product_conversions_from_row(row),
     }
 
 
@@ -1174,7 +1187,8 @@ def api_get_products():
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, name, unit, price_with_vat, product_group, product_condition, barcode "
+            "SELECT id, name, unit, price_with_vat, product_group, product_condition, barcode, "
+            "image_url, conversions_json "
             "FROM products ORDER BY id ASC"
         )
         rows = cur.fetchall()
@@ -1187,12 +1201,16 @@ def api_create_product():
     if not _has_crud_permission():
         return _forbidden()
     data = request.get_json(silent=True) or {}
+    conversions = data.get("conversions")
+    conversions_json = json.dumps(conversions) if isinstance(conversions, list) and conversions else None
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "INSERT INTO products (name, unit, price_with_vat, product_group, product_condition, barcode) "
-            "VALUES (%s, %s, %s, %s, %s, %s) "
-            "RETURNING id, name, unit, price_with_vat, product_group, product_condition, barcode",
+            "INSERT INTO products (name, unit, price_with_vat, product_group, product_condition, barcode, "
+            "image_url, conversions_json) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING id, name, unit, price_with_vat, product_group, product_condition, barcode, "
+            "image_url, conversions_json",
             (
                 data.get("name", ""),
                 data.get("unit", "Lon"),
@@ -1200,6 +1218,8 @@ def api_create_product():
                 data.get("productGroup", "DELI"),
                 data.get("productCondition"),
                 (data.get("barcode") or "").strip() or None,
+                data.get("imageUrl") or None,
+                conversions_json,
             ),
         )
         row = cur.fetchone()
@@ -1213,12 +1233,15 @@ def api_update_product(product_id: int):
     if not _has_crud_permission():
         return _forbidden()
     data = request.get_json(silent=True) or {}
+    conversions = data.get("conversions")
+    conversions_json = json.dumps(conversions) if isinstance(conversions, list) and conversions else None
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
             "UPDATE products SET name = %s, unit = %s, price_with_vat = %s, product_group = %s, "
-            "product_condition = %s, barcode = %s "
-            "WHERE id = %s RETURNING id, name, unit, price_with_vat, product_group, product_condition, barcode",
+            "product_condition = %s, barcode = %s, image_url = %s, conversions_json = %s "
+            "WHERE id = %s RETURNING id, name, unit, price_with_vat, product_group, product_condition, barcode, "
+            "image_url, conversions_json",
             (
                 data.get("name", ""),
                 data.get("unit", "Lon"),
@@ -1226,6 +1249,8 @@ def api_update_product(product_id: int):
                 data.get("productGroup", "DELI"),
                 data.get("productCondition"),
                 (data.get("barcode") or "").strip() or None,
+                data.get("imageUrl") or None,
+                conversions_json,
                 product_id,
             ),
         )
