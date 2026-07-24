@@ -39,6 +39,9 @@ dependencies:
   # Barcode scanning (Bán hàng POS)
   mobile_scanner: ^5.2.3
 
+  # Camera capture for product photos
+  image_picker: ^1.1.2
+
   # Typography
   google_fonts: ^6.2.1
 
