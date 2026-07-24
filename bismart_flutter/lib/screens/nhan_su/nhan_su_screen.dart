@@ -101,9 +101,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 child: Column(
                   children: [
                     _buildAttendancePanel(provider, canManage),
-                    _buildShiftPanel(provider),
-                    _buildSchedulePanel(provider, canManage),
-                    _buildHoursReportPanel(provider, canManage),
                   ],
                 ),
               ),
@@ -133,6 +130,60 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     );
   }
 
+  void _openShiftScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text(AppStrings.caLamViec)),
+          body: Consumer<EmployeeProvider>(
+            builder: (context, provider, _) => SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _buildShiftPanel(provider),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openScheduleScreen(bool canManage) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Lịch làm việc')),
+          body: Consumer<EmployeeProvider>(
+            builder: (context, provider, _) => SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _buildSchedulePanel(provider, canManage),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openHoursReportScreen(bool canManage) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Bảng giờ công nhân viên')),
+          body: Consumer<EmployeeProvider>(
+            builder: (context, provider, _) => SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _buildHoursReportPanel(provider, canManage),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildScreenHeader(EmployeeProvider provider, bool canManage, bool emphasize) {
     final myStoreCode = context.read<AuthProvider>().currentUser?.storeCode;
     final scopedEmployees = (myStoreCode == null || myStoreCode.isEmpty)
@@ -147,8 +198,23 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     final activeShiftCount = provider.shifts.length;
     final memberCount = scopedEmployees.length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
-    final rankingAction = HeaderActionCluster(
+    final moreActions = HeaderActionCluster(
       actions: [
+        HeaderAction(
+          icon: Icons.schedule_rounded,
+          label: AppStrings.caLamViec,
+          onPressed: _openShiftScreen,
+        ),
+        HeaderAction(
+          icon: Icons.calendar_month_rounded,
+          label: 'Lịch làm việc',
+          onPressed: () => _openScheduleScreen(canManage),
+        ),
+        HeaderAction(
+          icon: Icons.table_chart_rounded,
+          label: 'Bảng giờ công nhân viên',
+          onPressed: () => _openHoursReportScreen(canManage),
+        ),
         HeaderAction(
           icon: Icons.emoji_events_rounded,
           label: 'Bảng xếp hạng',
@@ -157,7 +223,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       ],
     );
 
-    // Phones keep just the title + ranking action — the KPI chips already
+    // Phones keep just the title + actions — the KPI chips already
     // dropped their icons/numbers there, so a full card adds nothing.
     if (isCompactMobile) {
       return Row(
@@ -165,7 +231,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           Expanded(
             child: Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
           ),
-          rankingAction,
+          moreActions,
         ],
       );
     }
@@ -192,7 +258,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   ],
                 ),
               ),
-              rankingAction,
+              moreActions,
             ],
           ),
           const SizedBox(height: 12),
