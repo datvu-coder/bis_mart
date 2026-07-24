@@ -97,10 +97,14 @@ class _MainShellState extends State<MainShell> {
           ],
         ),
       ),
+      // bottom: false — the device's full home-indicator inset (~34pt) read
+      // as an oversized solid-gray footer band under the bar; a small fixed
+      // gap instead keeps the bar close to the edge like the reference app.
       bottomNavigationBar: SafeArea(
         top: false,
+        bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 6),
           child: _FloatingNavBar(
             items: _navItems,
             selectedIndex: _selectedIndex,
