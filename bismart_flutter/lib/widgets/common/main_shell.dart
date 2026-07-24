@@ -178,14 +178,10 @@ class _FloatingNavItem extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Center(
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
+        // No tinted pill behind the active item — the whole bar keeps one
+        // flat background, selection reads purely through icon/label color.
+        child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary.withValues(alpha: 0.16) : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
