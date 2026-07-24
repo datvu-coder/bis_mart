@@ -57,36 +57,48 @@ class _SalesPosScreenState extends State<SalesPosScreen>
     super.dispose();
   }
 
-  void _openGroupFilterSheet(ProductProvider productProvider) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+  /// Group filter as a dropdown menu anchored to its own icon (drops down
+  /// right below the search field, like the header's "..." menu) instead
+  /// of a bottom sheet — one consistent popup style across the tab.
+  Widget _buildGroupFilterButton(ProductProvider productProvider) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.tune_rounded, size: 20),
+      tooltip: 'Lọc theo nhóm',
+      color: AppColors.white,
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.borderLight),
       ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text('Lọc theo nhóm sản phẩm',
-                  style: AppTextStyles.sectionHeader),
-            ),
-            for (final group in _groups)
-              RadioListTile<String>(
-                value: group,
-                groupValue: productProvider.selectedGroup,
-                title: Text(group),
-                activeColor: AppColors.primary,
-                onChanged: (v) {
-                  if (v != null) productProvider.setGroup(v);
-                  Navigator.pop(ctx);
-                },
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+      onSelected: productProvider.setGroup,
+      itemBuilder: (context) => [
+        for (final group in _groups)
+          PopupMenuItem<String>(
+            value: group,
+            child: Builder(builder: (context) {
+              final isSelected = productProvider.selectedGroup == group;
+              return Row(
+                children: [
+                  Icon(
+                    isSelected
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 18,
+                    color: isSelected ? AppColors.primary : AppColors.textHint,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    group,
+                    style: TextStyle(
+                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
+      ],
     );
   }
 
@@ -105,41 +117,8 @@ class _SalesPosScreenState extends State<SalesPosScreen>
             onChanged: (v) => productProvider.setSearch(v),
             decoration: AppDecorations.searchField(
               'Tìm sản phẩm...',
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.tune_rounded, size: 20),
-                tooltip: 'Lọc theo nhóm',
-                onPressed: () => _openGroupFilterSheet(productProvider),
-              ),
+              suffixIcon: _buildGroupFilterButton(productProvider),
             ),
-          ),
-        ),
-        SizedBox(
-          height: 32,
-          child: ListView.separated(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            scrollDirection: Axis.horizontal,
-            itemCount: _groups.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 6),
-            itemBuilder: (context, i) {
-              final group = _groups[i];
-              final isSelected = productProvider.selectedGroup == group;
-              return ChoiceChip(
-                label: Text(group),
-                labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                labelStyle: TextStyle(
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
-                ),
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                selected: isSelected,
-                selectedColor: AppColors.primaryLight,
-                side: BorderSide(
-                  color: isSelected ? AppColors.primary.withValues(alpha: 0.4) : AppColors.border,
-                ),
-                onSelected: (_) => productProvider.setGroup(group),
-              );
-            },
           ),
         ),
         const SizedBox(height: 6),

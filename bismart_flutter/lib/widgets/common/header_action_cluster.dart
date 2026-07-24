@@ -42,22 +42,38 @@ class HeaderActionCluster extends StatelessWidget {
       child: PopupMenuButton<int>(
         icon: const Icon(Icons.more_horiz_rounded, size: 20, color: AppColors.textPrimary),
         tooltip: 'Thêm',
+        color: AppColors.white,
+        elevation: 6,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.borderLight),
+        ),
         onSelected: (i) => actions[i].onPressed(),
         itemBuilder: (context) => [
-          for (var i = 0; i < actions.length; i++)
+          for (var i = 0; i < actions.length; i++) ...[
+            // A destructive action reads as visually set apart from the
+            // rest, the same way the reference app puts "Delete" at the
+            // bottom of its overflow menu with a divider above it.
+            if (i > 0 && actions[i].color == AppColors.error && actions[i - 1].color != AppColors.error)
+              const PopupMenuDivider(height: 8),
             PopupMenuItem(
               value: i,
+              height: 44,
               child: Row(
                 children: [
                   Icon(actions[i].icon, size: 18, color: actions[i].color ?? AppColors.textSecondary),
                   const SizedBox(width: 12),
                   Text(
                     actions[i].label,
-                    style: TextStyle(color: actions[i].color ?? AppColors.textPrimary),
+                    style: TextStyle(
+                      color: actions[i].color ?? AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ],
               ),
             ),
+          ],
         ],
       ),
     );
