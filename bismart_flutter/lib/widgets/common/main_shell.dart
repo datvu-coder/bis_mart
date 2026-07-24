@@ -21,19 +21,11 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   late int _selectedIndex;
-  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
     _selectedIndex = widget.initialIndex;
-    _pageController = PageController(initialPage: _selectedIndex);
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
   }
 
   static const _navItems = [
@@ -46,11 +38,6 @@ class _MainShellState extends State<MainShell> {
 
   void _onNavTap(int index) {
     setState(() => _selectedIndex = index);
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-    );
   }
 
   void _handleLogout() {
@@ -79,10 +66,8 @@ class _MainShellState extends State<MainShell> {
               isExpanded: width >= 1100,
             ),
             Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (i) => setState(() => _selectedIndex = i),
+              child: IndexedStack(
+                index: _selectedIndex,
                 children: const [
                   DashboardScreen(),
                   NhanSuScreen(),
@@ -101,10 +86,8 @@ class _MainShellState extends State<MainShell> {
       backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
-        child: PageView(
-          controller: _pageController,
-          physics: const NeverScrollableScrollPhysics(),
-          onPageChanged: (i) => setState(() => _selectedIndex = i),
+        child: IndexedStack(
+          index: _selectedIndex,
           children: const [
             DashboardScreen(),
             NhanSuScreen(),
@@ -116,9 +99,8 @@ class _MainShellState extends State<MainShell> {
       ),
       bottomNavigationBar: SafeArea(
         top: false,
-        minimum: const EdgeInsets.only(bottom: 4),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 4, 14, 0),
+          padding: const EdgeInsets.fromLTRB(14, 0, 14, 0),
           child: _FloatingNavBar(
             items: _navItems,
             selectedIndex: _selectedIndex,
@@ -197,16 +179,18 @@ class _FloatingNavItem extends StatelessWidget {
           curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryLight : Colors.transparent,
+            color: isSelected ? AppColors.primary.withValues(alpha: 0.16) : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                isSelected ? item.selectedIcon : item.icon,
+                // Always the bold/filled glyph — inactive tabs differ only
+                // by color, not by a thinner outline icon.
+                item.selectedIcon,
                 size: 21,
-                color: isSelected ? AppColors.primary : AppColors.textGrey,
+                color: isSelected ? AppColors.primary : AppColors.textDark,
               ),
               const SizedBox(height: 2),
               Text(
