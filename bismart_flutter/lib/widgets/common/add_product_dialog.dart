@@ -145,23 +145,21 @@ Widget _photoPicker({required String? imageDataUrl, required VoidCallback onTap}
   );
 }
 
-/// One editable "Quy đổi" row: how many of the previous level (the base
-/// unit for the first row) make up one of `unitCtrl`, plus its own custom
-/// price — not derived from the base price.
+/// One editable "Quy đổi" row: a smaller sale unit than the one before it
+/// (the base/standard unit is the largest, e.g. Thùng, with each level
+/// below it — Lốc, Hộp — getting progressively smaller), each with its
+/// own custom selling price.
 class _ConversionRow {
   final unitCtrl = TextEditingController();
-  final qtyCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
 
-  _ConversionRow({String unit = '', String qty = '', String price = ''}) {
+  _ConversionRow({String unit = '', String price = ''}) {
     unitCtrl.text = unit;
-    qtyCtrl.text = qty;
     priceCtrl.text = price;
   }
 
   void dispose() {
     unitCtrl.dispose();
-    qtyCtrl.dispose();
     priceCtrl.dispose();
   }
 }
@@ -199,7 +197,6 @@ void showAddProductDialog(BuildContext context) {
         ..clear()
         ..addAll(p.conversions.map((c) => _ConversionRow(
               unit: c.unit,
-              qty: _trimNumber(c.quantity),
               price: _trimNumber(c.price),
             )));
     });
@@ -315,7 +312,6 @@ void showAddProductDialog(BuildContext context) {
   showResponsiveForm(
     context: context,
     title: 'Thêm sản phẩm',
-    desktopWidth: 520,
     contentBuilder: (ctx, setDialogState) => Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,28 +371,19 @@ void showAddProductDialog(BuildContext context) {
           title: 'Thông tin sản phẩm',
           child: Column(
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _photoPicker(
-                    imageDataUrl: imageDataUrl,
-                    onTap: () => showImageSourceSheet(ctx, setDialogState),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên sản phẩm')),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: priceCtrl,
-                          decoration: const InputDecoration(labelText: 'Giá'),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              Center(
+                child: _photoPicker(
+                  imageDataUrl: imageDataUrl,
+                  onTap: () => showImageSourceSheet(ctx, setDialogState),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Tên sản phẩm')),
+              const SizedBox(height: 10),
+              TextField(
+                controller: priceCtrl,
+                decoration: const InputDecoration(labelText: 'Giá'),
+                keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 10),
               TextField(
@@ -405,33 +392,25 @@ void showAddProductDialog(BuildContext context) {
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: unit,
-                      decoration: const InputDecoration(labelText: 'Đơn vị chuẩn'),
-                      items: _kProductUnits.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
-                      onChanged: (v) => setDialogState(() => unit = v ?? unit),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      initialValue: group,
-                      decoration: const InputDecoration(labelText: 'Nhóm'),
-                      items: _kProductGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
-                      onChanged: (v) => setDialogState(() => group = v ?? group),
-                    ),
-                  ),
-                ],
+              DropdownButtonFormField<String>(
+                initialValue: unit,
+                decoration: const InputDecoration(labelText: 'Đơn vị chuẩn (đơn vị lớn nhất)'),
+                items: _kProductUnits.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+                onChanged: (v) => setDialogState(() => unit = v ?? unit),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: group,
+                decoration: const InputDecoration(labelText: 'Nhóm sản phẩm'),
+                items: _kProductGroups.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                onChanged: (v) => setDialogState(() => group = v ?? group),
               ),
             ],
           ),
         ),
         _formSection(
           title: 'Quy đổi đơn vị',
-          subtitle: 'Ví dụ: đơn vị chuẩn Hộp — 6 Hộp = 1 Lốc, 24 Lốc = 1 Thùng. Mỗi quy đổi có giá riêng.',
+          subtitle: 'Đơn vị chuẩn là đơn vị lớn nhất (vd: Thùng), các cấp quy đổi nhỏ dần (vd: Lốc, Hộp) — chỉ cần nhập tên đơn vị và giá bán.',
           trailing: TextButton.icon(
             onPressed: () => setDialogState(() => conversions.add(_ConversionRow())),
             style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
@@ -498,36 +477,14 @@ void showAddProductDialog(BuildContext context) {
                               ],
                             ),
                             const SizedBox(height: 8),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: conversions[i].qtyCtrl,
-                                    decoration: InputDecoration(
-                                      labelText: i == 0 ? 'SL $unit' : 'SL ${conversions[i - 1].unitCtrl.text.isEmpty ? 'trước' : conversions[i - 1].unitCtrl.text}',
-                                      isDense: true,
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                  ),
-                                ),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  child: Icon(Icons.arrow_forward_rounded, size: 16, color: AppColors.textHint),
-                                ),
-                                Expanded(
-                                  child: TextField(
-                                    controller: conversions[i].unitCtrl,
-                                    decoration: const InputDecoration(labelText: 'Đơn vị mới', isDense: true),
-                                    onChanged: (_) => setDialogState(() {}),
-                                  ),
-                                ),
-                              ],
+                            TextField(
+                              controller: conversions[i].unitCtrl,
+                              decoration: const InputDecoration(labelText: 'Đơn vị mới', isDense: true),
                             ),
                             const SizedBox(height: 8),
                             TextField(
                               controller: conversions[i].priceCtrl,
-                              decoration: const InputDecoration(labelText: 'Giá riêng cho đơn vị này', isDense: true),
+                              decoration: const InputDecoration(labelText: 'Giá bán', isDense: true),
                               keyboardType: TextInputType.number,
                             ),
                           ],
@@ -571,7 +528,6 @@ void showAddProductDialog(BuildContext context) {
                       if (c.unitCtrl.text.trim().isNotEmpty)
                         ProductConversion(
                           unit: c.unitCtrl.text.trim(),
-                          quantity: double.tryParse(c.qtyCtrl.text) ?? 0,
                           price: double.tryParse(c.priceCtrl.text) ?? 0,
                         ),
                   ],
