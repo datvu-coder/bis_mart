@@ -185,10 +185,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
 
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(AppRadius.panel),
-      ),
+      decoration: AppDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -198,10 +195,10 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                 width: 68,
                 height: 68,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(AppRadius.row + 6),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.3),
+                    color: AppColors.primary.withValues(alpha: 0.3),
                     width: 2.5,
                   ),
                   image: hasAvatar
@@ -221,7 +218,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.white,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
@@ -233,9 +230,9 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                   children: [
                     Text(
                       '${AppStrings.xinChao},',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 13,
-                        color: Colors.white.withValues(alpha: 0.75),
+                        color: AppColors.textGrey,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -244,7 +241,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.white,
+                        color: AppColors.textDark,
                         letterSpacing: -0.3,
                       ),
                     ),
@@ -254,7 +251,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.18),
+                            color: AppColors.primaryLight,
                             borderRadius: BorderRadius.circular(AppRadius.chip),
                           ),
                           child: Text(
@@ -262,7 +259,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.white,
+                              color: AppColors.primary,
                             ),
                           ),
                         ),
@@ -270,7 +267,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.12),
+                            color: AppColors.surfaceVariant,
                             borderRadius: BorderRadius.circular(AppRadius.chip),
                           ),
                           child: Text(
@@ -278,7 +275,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.white,
+                              color: AppColors.textGrey,
                             ),
                           ),
                         ),
@@ -288,14 +285,14 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          Icon(Icons.store_rounded, size: 14, color: Colors.white.withValues(alpha: 0.75)),
+                          const Icon(Icons.store_rounded, size: 14, color: AppColors.textGrey),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               storeLabel,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 12.5, color: Colors.white.withValues(alpha: 0.85)),
+                              style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
                             ),
                           ),
                         ],
@@ -310,10 +307,10 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: AppColors.surfaceVariant,
                     borderRadius: BorderRadius.circular(AppRadius.row - 2),
                   ),
-                  child: const Icon(Icons.edit_rounded, color: AppColors.white, size: 18),
+                  child: const Icon(Icons.edit_rounded, color: AppColors.primary, size: 18),
                 ),
               ),
             ],
@@ -322,13 +319,13 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
             const SizedBox(height: 14),
             OutlinedButton.icon(
               onPressed: () => _showTransferStoreDialog(context, user),
-              icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: AppColors.white),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: AppColors.primary),
               label: const Text(
                 'Chuyển cửa hàng',
-                style: TextStyle(color: AppColors.white, fontSize: 13),
+                style: TextStyle(color: AppColors.primary, fontSize: 13),
               ),
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
+                side: const BorderSide(color: AppColors.border),
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.row)),
               ),
