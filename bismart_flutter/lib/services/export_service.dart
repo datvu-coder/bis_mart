@@ -201,6 +201,42 @@ tfoot td { background: #fff3ec; font-weight: 700; }
     downloadFile(bytes, fileName, 'text/html;charset=utf-8');
   }
 
+  static void exportHoursReportToCsv(
+    List<Map<String, dynamic>> rows, {
+    required String monthLabel,
+  }) {
+    final buffer = StringBuffer();
+    buffer.writeln('sep=;');
+    buffer.writeln([
+      'Nhân viên',
+      'Số ngày công',
+      'Tổng giờ',
+      'Số lần đi trễ',
+      'Phút đi trễ',
+      'Số lần về sớm',
+      'Phút về sớm',
+      'Phút tăng ca',
+    ].map(_csvCell).join(';'));
+
+    for (final r in rows) {
+      buffer.writeln([
+        (r['fullName'] ?? '').toString(),
+        (r['daysWorked'] ?? 0).toString(),
+        (r['totalHours'] ?? 0).toString(),
+        (r['lateCount'] ?? 0).toString(),
+        (r['lateMinutes'] ?? 0).toString(),
+        (r['earlyLeaveCount'] ?? 0).toString(),
+        (r['earlyLeaveMinutes'] ?? 0).toString(),
+        (r['overtimeMinutes'] ?? 0).toString(),
+      ].map(_csvCell).join(';'));
+    }
+
+    final body = buffer.toString();
+    final bytes = <int>[..._bom, ...utf8.encode(body)];
+    final safeMonth = monthLabel.replaceAll(RegExp(r'[^0-9A-Za-z]'), '_');
+    downloadFile(bytes, 'bang_gio_cong_$safeMonth.csv', 'text/csv;charset=utf-8');
+  }
+
   static String _escapeHtml(String s) => s
       .replaceAll('&', '&amp;')
       .replaceAll('<', '&lt;')

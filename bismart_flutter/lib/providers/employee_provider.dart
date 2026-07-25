@@ -3,6 +3,7 @@ import '../models/employee.dart';
 import '../models/attendance.dart';
 import '../models/work_shift.dart';
 import '../models/work_schedule.dart';
+import '../models/leave_request.dart';
 import '../services/api_service.dart';
 
 class EmployeeProvider extends ChangeNotifier {
@@ -13,6 +14,8 @@ class EmployeeProvider extends ChangeNotifier {
   List<Attendance> _historyAttendances = [];
   List<WorkShift> _shifts = [];
   List<WorkSchedule> _schedules = [];
+  List<WorkSchedule> _todaySchedules = [];
+  List<LeaveRequest> _leaveRequests = [];
   DateTime _scheduleWeekStart = _getMonday(DateTime.now());
   String? _selectedShiftStoreId;
   bool _isLoading = false;
@@ -29,6 +32,8 @@ class EmployeeProvider extends ChangeNotifier {
   List<Attendance> get historyAttendances => _historyAttendances;
   List<WorkShift> get shifts => _shifts;
   List<WorkSchedule> get schedules => _schedules;
+  List<WorkSchedule> get todaySchedules => _todaySchedules;
+  List<LeaveRequest> get leaveRequests => _leaveRequests;
   DateTime get scheduleWeekStart => _scheduleWeekStart;
   String? get selectedShiftStoreId => _selectedShiftStoreId;
   bool get isLoading => _isLoading;
@@ -49,9 +54,31 @@ class EmployeeProvider extends ChangeNotifier {
     return DateTime(d.year, d.month, d.day - diff);
   }
 
+  /// Blends each employee's manually-set `score` with a bonus/penalty
+  /// derived from this month's actual attendance quality (late/early-leave
+  /// minutes penalize, overtime minutes reward) — so the leaderboard isn't
+  /// purely a hand-entered number disconnected from the attendance data
+  /// the app already collects. Employees with no hours-report row this
+  /// month (out of scope of the currently-loaded report, or no attendance
+  /// yet) simply get no adjustment, never a crash.
   List<Employee> get rankedEmployees {
-    final sorted = List<Employee>.from(_employees);
+    final bonusByEmployeeId = <String, int>{};
+    for (final row in hoursReportRows) {
+      final empId = row['employeeId']?.toString();
+      if (empId == null) continue;
+      final lateMin = (row['lateMinutes'] as num?)?.toInt() ?? 0;
+      final earlyMin = (row['earlyLeaveMinutes'] as num?)?.toInt() ?? 0;
+      final otMin = (row['overtimeMinutes'] as num?)?.toInt() ?? 0;
+      bonusByEmployeeId[empId] = ((otMin * 0.1) - (lateMin * 0.3) - (earlyMin * 0.3)).round();
+    }
+    final sorted = _employees.map((e) {
+      final bonus = bonusByEmployeeId[e.id] ?? 0;
+      return bonus == 0 ? e : e.copyWith(score: e.score + bonus);
+    }).toList();
     sorted.sort((a, b) => b.score.compareTo(a.score));
+    for (var i = 0; i < sorted.length; i++) {
+      sorted[i] = sorted[i].copyWith(rank: i + 1);
+    }
     return sorted;
   }
 
@@ -282,20 +309,27 @@ class EmployeeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// [repeatWeeks] > 1 also creates the same employee/shift assignment on
+  /// the same weekday for the following weeks (e.g. a recurring Monday
+  /// shift), so a manager doesn't have to repeat the assignment by hand.
   Future<void> addSchedule({
     required String employeeId,
     required String shiftId,
     required DateTime workDate,
     String? note,
+    int repeatWeeks = 1,
   }) async {
-    final dateStr =
-        '${workDate.year}-${workDate.month.toString().padLeft(2, '0')}-${workDate.day.toString().padLeft(2, '0')}';
-    await _api.createEmployeeSchedule({
-      'employeeId': employeeId,
-      'shiftId': shiftId,
-      'workDate': dateStr,
-      'note': note,
-    });
+    for (var i = 0; i < repeatWeeks; i++) {
+      final date = workDate.add(Duration(days: 7 * i));
+      final dateStr =
+          '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+      await _api.createEmployeeSchedule({
+        'employeeId': employeeId,
+        'shiftId': shiftId,
+        'workDate': dateStr,
+        'note': note,
+      });
+    }
     await loadSchedules();
   }
 
@@ -303,6 +337,97 @@ class EmployeeProvider extends ChangeNotifier {
     await _api.deleteEmployeeSchedule(int.parse(id));
     _schedules.removeWhere((s) => s.id == id);
     notifyListeners();
+  }
+
+  /// Independent of [scheduleWeekStart] (which the Lịch làm việc week-grid
+  /// screen can navigate away from) so "who's scheduled today" on the
+  /// Chấm công tab always reflects today regardless of what week the
+  /// schedule screen happens to be showing.
+  Future<void> loadTodaySchedule({String? storeCode}) async {
+    final now = DateTime.now();
+    final monday = _getMonday(now);
+    final weekStr =
+        '${monday.year}-${monday.month.toString().padLeft(2, '0')}-${monday.day.toString().padLeft(2, '0')}';
+    try {
+      final data = await _api.getEmployeeSchedules(week: weekStr, storeCode: storeCode);
+      final all = data.map((s) => WorkSchedule.fromJson(s as Map<String, dynamic>)).toList();
+      _todaySchedules = all
+          .where((s) =>
+              s.workDate.year == now.year &&
+              s.workDate.month == now.month &&
+              s.workDate.day == now.day)
+          .toList();
+    } catch (_) {
+      _todaySchedules = [];
+    }
+    notifyListeners();
+  }
+
+  Future<void> loadLeaveRequests({String? storeCode, String? status}) async {
+    try {
+      final data = await _api.getLeaveRequests(storeCode: storeCode, status: status);
+      _leaveRequests = data.map((r) => LeaveRequest.fromJson(r as Map<String, dynamic>)).toList();
+    } catch (_) {
+      _leaveRequests = [];
+    }
+    notifyListeners();
+  }
+
+  Future<bool> submitLeaveRequest({
+    required DateTime startDate,
+    required DateTime endDate,
+    required String leaveType,
+    String? reason,
+  }) async {
+    String fmt(DateTime d) =>
+        '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    try {
+      final result = await _api.createLeaveRequest({
+        'startDate': fmt(startDate),
+        'endDate': fmt(endDate),
+        'leaveType': leaveType,
+        'reason': reason,
+      });
+      _leaveRequests.insert(0, LeaveRequest.fromJson(result));
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Gửi đơn nghỉ phép thất bại';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> _setLeaveStatus(String id, String status) async {
+    try {
+      final result = await _api.updateLeaveRequestStatus(int.parse(id), status);
+      final updated = LeaveRequest.fromJson(result);
+      final index = _leaveRequests.indexWhere((r) => r.id == id);
+      if (index != -1) _leaveRequests[index] = updated;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Cập nhật đơn nghỉ phép thất bại';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> approveLeaveRequest(String id) => _setLeaveStatus(id, 'approved');
+  Future<bool> rejectLeaveRequest(String id) => _setLeaveStatus(id, 'rejected');
+
+  Future<bool> cancelLeaveRequest(String id) async {
+    try {
+      await _api.deleteLeaveRequest(int.parse(id));
+      _leaveRequests.removeWhere((r) => r.id == id);
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Huỷ đơn nghỉ phép thất bại';
+      notifyListeners();
+      return false;
+    }
   }
 
   void _recalcRanks() {
