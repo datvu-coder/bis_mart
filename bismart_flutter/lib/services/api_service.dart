@@ -86,6 +86,13 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    await _dio.post('/api/auth/change-password', data: {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
+  }
+
   // ---- EMPLOYEES ----
   Future<List<dynamic>> getEmployees() async {
     final response = await _dio.get('/api/employees');

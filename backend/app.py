@@ -448,7 +448,8 @@ def api_update_profile():
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "SELECT e.id, e.full_name, e.email, e.work_location FROM users u "
+            "SELECT e.id, e.full_name, e.email, e.work_location, e.phone, e.date_of_birth, "
+            "e.cccd, e.address, e.avatar_url FROM users u "
             "LEFT JOIN employees e ON u.employee_id = e.id WHERE u.id = %s",
             (current_user.get("user_id"),),
         )
@@ -459,11 +460,17 @@ def api_update_profile():
 
     with db.cursor() as cur:
         cur.execute(
-            "UPDATE employees SET full_name = %s, email = %s, work_location = %s WHERE id = %s",
+            "UPDATE employees SET full_name = %s, email = %s, work_location = %s, phone = %s, "
+            "date_of_birth = %s, cccd = %s, address = %s, avatar_url = %s WHERE id = %s",
             (
                 data.get("fullName", existing.get("full_name")),
                 data.get("email", existing.get("email")),
                 data.get("workLocation", existing.get("work_location")),
+                data.get("phone", existing.get("phone")),
+                data.get("dateOfBirth", existing.get("date_of_birth")),
+                data.get("cccd", existing.get("cccd")),
+                data.get("address", existing.get("address")),
+                data.get("avatarUrl", existing.get("avatar_url")),
                 existing["id"],
             ),
         )
@@ -479,6 +486,35 @@ def api_update_profile():
         user_row = cur.fetchone()
 
     return jsonify({"user": _user_to_api_json(user_row)})
+
+
+@app.post("/api/auth/change-password")
+@login_required
+def api_change_password():
+    """Self-service password change — requires the current password."""
+    data = request.get_json(silent=True) or {}
+    current_password = (data.get("currentPassword") or "").strip()
+    new_password = (data.get("newPassword") or "").strip()
+    if not current_password or not new_password:
+        return jsonify({"error": "Vui lòng nhập đầy đủ mật khẩu"}), 400
+    if len(new_password) < 4:
+        return jsonify({"error": "Mật khẩu mới phải có ít nhất 4 ký tự"}), 400
+
+    user_id = (g.current_user or {}).get("user_id")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT password_hash FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+
+    if not row or not row.get("password_hash") or not check_password_hash(row["password_hash"], current_password):
+        return jsonify({"error": "Mật khẩu hiện tại không đúng"}), 401
+
+    new_hash = generate_password_hash(new_password, method="pbkdf2:sha256")
+    with db.cursor() as cur:
+        cur.execute("UPDATE users SET password_hash = %s WHERE id = %s", (new_hash, user_id))
+    db.commit()
+
+    return jsonify({"ok": True})
 
 
 @app.get("/api/dashboard")

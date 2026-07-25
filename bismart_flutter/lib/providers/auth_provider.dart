@@ -84,13 +84,28 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateProfile({String? fullName, String? email, String? position, String? workLocation}) async {
+  Future<void> updateProfile({
+    String? fullName,
+    String? email,
+    String? position,
+    String? workLocation,
+    String? phone,
+    String? dateOfBirth,
+    String? cccd,
+    String? address,
+    String? avatarUrl,
+  }) async {
     if (_currentUser == null) return;
     try {
       final data = <String, dynamic>{};
       if (fullName != null) data['fullName'] = fullName;
       if (email != null) data['email'] = email;
       if (workLocation != null) data['workLocation'] = workLocation;
+      if (phone != null) data['phone'] = phone;
+      if (dateOfBirth != null) data['dateOfBirth'] = dateOfBirth;
+      if (cccd != null) data['cccd'] = cccd;
+      if (address != null) data['address'] = address;
+      if (avatarUrl != null) data['avatarUrl'] = avatarUrl;
       final result = await _api.updateProfile(data);
       final userData = result['user'] as Map<String, dynamic>;
       _currentUser = Employee.fromJson(userData);
@@ -102,8 +117,37 @@ class AuthProvider extends ChangeNotifier {
         email: email,
         position: position,
         workLocation: workLocation,
+        phone: phone,
+        dateOfBirth: dateOfBirth,
+        cccd: cccd,
+        address: address,
+        avatarUrl: avatarUrl,
       );
       notifyListeners();
     }
+  }
+
+  Future<bool> changePassword({required String currentPassword, required String newPassword}) async {
+    try {
+      await _api.changePassword(currentPassword: currentPassword, newPassword: newPassword);
+      _error = null;
+      return true;
+    } catch (e) {
+      _error = _describeChangePasswordError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  String _describeChangePasswordError(Object e) {
+    if (e is DioException) {
+      final status = e.response?.statusCode;
+      final data = e.response?.data;
+      final serverMessage = data is Map ? data['error']?.toString() : null;
+      if (serverMessage != null && serverMessage.isNotEmpty) return serverMessage;
+      if (status == 401) return 'Mật khẩu hiện tại không đúng.';
+      return 'Không thể đổi mật khẩu. Vui lòng thử lại.';
+    }
+    return e.toString();
   }
 }
