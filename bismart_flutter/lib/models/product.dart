@@ -34,6 +34,8 @@ class Product {
   final String? barcode;
   final String? imageUrl;
   final List<ProductConversion> conversions;
+  final double stockQuantity;
+  final double lowStockThreshold;
 
   Product({
     required this.id,
@@ -45,7 +47,11 @@ class Product {
     this.barcode,
     this.imageUrl,
     this.conversions = const [],
+    this.stockQuantity = 0,
+    this.lowStockThreshold = 5,
   });
+
+  bool get isLowStock => stockQuantity <= lowStockThreshold;
 
   factory Product.fromJson(Map<String, dynamic> json) {
     final rawConversions = json['conversions'] as List<dynamic>?;
@@ -63,6 +69,8 @@ class Product {
           : rawConversions
               .map((c) => ProductConversion.fromJson(c as Map<String, dynamic>))
               .toList(),
+      stockQuantity: (json['stockQuantity'] as num?)?.toDouble() ?? 0,
+      lowStockThreshold: (json['lowStockThreshold'] as num?)?.toDouble() ?? 5,
     );
   }
 
@@ -76,5 +84,7 @@ class Product {
         'barcode': barcode,
         'imageUrl': imageUrl,
         'conversions': conversions.map((c) => c.toJson()).toList(),
+        'stockQuantity': stockQuantity,
+        'lowStockThreshold': lowStockThreshold,
       };
 }

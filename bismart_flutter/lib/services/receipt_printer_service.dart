@@ -61,6 +61,9 @@ class ReceiptPrinterService {
     required List<SaleItem> items,
     required double subtotal,
     required String paymentMethod,
+    double discountAmount = 0,
+    String? customerName,
+    String? customerPhone,
     int width = 32,
   }) {
     final bytes = <int>[];
@@ -76,14 +79,26 @@ class ReceiptPrinterService {
         '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year} '
         '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}\n'));
     bytes.addAll(utf8.encode('NV: $pgName\n'));
+    if ((customerName ?? '').isNotEmpty) {
+      bytes.addAll(utf8.encode('KH: $customerName\n'));
+    }
+    if ((customerPhone ?? '').isNotEmpty) {
+      bytes.addAll(utf8.encode('SDT: $customerPhone\n'));
+    }
     bytes.addAll(utf8.encode('-' * width + '\n'));
+    double itemsTotal = 0;
     for (final item in items) {
+      itemsTotal += item.total;
       bytes.addAll(utf8.encode('${item.productName}\n'));
       final qtyPrice = '${item.quantity} x ${item.unitPrice.toStringAsFixed(0)}';
       final total = item.total.toStringAsFixed(0);
       bytes.addAll(utf8.encode('${_padRow(qtyPrice, total, width)}\n'));
     }
     bytes.addAll(utf8.encode('-' * width + '\n'));
+    if (discountAmount > 0) {
+      bytes.addAll(utf8.encode('${_padRow('Tam tinh', itemsTotal.toStringAsFixed(0), width)}\n'));
+      bytes.addAll(utf8.encode('${_padRow('Giam gia', '-${discountAmount.toStringAsFixed(0)}', width)}\n'));
+    }
     bytes.addAll(_boldOn);
     bytes.addAll(utf8.encode('${_padRow('TONG CONG', subtotal.toStringAsFixed(0), width)}\n'));
     bytes.addAll(_boldOff);
@@ -105,6 +120,9 @@ class ReceiptPrinterService {
     required List<SaleItem> items,
     required double subtotal,
     required String paymentMethod,
+    double discountAmount = 0,
+    String? customerName,
+    String? customerPhone,
   }) async {
     final settings = await loadSettings();
     final ip = settings['ip'] as String;
@@ -120,6 +138,9 @@ class ReceiptPrinterService {
       items: items,
       subtotal: subtotal,
       paymentMethod: paymentMethod,
+      discountAmount: discountAmount,
+      customerName: customerName,
+      customerPhone: customerPhone,
       width: width,
     );
     final socket = await Socket.connect(ip, port, timeout: const Duration(seconds: 5));

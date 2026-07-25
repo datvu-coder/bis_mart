@@ -199,6 +199,24 @@ class SalesProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> createReturn(String reportId, double amount, String? reason) async {
+    try {
+      final result = await _api.createReportReturn(int.parse(reportId), amount, reason);
+      final returnedAmount = (result['returnedAmount'] as num?)?.toDouble() ?? 0;
+      final index = _reports.indexWhere((r) => r.id == reportId);
+      if (index != -1) {
+        _reports[index] = _reports[index].copyWith(returnedAmount: returnedAmount);
+      }
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _describeError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
   SalesReport? getReportById(String id) {
     try {
       return _reports.firstWhere((r) => r.id == id);

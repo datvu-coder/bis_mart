@@ -196,6 +196,8 @@ void showAddProductDialog(BuildContext context) {
   final nameCtrl = TextEditingController();
   final priceCtrl = TextEditingController();
   final barcodeCtrl = TextEditingController();
+  final stockQtyCtrl = TextEditingController(text: '0');
+  final lowStockCtrl = TextEditingController(text: '5');
   String unit = _kProductUnits.first;
   String group = _kProductGroups.first;
   bool saving = false;
@@ -209,6 +211,8 @@ void showAddProductDialog(BuildContext context) {
       nameCtrl.text = p.name;
       priceCtrl.text = _trimNumber(p.priceWithVAT);
       barcodeCtrl.text = p.barcode ?? '';
+      stockQtyCtrl.text = _trimNumber(p.stockQuantity);
+      lowStockCtrl.text = _trimNumber(p.lowStockThreshold);
       unit = _kProductUnits.contains(p.unit) ? p.unit : _kProductUnits.first;
       group = _kProductGroups.contains(p.productGroup) ? p.productGroup : _kProductGroups.first;
       imageDataUrl = p.imageUrl;
@@ -414,6 +418,26 @@ void showAddProductDialog(BuildContext context) {
                 keyboardType: TextInputType.number,
               ),
               const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: stockQtyCtrl,
+                      decoration: const InputDecoration(labelText: 'Tồn kho'),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      controller: lowStockCtrl,
+                      decoration: const InputDecoration(labelText: 'Ngưỡng cảnh báo'),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               DropdownButtonFormField<String>(
                 initialValue: unit,
                 decoration: const InputDecoration(labelText: 'Đơn vị chuẩn (đơn vị lớn nhất)'),
@@ -553,6 +577,8 @@ void showAddProductDialog(BuildContext context) {
                   productGroup: group,
                   barcode: barcodeCtrl.text.trim().isEmpty ? null : barcodeCtrl.text.trim(),
                   imageUrl: imageDataUrl,
+                  stockQuantity: double.tryParse(stockQtyCtrl.text) ?? 0,
+                  lowStockThreshold: double.tryParse(lowStockCtrl.text) ?? 5,
                   conversions: [
                     for (final c in conversions)
                       if (c.unitCtrl.text.trim().isNotEmpty)

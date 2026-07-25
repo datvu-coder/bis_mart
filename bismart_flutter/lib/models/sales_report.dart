@@ -12,6 +12,10 @@ class SalesReport {
   final int points;
   final String? employeeCode;
   final String? paymentMethod;
+  final double discountAmount;
+  final String? customerName;
+  final String? customerPhone;
+  final double returnedAmount;
 
   SalesReport({
     required this.id,
@@ -27,6 +31,10 @@ class SalesReport {
     this.points = 0,
     this.employeeCode,
     this.paymentMethod,
+    this.discountAmount = 0,
+    this.customerName,
+    this.customerPhone,
+    this.returnedAmount = 0,
   });
 
   factory SalesReport.fromJson(Map<String, dynamic> json) {
@@ -47,6 +55,10 @@ class SalesReport {
       points: json['points'] as int? ?? 0,
       employeeCode: json['employeeCode'] as String?,
       paymentMethod: json['paymentMethod'] as String?,
+      discountAmount: (json['discountAmount'] as num?)?.toDouble() ?? 0,
+      customerName: json['customerName'] as String?,
+      customerPhone: json['customerPhone'] as String?,
+      returnedAmount: (json['returnedAmount'] as num?)?.toDouble() ?? 0,
     );
   }
 
@@ -63,7 +75,32 @@ class SalesReport {
         'reportMonth': reportMonth,
         'employeeCode': employeeCode,
         'paymentMethod': paymentMethod,
+        'discountAmount': discountAmount,
+        'customerName': customerName,
+        'customerPhone': customerPhone,
       };
+
+  SalesReport copyWith({double? returnedAmount}) {
+    return SalesReport(
+      id: id,
+      date: date,
+      pgName: pgName,
+      nu: nu,
+      saleOut: saleOut,
+      products: products,
+      revenue: revenue,
+      storeName: storeName,
+      storeCode: storeCode,
+      reportMonth: reportMonth,
+      points: points,
+      employeeCode: employeeCode,
+      paymentMethod: paymentMethod,
+      discountAmount: discountAmount,
+      customerName: customerName,
+      customerPhone: customerPhone,
+      returnedAmount: returnedAmount ?? this.returnedAmount,
+    );
+  }
 }
 
 class SaleItem {
@@ -101,5 +138,7 @@ class SaleItem {
         'productName': productName,
         'quantity': quantity,
         'unitPrice': unitPrice,
+        'unit': unit,
+        'productGroup': productGroup,
       };
 }

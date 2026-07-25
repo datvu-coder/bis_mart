@@ -14,6 +14,8 @@ import '../../widgets/common/responsive_form.dart';
 import 'barcode_scanner_screen.dart';
 import 'receipt_preview_screen.dart';
 
+String _trimStock(double v) => v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
 /// Dedicated "Tạo đơn hàng" screen: pick products into a cart, then check
 /// out. Pushed as its own full-screen route from the Bán hàng tab (which
 /// itself only *displays* the product catalog and sales history) so order
@@ -59,9 +61,27 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     super.dispose();
   }
 
-  void _addToCart(Product product) {
+  /// Adds one unit of [product] to the cart. If the product has "Quy đổi"
+  /// conversion units defined, prompts the user to pick which unit (base or
+  /// a conversion level) is being sold before adding — each unit carries its
+  /// own price and is tracked as a distinct cart line. Returns false if the
+  /// picker was dismissed without a choice.
+  Future<bool> _addToCart(Product product) async {
+    String unit = product.unit;
+    double price = product.priceWithVAT;
+    if (product.conversions.isNotEmpty) {
+      final choice = await showModalBottomSheet<_UnitChoice>(
+        context: context,
+        backgroundColor: AppColors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        builder: (sheetCtx) => _UnitPickerSheet(product: product),
+      );
+      if (choice == null || !mounted) return false;
+      unit = choice.unit;
+      price = choice.price;
+    }
     setState(() {
-      final index = _cart.indexWhere((item) => item.productId == product.id);
+      final index = _cart.indexWhere((item) => item.productId == product.id && item.unit == unit);
       if (index != -1) {
         final existing = _cart[index];
         _cart[index] = SaleItem(
@@ -69,16 +89,21 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
           productName: existing.productName,
           quantity: existing.quantity + 1,
           unitPrice: existing.unitPrice,
+          unit: existing.unit,
+          productGroup: existing.productGroup,
         );
       } else {
         _cart.add(SaleItem(
           productId: product.id,
           productName: product.name,
           quantity: 1,
-          unitPrice: product.priceWithVAT,
+          unitPrice: price,
+          unit: unit,
+          productGroup: product.productGroup,
         ));
       }
     });
+    return true;
   }
 
   void _updateCartQty(int index, int delta) {
@@ -93,6 +118,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
           productName: item.productName,
           quantity: newQty,
           unitPrice: item.unitPrice,
+          unit: item.unit,
+          productGroup: item.productGroup,
         );
       }
     });
@@ -120,7 +147,8 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
       );
       return;
     }
-    _addToCart(match);
+    final added = await _addToCart(match);
+    if (!mounted || !added) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Đã thêm "${match.name}" vào giỏ hàng'),
@@ -283,6 +311,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
     final user = context.read<AuthProvider>().currentUser;
     final revenueCtrl = TextEditingController(text: _subtotal.toStringAsFixed(0));
     final cashReceivedCtrl = TextEditingController();
+    final discountCtrl = TextEditingController(text: '0');
+    final customerNameCtrl = TextEditingController();
+    final customerPhoneCtrl = TextEditingController();
     int nu = 0;
     String paymentMethod = 'cash';
     bool isSubmitting = false;
@@ -306,8 +337,10 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: Text(item.productName,
-                          style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600)),
+                      child: Text(
+                        (item.unit ?? '').isEmpty ? item.productName : '${item.productName} (${item.unit})',
+                        style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600),
+                      ),
                     ),
                     IconButton(
                       onPressed: () {
@@ -364,6 +397,13 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                   style: AppTextStyles.sectionHeader.copyWith(color: AppColors.primary),
                 ),
               ],
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: discountCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Giảm giá', suffixText: 'đ', isDense: true),
+              onChanged: (_) => setDialogState(() {}),
             ),
             const SizedBox(height: 10),
             Row(
@@ -459,6 +499,19 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                 ],
               ),
             ],
+            const SizedBox(height: 10),
+            Text('Thông tin khách hàng (tùy chọn)', style: AppTextStyles.metricLabel),
+            const SizedBox(height: 6),
+            TextField(
+              controller: customerNameCtrl,
+              decoration: const InputDecoration(labelText: 'Tên khách hàng', isDense: true),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: customerPhoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(labelText: 'SĐT khách hàng', isDense: true),
+            ),
           ],
         );
       },
@@ -507,6 +560,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                     storeName: storeNameForReceipt,
                     employeeCode: user?.employeeCode,
                     paymentMethod: paymentMethod,
+                    discountAmount: double.tryParse(discountCtrl.text) ?? 0,
+                    customerName: customerNameCtrl.text.trim().isEmpty ? null : customerNameCtrl.text.trim(),
+                    customerPhone: customerPhoneCtrl.text.trim().isEmpty ? null : customerPhoneCtrl.text.trim(),
                   );
 
                   final salesProvider = context.read<SalesProvider>();
@@ -533,6 +589,9 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
                           items: itemsForReceipt,
                           subtotal: revenue,
                           paymentMethod: paymentMethod,
+                          discountAmount: report.discountAmount,
+                          customerName: report.customerName,
+                          customerPhone: report.customerPhone,
                         ),
                       ),
                     );
@@ -657,6 +716,20 @@ class _OrderProductRow extends StatelessWidget {
                           style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary),
                         ),
                       ),
+                      if (product.isLowStock) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                          ),
+                          child: Text(
+                            'Tồn: ${_trimStock(product.stockQuantity)}',
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.error),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -674,6 +747,78 @@ class _OrderProductRow extends StatelessWidget {
                 const Icon(Icons.add_circle_rounded, size: 22, color: AppColors.primary),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The unit + price a staff member picked for a product with "Quy đổi"
+/// conversion levels defined.
+class _UnitChoice {
+  final String unit;
+  final double price;
+
+  const _UnitChoice({required this.unit, required this.price});
+}
+
+/// Bottom sheet listing a product's base unit plus every "Quy đổi"
+/// conversion level, each with its own price — shown before adding a
+/// product with conversions to the cart so staff pick which unit is
+/// actually being sold (e.g. "Thùng" vs "Lốc" vs "Hộp").
+class _UnitPickerSheet extends StatelessWidget {
+  final Product product;
+
+  const _UnitPickerSheet({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text('Chọn đơn vị bán', style: AppTextStyles.sectionHeader),
+            const SizedBox(height: 2),
+            Text(product.name, style: AppTextStyles.caption, maxLines: 1, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 8),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.inventory_2_rounded, color: AppColors.primary),
+              title: Text(product.unit, style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: const Text('Đơn vị chuẩn'),
+              trailing: Text(
+                CurrencyFormatter.formatVND(product.priceWithVAT),
+                style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
+              ),
+              onTap: () => Navigator.pop(
+                context,
+                _UnitChoice(unit: product.unit, price: product.priceWithVAT),
+              ),
+            ),
+            for (final c in product.conversions)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.swap_horiz_rounded, color: AppColors.textGrey),
+                title: Text(c.unit, style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Quy đổi'),
+                trailing: Text(
+                  CurrencyFormatter.formatVND(c.price),
+                  style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w700, color: AppColors.primary),
+                ),
+                onTap: () => Navigator.pop(context, _UnitChoice(unit: c.unit, price: c.price)),
+              ),
           ],
         ),
       ),
