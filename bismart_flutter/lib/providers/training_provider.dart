@@ -110,20 +110,29 @@ class TrainingProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> addCommentText(String postId, String text, {String authorName = 'Bạn'}) async {
+  /// Posts a comment. Adds it to the local list optimistically, but rolls
+  /// that back and returns false if the server call fails, so a failed post
+  /// doesn't silently vanish next time comments are refreshed from the server.
+  Future<bool> addCommentText(String postId, String text, {String authorName = 'Bạn'}) async {
     final index = _posts.indexWhere((p) => p.id == postId);
-    if (index != -1) {
-      _posts[index].comments.add(
-        PostComment(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          authorName: authorName,
-          text: text,
-          createdAt: DateTime.now(),
-        ),
-      );
-      _posts[index].commentCount++;
+    if (index == -1) return false;
+    final optimistic = PostComment(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      authorName: authorName,
+      text: text,
+      createdAt: DateTime.now(),
+    );
+    _posts[index].comments.add(optimistic);
+    _posts[index].commentCount++;
+    notifyListeners();
+    try {
+      await _api.addComment(int.parse(postId), text: text, authorName: authorName);
+      return true;
+    } catch (_) {
+      _posts[index].comments.remove(optimistic);
+      _posts[index].commentCount--;
       notifyListeners();
-      try { await _api.addComment(int.parse(postId), text: text, authorName: authorName); } catch (_) {}
+      return false;
     }
   }
 

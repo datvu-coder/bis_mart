@@ -43,13 +43,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         final data = provider.data;
         if (data == null) {
+          final hasError = provider.error != null;
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.inbox_rounded, size: 48, color: AppColors.textHint),
+                Icon(
+                  hasError ? Icons.error_outline_rounded : Icons.inbox_rounded,
+                  size: 48,
+                  color: hasError ? AppColors.error : AppColors.textHint,
+                ),
                 const SizedBox(height: 12),
-                Text('Không có dữ liệu', style: AppTextStyles.bodyText),
+                Text(
+                  hasError ? provider.error! : 'Không có dữ liệu',
+                  style: AppTextStyles.bodyText,
+                  textAlign: TextAlign.center,
+                ),
+                if (hasError) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: provider.loadDashboard,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Thử lại'),
+                  ),
+                ],
               ],
             ),
           );
@@ -381,7 +398,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             height: 44,
             decoration: BoxDecoration(
               color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.row),
             ),
             child: const Icon(Icons.campaign_rounded, color: AppColors.primary, size: 22),
           ),
@@ -420,7 +437,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 height: 32,
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
                 ),
                 child: Icon(icon, color: AppColors.primary, size: 18),
               ),
@@ -450,7 +467,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 height: 32,
                 decoration: BoxDecoration(
                   color: AppColors.warningLight,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
                 ),
                 child: const Icon(Icons.star_rounded, color: AppColors.warning, size: 18),
               ),
@@ -497,7 +514,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 height: 32,
                 decoration: BoxDecoration(
                   color: AppColors.warningLight,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
                 ),
                 child: const Icon(Icons.emoji_events_rounded, color: AppColors.warning, size: 18),
               ),

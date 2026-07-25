@@ -25,6 +25,7 @@ class PostDetailScreen extends StatefulWidget {
 
 class _PostDetailScreenState extends State<PostDetailScreen> {
   final TextEditingController _commentCtrl = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
   bool _sending = false;
   bool _loadingComments = true;
 
@@ -55,10 +56,22 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     final text = _commentCtrl.text.trim();
     if (text.isEmpty) return;
     setState(() => _sending = true);
+    _commentCtrl.clear();
+    FocusScope.of(context).unfocus();
     try {
-      _commentCtrl.clear();
-      FocusScope.of(context).unfocus();
-      await provider.addCommentText(widget.postId, text, authorName: name);
+      final ok = await provider.addCommentText(widget.postId, text, authorName: name);
+      if (!ok) {
+        if (mounted) {
+          _commentCtrl.text = text;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Không thể gửi bình luận. Vui lòng thử lại.'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
       // Re-pull from server now that the comment is persisted, so any other
       // comments made elsewhere appear too and the new one gets its real
       // server id / timestamp.
@@ -71,6 +84,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   void dispose() {
     _commentCtrl.dispose();
+    _commentFocusNode.dispose();
     super.dispose();
   }
 
@@ -265,7 +279,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       Icons.chat_bubble_outline_rounded,
                       'Bình luận',
                       AppColors.textGrey,
-                      () => FocusScope.of(context).requestFocus(FocusNode()))),
+                      () => _commentFocusNode.requestFocus())),
               Expanded(
                   child: _action(Icons.share_outlined, 'Chia sẻ',
                       AppColors.textGrey, null)),
@@ -312,7 +326,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadius.row),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,6 +392,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           Expanded(
             child: TextField(
               controller: _commentCtrl,
+              focusNode: _commentFocusNode,
               decoration: InputDecoration(
                 hintText: 'Viết bình luận…',
                 filled: true,

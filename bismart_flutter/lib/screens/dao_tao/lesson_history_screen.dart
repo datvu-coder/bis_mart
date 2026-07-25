@@ -200,11 +200,15 @@ class _LessonHistoryScreenState extends State<LessonHistoryScreen> {
     if (partId.isNotEmpty) {
       try {
         final pid = int.parse(partId);
-        final p = widget.lesson.parts.firstWhere(
-          (e) => int.tryParse(e.id) == pid,
-          orElse: () => LessonPart(id: '0', lessonId: '', title: 'Phần $partId'),
-        );
-        partTitle = p.title.isEmpty ? 'Phần ${p.orderIndex}' : p.title;
+        // Use the part's position in the displayed list (1-based), matching
+        // the numbering shown in lesson_detail_screen.dart, rather than the
+        // raw orderIndex field which can be sparse/out of sync with it.
+        final idx = widget.lesson.parts.indexWhere((e) => int.tryParse(e.id) == pid);
+        partTitle = idx == -1
+            ? 'Phần $partId'
+            : (widget.lesson.parts[idx].title.isEmpty
+                ? 'Phần ${idx + 1}'
+                : widget.lesson.parts[idx].title);
       } catch (_) {}
     }
     return Padding(
