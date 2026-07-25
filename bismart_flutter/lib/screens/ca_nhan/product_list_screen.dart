@@ -5,7 +5,6 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../providers/product_provider.dart';
 import '../../widgets/common/add_product_dialog.dart';
-import '../../widgets/common/screen_header_card.dart';
 import '../../widgets/common/gradient_fab.dart';
 
 class ProductListScreen extends StatefulWidget {
@@ -24,6 +23,23 @@ class _ProductListScreenState extends State<ProductListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProductProvider>().loadProducts();
     });
+  }
+
+  /// Plain title (+ subtitle on wide screens), matching the headerless
+  /// style the other tabs use instead of a bordered icon-avatar card.
+  Widget _buildHeader(String subtitle) {
+    final isCompactMobile = MediaQuery.of(context).size.width < 430;
+    if (isCompactMobile) {
+      return Text('Danh sách sản phẩm', style: AppTextStyles.appTitle);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Danh sách sản phẩm', style: AppTextStyles.appTitle),
+        const SizedBox(height: 2),
+        Text(subtitle, style: AppTextStyles.caption),
+      ],
+    );
   }
 
   /// Group filter as a dropdown menu anchored to the search field's own
@@ -93,13 +109,10 @@ class _ProductListScreenState extends State<ProductListScreen> {
           body: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                child: ScreenHeaderCard(
-                  icon: Icons.inventory_2_rounded,
-                  iconColor: AppColors.primary,
-                  iconBg: AppColors.primaryLight,
-                  title: 'Danh sách sản phẩm',
-                  subtitle: '${products.length} sản phẩm',
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _buildHeader('${products.length} sản phẩm'),
                 ),
               ),
               Padding(

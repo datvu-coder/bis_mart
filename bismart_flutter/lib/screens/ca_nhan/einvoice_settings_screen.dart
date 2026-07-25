@@ -261,7 +261,7 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
                                   child: CircularProgressIndicator(
                                       strokeWidth: 2, color: AppColors.white))
                               : const Icon(Icons.save_rounded, size: 18),
-                          label: const Text('Lưu cấu hình'),
+                          label: const Text('Lưu'),
                         ),
                       ),
                     ],

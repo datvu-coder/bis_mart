@@ -8,7 +8,6 @@ import '../../providers/store_provider.dart';
 import '../../providers/permission_provider.dart';
 import '../../services/location_service.dart';
 import '../../widgets/common/responsive_form.dart';
-import '../../widgets/common/screen_header_card.dart';
 import '../../widgets/common/gradient_fab.dart';
 
 class StoreListScreen extends StatefulWidget {
@@ -27,6 +26,23 @@ class _StoreListScreenState extends State<StoreListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<StoreProvider>().loadStores();
     });
+  }
+
+  /// Plain title (+ subtitle on wide screens), matching the headerless
+  /// style the other tabs use instead of a bordered icon-avatar card.
+  Widget _buildHeader(String subtitle) {
+    final isCompactMobile = MediaQuery.of(context).size.width < 430;
+    if (isCompactMobile) {
+      return Text('Danh sách cửa hàng', style: AppTextStyles.appTitle);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Danh sách cửa hàng', style: AppTextStyles.appTitle),
+        const SizedBox(height: 2),
+        Text(subtitle, style: AppTextStyles.caption),
+      ],
+    );
   }
 
   /// Group filter as a dropdown menu anchored to the search field's own
@@ -107,13 +123,10 @@ class _StoreListScreenState extends State<StoreListScreen> {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-            child: ScreenHeaderCard(
-              icon: Icons.store_rounded,
-              iconColor: AppColors.primary,
-              iconBg: AppColors.primaryLight,
-              title: 'Danh sách cửa hàng',
-              subtitle: '${stores.length} cửa hàng',
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: _buildHeader('${stores.length} cửa hàng'),
             ),
           ),
           // Search
