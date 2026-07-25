@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/sales_report.dart';
@@ -14,6 +15,9 @@ class ReceiptPreviewScreen extends StatefulWidget {
   final List<SaleItem> items;
   final double subtotal;
   final String paymentMethod;
+  final double discountAmount;
+  final String? customerName;
+  final String? customerPhone;
 
   const ReceiptPreviewScreen({
     super.key,
@@ -23,6 +27,9 @@ class ReceiptPreviewScreen extends StatefulWidget {
     required this.items,
     required this.subtotal,
     required this.paymentMethod,
+    this.discountAmount = 0,
+    this.customerName,
+    this.customerPhone,
   });
 
   @override
@@ -42,6 +49,9 @@ class _ReceiptPreviewScreenState extends State<ReceiptPreviewScreen> {
         items: widget.items,
         subtotal: widget.subtotal,
         paymentMethod: widget.paymentMethod,
+        discountAmount: widget.discountAmount,
+        customerName: widget.customerName,
+        customerPhone: widget.customerPhone,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -69,6 +79,59 @@ class _ReceiptPreviewScreenState extends State<ReceiptPreviewScreen> {
     final space = width - left.length - right.length;
     if (space <= 0) return '$left $right';
     return left + ' ' * space + right;
+  }
+
+  /// Plain-text version of the receipt — used for the "Sao chép hóa đơn"
+  /// fallback so staff can paste it into Zalo/SMS/email when no WiFi
+  /// printer is configured, instead of being stuck with only "In hoá đơn".
+  String _buildReceiptText() {
+    const width = 32;
+    final divider = '-' * width;
+    final buffer = StringBuffer();
+    buffer.writeln(widget.storeName);
+    buffer.writeln('HOA DON BAN HANG');
+    buffer.writeln(divider);
+    buffer.writeln(
+        '${widget.date.day.toString().padLeft(2, '0')}/${widget.date.month.toString().padLeft(2, '0')}/${widget.date.year} '
+        '${widget.date.hour.toString().padLeft(2, '0')}:${widget.date.minute.toString().padLeft(2, '0')}');
+    buffer.writeln('NV: ${widget.pgName}');
+    if ((widget.customerName ?? '').isNotEmpty) buffer.writeln('KH: ${widget.customerName}');
+    if ((widget.customerPhone ?? '').isNotEmpty) buffer.writeln('SDT: ${widget.customerPhone}');
+    buffer.writeln(divider);
+    for (final item in widget.items) {
+      buffer.writeln(item.productName);
+      buffer.writeln(_padRow(
+        '${item.quantity} x ${item.unitPrice.toStringAsFixed(0)}',
+        item.total.toStringAsFixed(0),
+        width,
+      ));
+    }
+    buffer.writeln(divider);
+    if (widget.discountAmount > 0) {
+      buffer.writeln(_padRow(
+        'Tam tinh',
+        widget.items.fold<double>(0, (s, i) => s + i.total).toStringAsFixed(0),
+        width,
+      ));
+      buffer.writeln(_padRow('Giam gia', '-${widget.discountAmount.toStringAsFixed(0)}', width));
+    }
+    buffer.writeln(_padRow('TONG CONG', widget.subtotal.toStringAsFixed(0), width));
+    buffer.writeln('Thanh toan: ${widget.paymentMethod == 'transfer' ? 'Chuyen khoan' : 'Tien mat'}');
+    buffer.writeln(divider);
+    buffer.write('Cam on quy khach!');
+    return buffer.toString();
+  }
+
+  Future<void> _copyToClipboard() async {
+    await Clipboard.setData(ClipboardData(text: _buildReceiptText()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đã sao chép hoá đơn'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.success,
+      ),
+    );
   }
 
   @override
@@ -113,6 +176,8 @@ class _ReceiptPreviewScreenState extends State<ReceiptPreviewScreen> {
                           '${widget.date.hour.toString().padLeft(2, '0')}:${widget.date.minute.toString().padLeft(2, '0')}',
                         ),
                         Text('NV: ${widget.pgName}'),
+                        if ((widget.customerName ?? '').isNotEmpty) Text('KH: ${widget.customerName}'),
+                        if ((widget.customerPhone ?? '').isNotEmpty) Text('SDT: ${widget.customerPhone}'),
                         Text(divider),
                         ...widget.items.expand((item) => [
                               Text(item.productName),
@@ -123,6 +188,14 @@ class _ReceiptPreviewScreenState extends State<ReceiptPreviewScreen> {
                               )),
                             ]),
                         Text(divider),
+                        if (widget.discountAmount > 0) ...[
+                          Text(_padRow(
+                            'Tam tinh',
+                            widget.items.fold<double>(0, (s, i) => s + i.total).toStringAsFixed(0),
+                            width,
+                          )),
+                          Text(_padRow('Giam gia', '-${widget.discountAmount.toStringAsFixed(0)}', width)),
+                        ],
                         Text(
                           _padRow('TONG CONG', widget.subtotal.toStringAsFixed(0), width),
                           style: const TextStyle(fontWeight: FontWeight.w800),
@@ -141,17 +214,30 @@ class _ReceiptPreviewScreenState extends State<ReceiptPreviewScreen> {
             top: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Đóng'),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Đóng'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _copyToClipboard,
+                          icon: const Icon(Icons.copy_rounded, size: 16),
+                          label: const Text('Sao chép'),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
                     child: ElevatedButton.icon(
                       onPressed: _printing ? null : _print,
                       icon: _printing

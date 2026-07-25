@@ -173,6 +173,10 @@ def _report_to_api_json(report_row: dict[str, Any], products: list[dict[str, Any
         "points": int(report_row.get("points") or 0),
         "employeeCode": report_row.get("employee_code"),
         "paymentMethod": report_row.get("payment_method"),
+        "discountAmount": float(report_row.get("discount_amount") or 0),
+        "customerName": report_row.get("customer_name"),
+        "customerPhone": report_row.get("customer_phone"),
+        "returnedAmount": float(report_row.get("returned_amount") or 0),
     }
 
 
@@ -198,6 +202,8 @@ def _product_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
         "barcode": row.get("barcode"),
         "imageUrl": row.get("image_url"),
         "conversions": _product_conversions_from_row(row),
+        "stockQuantity": float(row.get("stock_quantity") or 0),
+        "lowStockThreshold": float(row.get("low_stock_threshold") or 0),
     }
 
 
@@ -1364,7 +1370,7 @@ def api_get_products():
     with db.cursor() as cur:
         cur.execute(
             "SELECT id, name, unit, price_with_vat, product_group, product_condition, barcode, "
-            "image_url, conversions_json "
+            "image_url, conversions_json, stock_quantity, low_stock_threshold "
             "FROM products ORDER BY id ASC"
         )
         rows = cur.fetchall()
@@ -1383,10 +1389,10 @@ def api_create_product():
     with db.cursor() as cur:
         cur.execute(
             "INSERT INTO products (name, unit, price_with_vat, product_group, product_condition, barcode, "
-            "image_url, conversions_json) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+            "image_url, conversions_json, stock_quantity, low_stock_threshold) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
             "RETURNING id, name, unit, price_with_vat, product_group, product_condition, barcode, "
-            "image_url, conversions_json",
+            "image_url, conversions_json, stock_quantity, low_stock_threshold",
             (
                 data.get("name", ""),
                 data.get("unit", "Lon"),
@@ -1396,6 +1402,8 @@ def api_create_product():
                 (data.get("barcode") or "").strip() or None,
                 data.get("imageUrl") or None,
                 conversions_json,
+                data.get("stockQuantity", 0),
+                data.get("lowStockThreshold", 5),
             ),
         )
         row = cur.fetchone()
@@ -1415,9 +1423,10 @@ def api_update_product(product_id: int):
     with db.cursor() as cur:
         cur.execute(
             "UPDATE products SET name = %s, unit = %s, price_with_vat = %s, product_group = %s, "
-            "product_condition = %s, barcode = %s, image_url = %s, conversions_json = %s "
+            "product_condition = %s, barcode = %s, image_url = %s, conversions_json = %s, "
+            "stock_quantity = %s, low_stock_threshold = %s "
             "WHERE id = %s RETURNING id, name, unit, price_with_vat, product_group, product_condition, barcode, "
-            "image_url, conversions_json",
+            "image_url, conversions_json, stock_quantity, low_stock_threshold",
             (
                 data.get("name", ""),
                 data.get("unit", "Lon"),
@@ -1427,6 +1436,8 @@ def api_update_product(product_id: int):
                 (data.get("barcode") or "").strip() or None,
                 data.get("imageUrl") or None,
                 conversions_json,
+                data.get("stockQuantity", 0),
+                data.get("lowStockThreshold", 5),
                 product_id,
             ),
         )
@@ -1447,6 +1458,34 @@ def api_delete_product(product_id: int):
         cur.execute("DELETE FROM products WHERE id = %s", (product_id,))
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.post("/api/products/<int:product_id>/adjust-stock")
+@login_required
+def api_adjust_product_stock(product_id: int):
+    """Manual stock correction (stocktake, damaged goods, restock not tied
+    to a sale) — adds [delta] (positive or negative) to stock_quantity."""
+    if not _has_crud_permission():
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    try:
+        delta = float(data.get("delta", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "delta không hợp lệ"}), 400
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE products SET stock_quantity = GREATEST(stock_quantity + %s, 0) "
+            "WHERE id = %s "
+            "RETURNING id, name, unit, price_with_vat, product_group, product_condition, barcode, "
+            "image_url, conversions_json, stock_quantity, low_stock_threshold",
+            (delta, product_id),
+        )
+        row = cur.fetchone()
+    db.commit()
+    if not row:
+        return jsonify({"error": "Product not found"}), 404
+    return jsonify(_product_to_api_json(row))
 
 
 @app.get("/api/stores")
@@ -1751,46 +1790,83 @@ def api_create_report():
     if not store_name:
         store_name = resolved_store_name or ""
 
+    # Sale Out is always the sum of line items, computed server-side, never
+    # trusted from the client — Revenue stays separately client-editable
+    # (staff may adjust it for rounding/business reasons) but is clamped to
+    # be non-negative.
+    products_payload = data.get("products", [])
+    sale_out = sum(
+        float(item.get("quantity", 0) or 0) * float(item.get("unitPrice", 0) or 0)
+        for item in products_payload
+    )
+    revenue = max(float(data.get("revenue", 0) or 0), 0)
+    discount_amount = max(float(data.get("discountAmount", 0) or 0), 0)
+
     # ATOMIC INSERT - gets report_id immediately, no race condition
     with db.cursor() as cur:
         cur.execute(
             "INSERT INTO sales_reports "
             "(report_date, pg_name, store_name, nu, sale_out, store_code, "
-            "report_month, revenue, points, employee_code, created_by, payment_method) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
+            "report_month, revenue, points, employee_code, created_by, payment_method, "
+            "discount_amount, customer_name, customer_phone) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING *",
             (
                 report_date,
                 pg_name,
                 store_name,
                 data.get("nu", 0),
-                data.get("saleOut", 0),
+                sale_out,
                 store_code,
                 data.get("reportMonth"),
-                data.get("revenue", 0),
+                revenue,
                 data.get("points", 0),
                 employee_code,
                 user_id,
                 (data.get("paymentMethod") or "").strip() or None,
+                discount_amount,
+                (data.get("customerName") or "").strip() or None,
+                (data.get("customerPhone") or "").strip() or None,
             ),
         )
         report = cur.fetchone()
     report_id = report["id"]
     db.commit()
 
-    # Insert sale items for THIS exact report_id
-    for item in data.get("products", []):
+    # Insert sale items for THIS exact report_id, and decrement stock for
+    # any line sold in the product's own base unit — a line sold via a
+    # "Quy đổi" conversion unit has no stored multiplier back to the base
+    # unit, so it's left out of the automatic decrement rather than
+    # guessing a wrong number (use "Điều chỉnh tồn kho" to correct manually).
+    for item in products_payload:
         with db.cursor() as cur:
             cur.execute(
-                "INSERT INTO sale_items (report_id, product_id, product_name, quantity, unit_price) "
-                "VALUES (%s, %s, %s, %s, %s)",
+                "INSERT INTO sale_items (report_id, product_id, product_name, quantity, unit_price, unit, product_group) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                 (report_id, item.get("productId"), item.get("productName", ""),
-                 item.get("quantity", 0), item.get("unitPrice", 0)),
+                 item.get("quantity", 0), item.get("unitPrice", 0),
+                 item.get("unit"), item.get("productGroup")),
             )
+        product_id = item.get("productId")
+        item_unit = (item.get("unit") or "").strip()
+        if product_id:
+            try:
+                with db.cursor() as cur:
+                    cur.execute("SELECT unit FROM products WHERE id = %s", (int(product_id),))
+                    prod_row = cur.fetchone()
+                if prod_row and (not item_unit or item_unit == (prod_row.get("unit") or "")):
+                    with db.cursor() as cur:
+                        cur.execute(
+                            "UPDATE products SET stock_quantity = GREATEST(stock_quantity - %s, 0) WHERE id = %s",
+                            (item.get("quantity", 0), int(product_id)),
+                        )
+            except (TypeError, ValueError):
+                pass
     db.commit()
 
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code, payment_method "
+            "SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, "
+            "points, employee_code, payment_method, discount_amount, customer_name, customer_phone "
             "FROM sales_reports WHERE id = %s",
             (report_id,),
         )
@@ -1828,8 +1904,13 @@ def api_get_reports():
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            f"SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code, payment_method "
-            f"FROM sales_reports {where_clause} ORDER BY report_date DESC, id DESC",
+            f"SELECT sr.id, sr.report_date, sr.pg_name, sr.nu, sr.sale_out, sr.revenue, sr.store_name, sr.store_code, "
+            f"sr.report_month, sr.points, sr.employee_code, sr.payment_method, sr.discount_amount, "
+            f"sr.customer_name, sr.customer_phone, COALESCE(rr.returned, 0) AS returned_amount "
+            f"FROM sales_reports sr "
+            f"LEFT JOIN (SELECT report_id, SUM(amount) AS returned FROM report_returns GROUP BY report_id) rr "
+            f"ON rr.report_id = sr.id "
+            f"{where_clause} ORDER BY sr.report_date DESC, sr.id DESC",
             tuple(params),
         )
         report_rows = cur.fetchall()
@@ -1858,7 +1939,8 @@ def api_update_report(report_id: int):
     with db.cursor() as cur:
         cur.execute(
             "SELECT id, report_date, pg_name, store_name, nu, sale_out, store_code, "
-            "report_month, revenue, points, employee_code, created_by, payment_method FROM sales_reports WHERE id = %s",
+            "report_month, revenue, points, employee_code, created_by, payment_method, "
+            "discount_amount, customer_name, customer_phone FROM sales_reports WHERE id = %s",
             (report_id,),
         )
         existing = cur.fetchone()
@@ -1874,25 +1956,38 @@ def api_update_report(report_id: int):
     resolved_code, resolved_store_name = _get_store_info_by_code(db, store_code)
     store_code = resolved_code
     store_name = (data.get("storeName") or "").strip() or resolved_store_name or existing.get("store_name") or ""
+    # Sale Out is recomputed from the (possibly updated) line items rather
+    # than trusted from the client, same rule as report creation.
+    sale_out = (
+        sum(
+            float(item.get("quantity", 0) or 0) * float(item.get("unitPrice", 0) or 0)
+            for item in data.get("products", [])
+        )
+        if "products" in data
+        else existing.get("sale_out")
+    )
 
     with db.cursor() as cur:
         cur.execute(
             "UPDATE sales_reports SET report_date = %s, pg_name = %s, store_name = %s, nu = %s, "
             "sale_out = %s, store_code = %s, report_month = %s, revenue = %s, points = %s, employee_code = %s, "
-            "payment_method = %s "
+            "payment_method = %s, discount_amount = %s, customer_name = %s, customer_phone = %s "
             "WHERE id = %s",
             (
                 report_date,
                 data.get("pgName", existing.get("pg_name")),
                 store_name,
                 data.get("nu", existing.get("nu")),
-                data.get("saleOut", existing.get("sale_out")),
+                sale_out,
                 store_code,
                 data.get("reportMonth", existing.get("report_month")),
-                data.get("revenue", existing.get("revenue")),
+                max(float(data.get("revenue", existing.get("revenue")) or 0), 0),
                 data.get("points", existing.get("points")),
                 data.get("employeeCode", existing.get("employee_code")),
                 data.get("paymentMethod", existing.get("payment_method")),
+                max(float(data.get("discountAmount", existing.get("discount_amount")) or 0), 0),
+                (data.get("customerName", existing.get("customer_name")) or "").strip() or None,
+                (data.get("customerPhone", existing.get("customer_phone")) or "").strip() or None,
                 report_id,
             ),
         )
@@ -1901,16 +1996,18 @@ def api_update_report(report_id: int):
             cur.execute("DELETE FROM sale_items WHERE report_id = %s", (report_id,))
             for item in data.get("products", []):
                 cur.execute(
-                    "INSERT INTO sale_items (report_id, product_id, product_name, quantity, unit_price) "
-                    "VALUES (%s, %s, %s, %s, %s)",
+                    "INSERT INTO sale_items (report_id, product_id, product_name, quantity, unit_price, unit, product_group) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                     (report_id, item.get("productId"), item.get("productName", ""),
-                     item.get("quantity", 0), item.get("unitPrice", 0)),
+                     item.get("quantity", 0), item.get("unitPrice", 0),
+                     item.get("unit"), item.get("productGroup")),
                 )
     db.commit()
 
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, points, employee_code, payment_method "
+            "SELECT id, report_date, pg_name, nu, sale_out, revenue, store_name, store_code, report_month, "
+            "points, employee_code, payment_method, discount_amount, customer_name, customer_phone "
             "FROM sales_reports WHERE id = %s",
             (report_id,),
         )
@@ -1943,6 +2040,48 @@ def api_delete_report(report_id: int):
         cur.execute("DELETE FROM sales_reports WHERE id = %s", (report_id,))
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.post("/api/reports/<int:report_id>/returns")
+@login_required
+def api_create_report_return(report_id: int):
+    """Record a partial return/refund against a report. The report row itself
+    is never mutated — returnedAmount is the running sum of these records."""
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+
+    with db.cursor() as cur:
+        cur.execute("SELECT created_by FROM sales_reports WHERE id = %s", (report_id,))
+        existing = cur.fetchone()
+    if not existing:
+        return jsonify({"error": "Report not found"}), 404
+
+    user_id = g.current_user.get("user_id")
+    if existing.get("created_by") != user_id and not _has_crud_permission():
+        return _forbidden()
+
+    try:
+        amount = max(float(data.get("amount", 0) or 0), 0)
+    except (TypeError, ValueError):
+        return jsonify({"error": "amount không hợp lệ"}), 400
+    if amount <= 0:
+        return jsonify({"error": "amount phải lớn hơn 0"}), 400
+    reason = (data.get("reason") or "").strip() or None
+
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO report_returns (report_id, amount, reason, created_by) "
+            "VALUES (%s, %s, %s, %s)",
+            (report_id, amount, reason, user_id),
+        )
+        cur.execute(
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM report_returns WHERE report_id = %s",
+            (report_id,),
+        )
+        total_row = cur.fetchone()
+    db.commit()
+
+    return jsonify({"reportId": str(report_id), "returnedAmount": float(total_row.get("total") or 0)}), 201
 
 
 def _scheduled_shift_for(db, emp_id: Any, attend_date: str) -> dict | None:

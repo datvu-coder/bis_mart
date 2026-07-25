@@ -95,6 +95,8 @@ CREATE TABLE IF NOT EXISTS products (
     barcode TEXT,
     image_url TEXT,
     conversions_json TEXT,
+    stock_quantity REAL NOT NULL DEFAULT 0,
+    low_stock_threshold REAL NOT NULL DEFAULT 5,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -1187,3 +1189,40 @@ CREATE TABLE IF NOT EXISTS leave_requests (
 );
 CREATE INDEX IF NOT EXISTS idx_leave_requests_employee ON leave_requests(employee_id);
 CREATE INDEX IF NOT EXISTS idx_leave_requests_store ON leave_requests(store_code);
+
+-- Migration: inventory tracking columns on products, predates the
+-- CREATE TABLE above on databases created before this feature existed.
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='products' AND column_name='stock_quantity') THEN
+        ALTER TABLE products ADD COLUMN stock_quantity REAL NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='products' AND column_name='low_stock_threshold') THEN
+        ALTER TABLE products ADD COLUMN low_stock_threshold REAL NOT NULL DEFAULT 5;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='discount_amount') THEN
+        ALTER TABLE sales_reports ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='customer_name') THEN
+        ALTER TABLE sales_reports ADD COLUMN customer_name TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                 WHERE table_name='sales_reports' AND column_name='customer_phone') THEN
+        ALTER TABLE sales_reports ADD COLUMN customer_phone TEXT;
+    END IF;
+END $$;
+
+-- Returns/refunds recorded against a sales report — a report can have
+-- multiple partial returns over time; the report itself is never mutated.
+CREATE TABLE IF NOT EXISTS report_returns (
+    id SERIAL PRIMARY KEY,
+    report_id INTEGER NOT NULL REFERENCES sales_reports(id) ON DELETE CASCADE,
+    amount REAL NOT NULL DEFAULT 0,
+    reason TEXT,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_report_returns_report ON report_returns(report_id);

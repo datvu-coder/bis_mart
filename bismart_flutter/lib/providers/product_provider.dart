@@ -111,6 +111,24 @@ class ProductProvider extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> adjustStock(String id, double delta) async {
+    try {
+      final result = await _api.adjustProductStock(int.parse(id), delta);
+      final updated = Product.fromJson(result);
+      final index = _products.indexWhere((p) => p.id == id);
+      if (index != -1) {
+        _products[index] = updated;
+        notifyListeners();
+      }
+      _error = null;
+      return true;
+    } catch (e) {
+      _error = _describeError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
   String _describeError(Object e) {
     if (e is DioException) {
       final status = e.response?.statusCode;

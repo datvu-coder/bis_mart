@@ -257,6 +257,11 @@ class ApiService {
     await _dio.delete('/api/products/$id');
   }
 
+  Future<Map<String, dynamic>> adjustProductStock(int id, double delta) async {
+    final response = await _dio.post('/api/products/$id/adjust-stock', data: {'delta': delta});
+    return response.data as Map<String, dynamic>;
+  }
+
   // ---- REPORTS ----
   Future<List<dynamic>> getReports({String filter = 'all'}) async {
     final response = await _dio.get('/api/reports',
@@ -275,6 +280,12 @@ class ApiService {
 
   Future<Map<String, dynamic>> updateReport(int id, Map<String, dynamic> data) async {
     final response = await _dio.put('/api/reports/$id', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createReportReturn(int id, double amount, String? reason) async {
+    final response = await _dio.post('/api/reports/$id/returns',
+        data: {'amount': amount, 'reason': reason});
     return response.data as Map<String, dynamic>;
   }
 

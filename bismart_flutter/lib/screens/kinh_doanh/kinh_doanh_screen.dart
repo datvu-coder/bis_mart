@@ -469,7 +469,9 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                           .copyWith(fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(
-                      '${report.pgName} · ${CurrencyFormatter.formatVND(report.revenue)}',
+                      report.returnedAmount > 0
+                          ? '${report.pgName} · ${CurrencyFormatter.formatVND(report.revenue)} · Đã hoàn ${CurrencyFormatter.formatVND(report.returnedAmount)}'
+                          : '${report.pgName} · ${CurrencyFormatter.formatVND(report.revenue)}',
                       style: AppTextStyles.caption,
                     ),
                     trailing: const Icon(Icons.chevron_right_rounded,
@@ -1351,6 +1353,14 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                     ),
                   ),
                   IconButton(
+                    icon: const Icon(Icons.assignment_return_rounded, color: AppColors.textSecondary),
+                    tooltip: 'Trả hàng / hoàn tiền',
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _showReturnDialog(report);
+                    },
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.edit_rounded, color: AppColors.primary),
                     onPressed: () {
                       Navigator.pop(ctx);
@@ -1374,6 +1384,14 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
               _detailRow('NU', '${report.nu}'),
               _detailRow('Sale Out', CurrencyFormatter.formatVND(report.saleOut)),
               _detailRow('Doanh thu', CurrencyFormatter.formatVND(report.revenue)),
+              if (report.discountAmount > 0)
+                _detailRow('Giảm giá', CurrencyFormatter.formatVND(report.discountAmount)),
+              if (report.returnedAmount > 0)
+                _detailRow('Đã hoàn trả', CurrencyFormatter.formatVND(report.returnedAmount)),
+              if ((report.customerName ?? '').isNotEmpty)
+                _detailRow('Khách hàng', report.customerName!),
+              if ((report.customerPhone ?? '').isNotEmpty)
+                _detailRow('SĐT khách hàng', report.customerPhone!),
               if (report.products.isNotEmpty) ...[
                 const SizedBox(height: 16),
                 Text('Sản phẩm (${report.products.length})',
@@ -1423,6 +1441,92 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           const Spacer(),
           Text(value, style: AppTextStyles.bodyTextMedium),
         ],
+      ),
+    );
+  }
+
+  void _showReturnDialog(SalesReport report) {
+    final amountCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+    bool submitting = false;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Trả hàng / hoàn tiền'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: amountCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Số tiền hoàn trả', suffixText: 'đ'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: reasonCtrl,
+                decoration: const InputDecoration(labelText: 'Lý do (tùy chọn)'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: submitting ? null : () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: submitting
+                  ? null
+                  : () async {
+                      final amount = double.tryParse(amountCtrl.text) ?? 0;
+                      if (amount <= 0) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                            content: Text('Số tiền hoàn trả phải lớn hơn 0'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                        return;
+                      }
+                      setDialogState(() => submitting = true);
+                      final salesProvider = context.read<SalesProvider>();
+                      final success = await salesProvider.createReturn(
+                        report.id,
+                        amount,
+                        reasonCtrl.text.trim().isEmpty ? null : reasonCtrl.text.trim(),
+                      );
+                      if (!ctx.mounted) return;
+                      if (success) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Đã ghi nhận trả hàng!'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppColors.success,
+                          ),
+                        );
+                      } else {
+                        setDialogState(() => submitting = false);
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(
+                            content: Text(salesProvider.error ?? 'Không thể ghi nhận trả hàng.'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppColors.error,
+                          ),
+                        );
+                      }
+                    },
+              child: submitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(color: AppColors.white, strokeWidth: 2),
+                    )
+                  : const Text('Xác nhận'),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -303,6 +303,20 @@ class _ProductDisplayTile extends StatelessWidget {
                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary),
                       ),
                     ),
+                    if (product.isLowStock) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                        child: Text(
+                          'Tồn: ${product.stockQuantity == product.stockQuantity.roundToDouble() ? product.stockQuantity.toInt() : product.stockQuantity}',
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.error),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ],
