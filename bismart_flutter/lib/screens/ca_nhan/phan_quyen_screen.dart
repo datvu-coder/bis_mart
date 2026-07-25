@@ -30,10 +30,12 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
   // State for tab 1 (permissions per position)
   List<Permission> _permissions = [];
   bool _loadingPerms = false;
+  String? _permsError;
 
   // State for tab 2 (store assignments)
   List<Map<String, dynamic>> _assignments = [];
   bool _loadingAssign = false;
+  String? _assignError;
   String _assignmentSearch = '';
   bool _importingAssign = false;
 
@@ -58,7 +60,10 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
   }
 
   Future<void> _loadPermissions() async {
-    setState(() => _loadingPerms = true);
+    setState(() {
+      _loadingPerms = true;
+      _permsError = null;
+    });
     try {
       final data = await _api.getPermissions();
       setState(() {
@@ -66,18 +71,25 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
             .map((p) => Permission.fromJson(p as Map<String, dynamic>))
             .toList();
       });
-    } catch (_) {}
+    } catch (_) {
+      setState(() => _permsError = 'Không thể tải dữ liệu quyền. Vui lòng thử lại.');
+    }
     setState(() => _loadingPerms = false);
   }
 
   Future<void> _loadAssignments() async {
-    setState(() => _loadingAssign = true);
+    setState(() {
+      _loadingAssign = true;
+      _assignError = null;
+    });
     try {
       final data = await _api.getStoreManagers();
       setState(() {
         _assignments = data.cast<Map<String, dynamic>>().toList();
       });
-    } catch (_) {}
+    } catch (_) {
+      setState(() => _assignError = 'Không thể tải phân công cửa hàng. Vui lòng thử lại.');
+    }
     setState(() => _loadingAssign = false);
   }
 
@@ -198,10 +210,12 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
         Expanded(
           child: _permissions.isEmpty
               ? Center(
-                  child: Text(
-                      'Chưa có cấu hình quyền nào.\nNhấn "Thêm" để tạo.',
-                      textAlign: TextAlign.center,
-                      style: AppTextStyles.caption),
+                  child: _permsError != null
+                      ? _buildErrorState(_permsError!, _loadPermissions)
+                      : Text(
+                          'Chưa có cấu hình quyền nào.\nNhấn "Thêm" để tạo.',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.caption),
                 )
               : ListView(
                   padding: EdgeInsets.fromLTRB(innerPad, 6, innerPad, 80),
@@ -217,6 +231,23 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                     ],
                   ],
                 ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildErrorState(String message, Future<void> Function() onRetry) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.error),
+        const SizedBox(height: 12),
+        Text(message, textAlign: TextAlign.center, style: AppTextStyles.caption),
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: onRetry,
+          icon: const Icon(Icons.refresh_rounded, size: 18),
+          label: const Text('Thử lại'),
         ),
       ],
     );
@@ -672,13 +703,15 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
         Expanded(
           child: filtered.isEmpty
               ? Center(
-                  child: Text(
-                    _assignments.isEmpty
-                        ? 'Chưa có phân công nào.\nNhấn "Phân công" để thêm.'
-                        : 'Không có kết quả phù hợp.',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.caption,
-                  ),
+                  child: _assignments.isEmpty && _assignError != null
+                      ? _buildErrorState(_assignError!, _loadAssignments)
+                      : Text(
+                          _assignments.isEmpty
+                              ? 'Chưa có phân công nào.\nNhấn "Phân công" để thêm.'
+                              : 'Không có kết quả phù hợp.',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.caption,
+                        ),
                 )
               : ListView.builder(
                   padding: EdgeInsets.fromLTRB(innerPad, 4, innerPad, 80),

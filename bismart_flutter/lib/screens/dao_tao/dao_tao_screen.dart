@@ -1337,6 +1337,30 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     );
   }
 
+  Future<void> _submitComment(
+    BuildContext context,
+    TrainingProvider provider,
+    String postId,
+    String userName,
+    TextEditingController commentController,
+    StateSetter setSheetState,
+  ) async {
+    final text = commentController.text.trim();
+    if (text.isEmpty) return;
+    commentController.clear();
+    final ok = await provider.addCommentText(postId, text, authorName: userName);
+    setSheetState(() {});
+    if (!ok && context.mounted) {
+      commentController.text = text;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể gửi bình luận. Vui lòng thử lại.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   void _showCommentDialog(String postId, TrainingProvider provider) {
     final commentController = TextEditingController();
     final authProvider = context.read<AuthProvider>();
@@ -1513,26 +1537,24 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                                 borderSide: BorderSide.none,
                               ),
                             ),
-                            onSubmitted: (val) {
-                              final text = val.trim();
-                              if (text.isEmpty) return;
-                              provider.addCommentText(postId, text,
-                                  authorName: userName);
-                              commentController.clear();
-                              setSheetState(() {});
-                            },
+                            onSubmitted: (val) => _submitComment(
+                                context,
+                                provider,
+                                postId,
+                                userName,
+                                commentController,
+                                setSheetState),
                           ),
                         ),
                         const SizedBox(width: 8),
                         InkWell(
-                          onTap: () {
-                            final text = commentController.text.trim();
-                            if (text.isEmpty) return;
-                            provider.addCommentText(postId, text,
-                                authorName: userName);
-                            commentController.clear();
-                            setSheetState(() {});
-                          },
+                          onTap: () => _submitComment(
+                              context,
+                              provider,
+                              postId,
+                              userName,
+                              commentController,
+                              setSheetState),
                           borderRadius: BorderRadius.circular(50),
                           child: Container(
                             width: 38,
@@ -1967,7 +1989,8 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                         ),
                         const SizedBox(height: 6),
                         for (int i = 0; i < drafts.length; i++)
-                          _buildQuizDraftEditor(i, drafts[i], () => setS(() => drafts.removeAt(i))),
+                          _buildQuizDraftEditor(i, drafts[i],
+                              () => setS(() => drafts.removeAt(i).dispose())),
                       ],
                     ),
                   ),
@@ -2065,7 +2088,14 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         );
         },
       ),
-    );
+    ).then((_) {
+      titleCtrl.dispose();
+      descCtrl.dispose();
+      thumbCtrl.dispose();
+      for (final d in drafts) {
+        d.dispose();
+      }
+    });
   }
 
   Widget _buildQuizDraftEditor(int index, _QuizDraft d, VoidCallback onRemove) {
@@ -2275,6 +2305,13 @@ class _QuizDraft {
     (_) => TextEditingController(),
   );
   String correct = 'A';
+
+  void dispose() {
+    questionCtrl.dispose();
+    for (final c in optionCtrls) {
+      c.dispose();
+    }
+  }
 }
 
 class _CommunityAvatar extends StatelessWidget {

@@ -43,13 +43,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         final data = provider.data;
         if (data == null) {
+          final hasError = provider.error != null;
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.inbox_rounded, size: 48, color: AppColors.textHint),
+                Icon(
+                  hasError ? Icons.error_outline_rounded : Icons.inbox_rounded,
+                  size: 48,
+                  color: hasError ? AppColors.error : AppColors.textHint,
+                ),
                 const SizedBox(height: 12),
-                Text('Không có dữ liệu', style: AppTextStyles.bodyText),
+                Text(
+                  hasError ? provider.error! : 'Không có dữ liệu',
+                  style: AppTextStyles.bodyText,
+                  textAlign: TextAlign.center,
+                ),
+                if (hasError) ...[
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: provider.loadDashboard,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Thử lại'),
+                  ),
+                ],
               ],
             ),
           );

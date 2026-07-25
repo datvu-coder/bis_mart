@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../providers/permission_provider.dart';
 import '../../services/api_service.dart';
 
 /// Admin-only screen to configure connection details for a licensed
@@ -43,7 +45,11 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (context.read<PermissionProvider>().isAdmin) {
+      _load();
+    } else {
+      _loading = false;
+    }
   }
 
   @override
@@ -142,6 +148,23 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.watch<PermissionProvider>().isAdmin;
+    if (!isAdmin) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('Cài đặt hóa đơn điện tử')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline_rounded, size: 48, color: AppColors.textHint),
+              const SizedBox(height: 12),
+              Text('Bạn không có quyền truy cập trang này.', style: AppTextStyles.bodyText),
+            ],
+          ),
+        ),
+      );
+    }
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(title: const Text('Cài đặt hóa đơn điện tử')),

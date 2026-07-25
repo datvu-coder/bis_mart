@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/employee.dart';
 import '../../providers/employee_provider.dart';
+import '../../providers/permission_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../widgets/common/responsive_form.dart';
 import '../../widgets/common/header_action_cluster.dart';
@@ -31,6 +32,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canEdit = context.watch<PermissionProvider>().canCrud;
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -38,24 +40,25 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: HeaderActionCluster(
-              actions: [
-                HeaderAction(
-                  icon: Icons.edit_rounded,
-                  label: 'Sửa',
-                  onPressed: () => _showEditDialog(),
-                ),
-                HeaderAction(
-                  icon: Icons.delete_outline_rounded,
-                  label: 'Xóa',
-                  color: AppColors.error,
-                  onPressed: () => _confirmDelete(),
-                ),
-              ],
+          if (canEdit)
+            Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: HeaderActionCluster(
+                actions: [
+                  HeaderAction(
+                    icon: Icons.edit_rounded,
+                    label: 'Sửa',
+                    onPressed: () => _showEditDialog(),
+                  ),
+                  HeaderAction(
+                    icon: Icons.delete_outline_rounded,
+                    label: 'Xóa',
+                    color: AppColors.error,
+                    onPressed: () => _confirmDelete(),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -293,6 +296,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
     final emailCtrl = TextEditingController(text: _employee.email ?? '');
     String selectedPosition = _employee.position;
     String? selectedStoreCode = _employee.storeCode;
+    bool isSubmitting = false;
 
     showResponsiveForm(
       context: context,
@@ -340,35 +344,54 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
         final stores = this.context.read<StoreProvider>().stores;
         return [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
             child: const Text('Hủy'),
           ),
           ElevatedButton(
-            onPressed: () {
-              final selectedStore = stores.cast<dynamic>().firstWhere(
-                (s) => s.storeCode == selectedStoreCode,
-                orElse: () => null,
-              );
-              final updated = _employee.copyWith(
-                fullName: nameCtrl.text,
-                position: selectedPosition,
-                workLocation: selectedStore?.name ?? '',
-                storeCode: selectedStoreCode,
-                email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
-              );
-              this.context.read<EmployeeProvider>().updateEmployee(updated);
-              setState(() => _employee = updated);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(this.context).showSnackBar(
-                SnackBar(
-                  content: const Text('Đã cập nhật thông tin!'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: AppColors.success,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
-            },
-            child: const Text('Lưu'),
+            onPressed: isSubmitting
+                ? null
+                : () async {
+                    final selectedStore = stores.cast<dynamic>().firstWhere(
+                      (s) => s.storeCode == selectedStoreCode,
+                      orElse: () => null,
+                    );
+                    final updated = _employee.copyWith(
+                      fullName: nameCtrl.text,
+                      position: selectedPosition,
+                      workLocation: selectedStore?.name ?? '',
+                      storeCode: selectedStoreCode,
+                      email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
+                    );
+                    setDialogState(() => isSubmitting = true);
+                    final provider = this.context.read<EmployeeProvider>();
+                    final ok = await provider.updateEmployee(updated);
+                    if (!ctx.mounted) return;
+                    if (ok) {
+                      setState(() => _employee = updated);
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(this.context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Đã cập nhật thông tin!'),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: AppColors.success,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    } else {
+                      setDialogState(() => isSubmitting = false);
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text(provider.error ?? 'Cập nhật thất bại. Vui lòng thử lại.'),
+                          behavior: SnackBarBehavior.floating,
+                          backgroundColor: AppColors.error,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      );
+                    }
+                  },
+            child: isSubmitting
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white))
+                : const Text('Lưu'),
           ),
         ];
       },
@@ -376,34 +399,57 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
   }
 
   void _confirmDelete() {
+    bool isSubmitting = false;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Xóa nhân viên'),
-        content: Text('Bạn có chắc muốn xóa "${_employee.fullName}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              context.read<EmployeeProvider>().deleteEmployee(_employee.id);
-              Navigator.pop(ctx);
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Đã xóa nhân viên!'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: AppColors.success,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Xóa'),
-          ),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Xóa nhân viên'),
+          content: Text('Bạn có chắc muốn xóa "${_employee.fullName}"?'),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      setDialogState(() => isSubmitting = true);
+                      final provider = context.read<EmployeeProvider>();
+                      final ok = await provider.deleteEmployee(_employee.id);
+                      if (!ctx.mounted) return;
+                      if (ok) {
+                        Navigator.pop(ctx);
+                        if (!mounted) return;
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Đã xóa nhân viên!'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppColors.success,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      } else {
+                        setDialogState(() => isSubmitting = false);
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(
+                            content: Text(provider.error ?? 'Xóa thất bại. Vui lòng thử lại.'),
+                            behavior: SnackBarBehavior.floating,
+                            backgroundColor: AppColors.error,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        );
+                      }
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+              child: isSubmitting
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white))
+                  : const Text('Xóa'),
+            ),
+          ],
+        ),
       ),
     );
   }

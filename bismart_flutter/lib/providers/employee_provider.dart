@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../models/employee.dart';
 import '../models/attendance.dart';
@@ -251,22 +252,38 @@ class EmployeeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateEmployee(Employee updated) async {
-    await _api.updateEmployee(int.parse(updated.id), updated.toJson());
-    final index = _employees.indexWhere((e) => e.id == updated.id);
-    if (index != -1) {
-      _employees[index] = updated;
-      _recalcRanks();
+  Future<bool> updateEmployee(Employee updated) async {
+    try {
+      await _api.updateEmployee(int.parse(updated.id), updated.toJson());
+      final index = _employees.indexWhere((e) => e.id == updated.id);
+      if (index != -1) {
+        _employees[index] = updated;
+        _recalcRanks();
+      }
+      _error = null;
       notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _describeError(e);
+      notifyListeners();
+      return false;
     }
   }
 
-  Future<void> deleteEmployee(String id) async {
-    await _api.deleteEmployee(int.parse(id));
-    _employees.removeWhere((e) => e.id == id);
-    _attendances.removeWhere((a) => a.employeeId == id);
-    _recalcRanks();
-    notifyListeners();
+  Future<bool> deleteEmployee(String id) async {
+    try {
+      await _api.deleteEmployee(int.parse(id));
+      _employees.removeWhere((e) => e.id == id);
+      _attendances.removeWhere((a) => a.employeeId == id);
+      _recalcRanks();
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _describeError(e);
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> assignEmployeeToStore(String employeeId, String? storeCode) async {
@@ -435,5 +452,24 @@ class EmployeeProvider extends ChangeNotifier {
     for (var i = 0; i < _employees.length; i++) {
       _employees[i] = _employees[i].copyWith(rank: i + 1);
     }
+  }
+
+  String _describeError(Object e) {
+    if (e is DioException) {
+      final status = e.response?.statusCode;
+      final data = e.response?.data;
+      final serverMessage = data is Map ? data['error']?.toString() : null;
+      if (status == 401 || status == 403) {
+        return 'Bạn không có quyền thực hiện thao tác này.';
+      }
+      if (serverMessage != null && serverMessage.isNotEmpty) {
+        return serverMessage;
+      }
+      if (status != null) {
+        return 'Lỗi máy chủ (mã $status).';
+      }
+      return 'Không thể kết nối đến máy chủ. Kiểm tra lại mạng.';
+    }
+    return e.toString();
   }
 }

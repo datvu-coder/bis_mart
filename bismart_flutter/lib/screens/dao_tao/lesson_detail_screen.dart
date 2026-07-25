@@ -613,6 +613,9 @@ class _PartEditorDialogState extends State<_PartEditorDialog> {
   void dispose() {
     _titleCtrl.dispose();
     _descCtrl.dispose();
+    for (final q in _questions) {
+      q.dispose();
+    }
     super.dispose();
   }
 
@@ -857,7 +860,7 @@ class _PartEditorDialogState extends State<_PartEditorDialog> {
                     .copyWith(color: AppColors.primary)),
             const Spacer(),
             IconButton(
-              onPressed: () => setState(() => _questions.removeAt(i)),
+              onPressed: () => setState(() => _questions.removeAt(i).dispose()),
               icon: const Icon(Icons.delete_outline_rounded,
                   color: Colors.red),
             ),
@@ -896,7 +899,7 @@ class _PartEditorDialogState extends State<_PartEditorDialog> {
                 if (q.optionCtrls.length > 2)
                   IconButton(
                     onPressed: () => setState(() {
-                      q.optionCtrls.removeAt(j);
+                      q.optionCtrls.removeAt(j).dispose();
                       if (q.correctIndex >= q.optionCtrls.length) {
                         q.correctIndex = 0;
                       }
@@ -964,5 +967,12 @@ class _QEdit {
       'correctAnswer': letters[idx],
       'points': 1,
     };
+  }
+
+  void dispose() {
+    questionCtrl.dispose();
+    for (final c in optionCtrls) {
+      c.dispose();
+    }
   }
 }
