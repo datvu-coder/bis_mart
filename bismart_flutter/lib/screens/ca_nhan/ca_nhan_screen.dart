@@ -400,10 +400,6 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     final menuItems = <_MenuItem>[
       if (permProv.canEmployees)
         _MenuItem(Icons.people_rounded, AppStrings.danhSachNhanVien, 'Xem danh sách & thông tin nhân viên', AppRoutes.employeeList, AppColors.info, AppColors.infoLight),
-      if (permProv.canAttendance)
-        _MenuItem(Icons.fingerprint_rounded, AppStrings.quanLyChamCong, 'Chấm công, ca làm & xếp hạng', AppRoutes.nhanSu, AppColors.success, AppColors.successLight),
-      if (permProv.canReport)
-        _MenuItem(Icons.bar_chart_rounded, AppStrings.quanLyBaoCao, 'Báo cáo doanh thu & thống kê', AppRoutes.kinhDoanh, AppColors.warning, AppColors.warningLight),
       if (permProv.canStoreList ||
           permProv.managedStoreIds.isNotEmpty ||
           (permProv.ownStoreCode != null && permProv.ownStoreCode!.isNotEmpty))

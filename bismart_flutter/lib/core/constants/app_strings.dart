@@ -50,8 +50,6 @@ class AppStrings {
   // Cá nhân
   static const xinChao = 'Xin chào';
   static const danhSachNhanVien = 'Danh sách nhân viên';
-  static const quanLyChamCong = 'Quản lý chấm công';
-  static const quanLyBaoCao = 'Quản lý báo cáo';
   static const danhSachCuaHang = 'Danh sách cửa hàng';
   static const danhSachSanPham = 'Danh sách sản phẩm';
 
