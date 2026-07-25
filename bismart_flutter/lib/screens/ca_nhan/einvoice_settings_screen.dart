@@ -239,6 +239,7 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
                   Row(
                     children: [
                       Expanded(
+                        flex: 2,
                         child: OutlinedButton.icon(
                           onPressed: (_configured && !_testing) ? _testConnection : null,
                           icon: _testing
