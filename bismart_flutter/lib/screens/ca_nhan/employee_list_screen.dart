@@ -18,6 +18,8 @@ class EmployeeListScreen extends StatefulWidget {
 }
 
 class _EmployeeListScreenState extends State<EmployeeListScreen> {
+  static const _positions = ['Tất cả', 'ADM', 'PG', 'TLD', 'MNG', 'CS'];
+
   String _searchQuery = '';
   String _selectedPosition = 'Tất cả';
 
@@ -28,6 +30,51 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
       context.read<EmployeeProvider>().loadEmployees();
       context.read<StoreProvider>().loadStores();
     });
+  }
+
+  /// Position filter as a dropdown menu anchored to the search field's own
+  /// icon instead of a full-width chip row — same "tune" pattern as Kinh
+  /// doanh's Bán hàng, so the list itself gets the vertical space back.
+  Widget _buildPositionFilterButton() {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.tune_rounded, size: 20),
+      tooltip: 'Lọc theo vị trí',
+      color: AppColors.white,
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.borderLight),
+      ),
+      onSelected: (v) => setState(() => _selectedPosition = v),
+      itemBuilder: (context) => [
+        for (final pos in _positions)
+          PopupMenuItem<String>(
+            value: pos,
+            child: Builder(builder: (context) {
+              final isSelected = _selectedPosition == pos;
+              return Row(
+                children: [
+                  Icon(
+                    isSelected
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 18,
+                    color: isSelected ? AppColors.primary : AppColors.textHint,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    pos,
+                    style: TextStyle(
+                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
+      ],
+    );
   }
 
   @override
@@ -76,44 +123,14 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: TextField(
-                  decoration: AppDecorations.searchField('Tìm kiếm nhân viên...'),
+                  decoration: AppDecorations.searchField(
+                    'Tìm kiếm nhân viên...',
+                    suffixIcon: _buildPositionFilterButton(),
+                  ),
                   onChanged: (v) => setState(() => _searchQuery = v),
                 ),
               ),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(
-                  children: ['Tất cả', 'ADM', 'PG', 'TLD', 'MNG', 'CS'].map((pos) {
-                    final selected = _selectedPosition == pos;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(pos),
-                        selected: selected,
-                        selectedColor: AppColors.primaryLight,
-                        checkmarkColor: AppColors.primary,
-                        onSelected: (_) {
-                          setState(() => _selectedPosition = pos);
-                        },
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Text(
-                      '${employees.length} nhân viên',
-                      style: AppTextStyles.caption,
-                    ),
-                    const Spacer(),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 12),
               Expanded(
                 child: employees.isEmpty
                     ? Center(
