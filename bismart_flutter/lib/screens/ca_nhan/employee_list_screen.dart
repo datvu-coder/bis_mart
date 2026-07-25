@@ -84,6 +84,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        toolbarHeight: 40,
         title: const SizedBox.shrink(),
       ),
       floatingActionButton: GradientFab(

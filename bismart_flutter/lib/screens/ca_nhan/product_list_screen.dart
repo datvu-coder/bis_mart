@@ -82,6 +82,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
+            toolbarHeight: 40,
             title: const SizedBox.shrink(),
           ),
           floatingActionButton: GradientFab(
