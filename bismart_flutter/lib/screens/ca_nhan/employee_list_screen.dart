@@ -7,7 +7,6 @@ import '../../models/employee.dart';
 import '../../providers/employee_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../widgets/common/responsive_form.dart';
-import '../../widgets/common/screen_header_card.dart';
 import '../../widgets/common/gradient_fab.dart';
 
 class EmployeeListScreen extends StatefulWidget {
@@ -30,6 +29,23 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
       context.read<EmployeeProvider>().loadEmployees();
       context.read<StoreProvider>().loadStores();
     });
+  }
+
+  /// Plain title (+ subtitle on wide screens), matching the headerless
+  /// style the other tabs use instead of a bordered icon-avatar card.
+  Widget _buildHeader(String subtitle) {
+    final isCompactMobile = MediaQuery.of(context).size.width < 430;
+    if (isCompactMobile) {
+      return Text('Danh sách nhân viên', style: AppTextStyles.appTitle);
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Danh sách nhân viên', style: AppTextStyles.appTitle),
+        const SizedBox(height: 2),
+        Text(subtitle, style: AppTextStyles.caption),
+      ],
+    );
   }
 
   /// Position filter as a dropdown menu anchored to the search field's own
@@ -112,13 +128,10 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
           return Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                child: ScreenHeaderCard(
-                  icon: Icons.badge_rounded,
-                  iconColor: AppColors.primary,
-                  iconBg: AppColors.primaryLight,
-                  title: 'Danh sách nhân viên',
-                  subtitle: '${employees.length} nhân viên',
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _buildHeader('${employees.length} nhân viên'),
                 ),
               ),
               Padding(
