@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_routes.dart';
@@ -12,6 +16,28 @@ import '../../models/employee.dart';
 import '../../models/store.dart';
 import '../../services/api_service.dart';
 import '../../widgets/common/responsive_form.dart';
+
+String _avatarMimeType(String? ext) {
+  switch ((ext ?? '').toLowerCase()) {
+    case 'png':
+      return 'image/png';
+    case 'webp':
+      return 'image/webp';
+    case 'heic':
+      return 'image/heic';
+    default:
+      return 'image/jpeg';
+  }
+}
+
+Uint8List _decodeAvatarDataUrl(String dataUrl) {
+  final comma = dataUrl.indexOf(',');
+  return base64Decode(comma == -1 ? dataUrl : dataUrl.substring(comma + 1));
+}
+
+// Keep in sync with the `version:` field in pubspec.yaml — read locally
+// rather than via a plugin so "Về ứng dụng" needs zero new dependencies.
+const String _appVersion = '1.0.0';
 
 class CaNhanScreen extends StatefulWidget {
   const CaNhanScreen({super.key});
@@ -70,7 +96,13 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                     const SizedBox(width: 20),
                     Expanded(
                       flex: 7,
-                      child: _buildMenuSection(context),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildMenuSection(context),
+                          _buildAccountSection(context, includeLogout: false),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -104,42 +136,13 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
 
               // Menu items
               _buildMenuSection(context),
-              const SizedBox(height: 20),
 
-              // Đăng xuất — no dedicated top bar on mobile anymore, so this
-              // is the only way to log out on that layout (desktop still
-              // has it in the sidebar).
-              _buildLogoutButton(context),
+              // Tài khoản (đổi mật khẩu, về ứng dụng, đăng xuất) — desktop
+              // already exposes logout permanently in the sidebar, so only
+              // the mobile copy includes it here.
+              _buildAccountSection(context, includeLogout: true),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLogoutButton(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
-      onTap: () => _confirmLogout(context),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.errorLight,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.logout_rounded, color: AppColors.error, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              AppStrings.dangXuat,
-              style: AppTextStyles.bodyTextMedium.copyWith(
-                color: AppColors.error,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -168,6 +171,18 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
   }
 
   Widget _buildProfileCard(BuildContext context, Employee? user) {
+    final stores = context.watch<StoreProvider>().stores;
+    final myStore = (user?.storeCode != null && user!.storeCode!.isNotEmpty && stores.isNotEmpty)
+        ? stores.cast<dynamic>().firstWhere(
+            (s) => s.storeCode.toString().toUpperCase() == user.storeCode!.toUpperCase(),
+            orElse: () => null,
+          )
+        : null;
+    final storeLabel = myStore != null
+        ? '${myStore.name} (${myStore.storeCode})'
+        : ((user?.workLocation ?? '').isNotEmpty ? user!.workLocation : null);
+    final hasAvatar = (user?.avatarUrl ?? '').isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -184,24 +199,32 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                 height: 68,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(AppRadius.row + 6),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.3),
                     width: 2.5,
                   ),
+                  image: hasAvatar
+                      ? DecorationImage(
+                          image: MemoryImage(_decodeAvatarDataUrl(user!.avatarUrl!)),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
                 ),
-                child: Center(
-                  child: Text(
-                    user?.fullName?.isNotEmpty == true
-                        ? user!.fullName[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.white,
-                    ),
-                  ),
-                ),
+                child: hasAvatar
+                    ? null
+                    : Center(
+                        child: Text(
+                          user?.fullName.isNotEmpty == true
+                              ? user!.fullName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.white,
+                          ),
+                        ),
+                      ),
               ),
               const SizedBox(width: 18),
               Expanded(
@@ -232,7 +255,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppRadius.chip),
                           ),
                           child: Text(
                             user?.positionLabel ?? user?.position ?? '',
@@ -248,7 +271,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppRadius.chip),
                           ),
                           child: Text(
                             user?.employeeCode ?? '',
@@ -261,6 +284,23 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                         ),
                       ],
                     ),
+                    if (storeLabel != null) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(Icons.store_rounded, size: 14, color: Colors.white.withValues(alpha: 0.75)),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              storeLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 12.5, color: Colors.white.withValues(alpha: 0.85)),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -271,14 +311,14 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                   height: 40,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.row - 2),
                   ),
                   child: const Icon(Icons.edit_rounded, color: AppColors.white, size: 18),
                 ),
               ),
             ],
           ),
-          if (user != null && context.watch<PermissionProvider>().managedStoreIds.length >= 2) ...[            
+          if (user != null && context.watch<PermissionProvider>().managedStoreIds.length >= 2) ...[
             const SizedBox(height: 14),
             OutlinedButton.icon(
               onPressed: () => _showTransferStoreDialog(context, user),
@@ -290,7 +330,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: Colors.white.withValues(alpha: 0.4)),
                 padding: const EdgeInsets.symmetric(vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.row)),
               ),
             ),
           ],
@@ -331,7 +371,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                           height: 40,
                           decoration: BoxDecoration(
                             color: s.bgColor,
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(AppRadius.row - 2),
                           ),
                           child: Icon(s.icon, color: s.color, size: 20),
                         ),
@@ -394,15 +434,68 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     );
   }
 
+  /// Account-level actions (đổi mật khẩu, về ứng dụng, đăng xuất) — kept in
+  /// its own "Tài khoản" card, separate from "Quản lý" business features.
+  /// [includeLogout] is only true on mobile: desktop already exposes logout
+  /// permanently in the sidebar, so this avoids showing it twice there.
+  Widget _buildAccountSection(BuildContext context, {required bool includeLogout}) {
+    final accountItems = <_MenuItem>[
+      _MenuItem(
+        Icons.lock_reset_rounded,
+        'Đổi mật khẩu',
+        'Cập nhật mật khẩu đăng nhập',
+        null,
+        AppColors.info,
+        AppColors.infoLight,
+        onTap: () => _showChangePasswordDialog(context),
+      ),
+      _MenuItem(
+        Icons.info_outline_rounded,
+        'Về ứng dụng',
+        'Phiên bản $_appVersion',
+        null,
+        AppColors.textGrey,
+        AppColors.surfaceVariant,
+        onTap: () => _showAboutDialog(context),
+      ),
+      if (includeLogout)
+        _MenuItem(
+          Icons.logout_rounded,
+          AppStrings.dangXuat,
+          'Thoát khỏi tài khoản hiện tại',
+          null,
+          AppColors.error,
+          AppColors.errorLight,
+          onTap: () => _confirmLogout(context),
+        ),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      decoration: AppDecorations.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 22, 22, 14),
+            child: Text('Tài khoản', style: AppTextStyles.sectionHeader),
+          ),
+          ...accountItems.map((item) => _buildMenuItem(context, item)),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMenuItem(BuildContext context, _MenuItem item) {
     return InkWell(
-      onTap: () => Navigator.pushNamed(context, item.route),
+      onTap: item.onTap ?? () => Navigator.pushNamed(context, item.route!),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(AppRadius.row),
           ),
           child: Row(
             children: [
@@ -411,7 +504,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                 height: 46,
                 decoration: BoxDecoration(
                   color: item.bgColor,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.row),
                 ),
                 child: Icon(item.icon, color: item.color, size: 22),
               ),
@@ -494,7 +587,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                 alignment: Alignment.topLeft,
                 child: Material(
                   elevation: 4,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.row),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxHeight: 200, maxWidth: 360),
                     child: ListView.builder(
@@ -561,7 +654,6 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                           content: const Text('Vui lòng chọn cửa hàng hợp lệ'),
                           behavior: SnackBarBehavior.floating,
                           backgroundColor: AppColors.error,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       );
                       return;
@@ -580,7 +672,6 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                           content: Text('Đã chuyển ${user.fullName} đến ${store.name}!'),
                           behavior: SnackBarBehavior.floating,
                           backgroundColor: AppColors.success,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       );
                     } catch (e) {
@@ -591,7 +682,6 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                           content: Text('Lỗi: $e'),
                           behavior: SnackBarBehavior.floating,
                           backgroundColor: AppColors.error,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       );
                     }
@@ -605,9 +695,84 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     );
   }
 
-  void _showEditProfileDialog(BuildContext context, dynamic user) {
+  void _showEditProfileDialog(BuildContext context, Employee? user) {
     final nameCtrl = TextEditingController(text: user?.fullName ?? '');
     final emailCtrl = TextEditingController(text: user?.email ?? '');
+    final phoneCtrl = TextEditingController(text: user?.phone ?? '');
+    final dobCtrl = TextEditingController(text: user?.dateOfBirth ?? '');
+    final cccdCtrl = TextEditingController(text: user?.cccd ?? '');
+    final addressCtrl = TextEditingController(text: user?.address ?? '');
+    String? avatarDataUrl = user?.avatarUrl;
+
+    Future<void> pickAvatar(BuildContext ctx, StateSetter setDialogState, ImageSource source) async {
+      try {
+        final file = await ImagePicker().pickImage(source: source, imageQuality: 80, maxWidth: 640);
+        if (file == null) return;
+        final bytes = await file.readAsBytes();
+        final ext = file.name.contains('.') ? file.name.split('.').last : 'jpg';
+        final dataUrl = 'data:${_avatarMimeType(ext)};base64,${base64Encode(bytes)}';
+        setDialogState(() => avatarDataUrl = dataUrl);
+      } catch (_) {
+        if (ctx.mounted) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(content: Text('Không thể lấy ảnh.'), behavior: SnackBarBehavior.floating),
+          );
+        }
+      }
+    }
+
+    void showAvatarSourceSheet(BuildContext ctx, StateSetter setDialogState) {
+      showModalBottomSheet(
+        context: ctx,
+        backgroundColor: AppColors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+        builder: (sheetCtx) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_camera_rounded, color: AppColors.primary),
+                title: const Text('Chụp ảnh'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  pickAvatar(ctx, setDialogState, ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+                title: const Text('Chọn từ thư viện'),
+                onTap: () {
+                  Navigator.pop(sheetCtx);
+                  pickAvatar(ctx, setDialogState, ImageSource.gallery);
+                },
+              ),
+              if (avatarDataUrl != null)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                  title: const Text('Xóa ảnh', style: TextStyle(color: AppColors.error)),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    setDialogState(() => avatarDataUrl = null);
+                  },
+                ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    Future<void> pickDob(BuildContext ctx, StateSetter setDialogState) async {
+      final initial = DateTime.tryParse(dobCtrl.text) ?? DateTime(1995, 1, 1);
+      final picked = await showDatePicker(
+        context: ctx,
+        initialDate: initial,
+        firstDate: DateTime(1940),
+        lastDate: DateTime.now(),
+      );
+      if (picked != null) {
+        setDialogState(() => dobCtrl.text = picked.toIso8601String().substring(0, 10));
+      }
+    }
 
     showResponsiveForm(
       context: context,
@@ -616,9 +781,66 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Center(
+            child: GestureDetector(
+              onTap: () => showAvatarSourceSheet(ctx, setDialogState),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 84,
+                    height: 84,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.borderLight),
+                      image: avatarDataUrl != null
+                          ? DecorationImage(image: MemoryImage(_decodeAvatarDataUrl(avatarDataUrl!)), fit: BoxFit.cover)
+                          : null,
+                    ),
+                    child: avatarDataUrl == null
+                        ? const Icon(Icons.person_rounded, color: AppColors.textHint, size: 34)
+                        : null,
+                  ),
+                  Positioned(
+                    right: -4,
+                    bottom: -4,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.white, width: 2.5),
+                      ),
+                      child: const Icon(Icons.camera_alt_rounded, color: AppColors.white, size: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
           TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Họ tên')),
           const SizedBox(height: 8),
           TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: 'Email')),
+          const SizedBox(height: 8),
+          TextField(
+            controller: phoneCtrl,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(labelText: 'Số điện thoại'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: dobCtrl,
+            readOnly: true,
+            decoration: const InputDecoration(labelText: 'Ngày sinh', suffixIcon: Icon(Icons.cake_outlined, size: 18)),
+            onTap: () => pickDob(ctx, setDialogState),
+          ),
+          const SizedBox(height: 8),
+          TextField(controller: cccdCtrl, decoration: const InputDecoration(labelText: 'CCCD')),
+          const SizedBox(height: 8),
+          TextField(controller: addressCtrl, decoration: const InputDecoration(labelText: 'Địa chỉ')),
         ],
       ),
       actionsBuilder: (ctx, setDialogState) => [
@@ -628,6 +850,11 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
             context.read<AuthProvider>().updateProfile(
               fullName: nameCtrl.text,
               email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
+              phone: phoneCtrl.text.isNotEmpty ? phoneCtrl.text : null,
+              dateOfBirth: dobCtrl.text.isNotEmpty ? dobCtrl.text : null,
+              cccd: cccdCtrl.text.isNotEmpty ? cccdCtrl.text : null,
+              address: addressCtrl.text.isNotEmpty ? addressCtrl.text : null,
+              avatarUrl: avatarDataUrl,
             );
             Navigator.pop(ctx);
             ScaffoldMessenger.of(context).showSnackBar(
@@ -635,13 +862,152 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                 content: const Text('Đã cập nhật hồ sơ!'),
                 behavior: SnackBarBehavior.floating,
                 backgroundColor: AppColors.success,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
               ),
             );
           },
           child: const Text('Lưu'),
         ),
       ],
+    );
+  }
+
+  void _showChangePasswordDialog(BuildContext context) {
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    showResponsiveForm<void>(
+      context: context,
+      title: 'Đổi mật khẩu',
+      contentBuilder: (ctx, setDialogState) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: currentCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Mật khẩu hiện tại'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: newCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Mật khẩu mới'),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: confirmCtrl,
+            obscureText: true,
+            decoration: const InputDecoration(labelText: 'Xác nhận mật khẩu mới'),
+          ),
+        ],
+      ),
+      actionsBuilder: (ctx, setDialogState) => [
+        TextButton(
+          onPressed: isSubmitting ? null : () => Navigator.pop(ctx),
+          child: const Text('Hủy'),
+        ),
+        ElevatedButton(
+          onPressed: isSubmitting
+              ? null
+              : () async {
+                  if (currentCtrl.text.isEmpty || newCtrl.text.isEmpty) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Vui lòng nhập đầy đủ mật khẩu'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+                  if (newCtrl.text != confirmCtrl.text) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Mật khẩu xác nhận không khớp'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+                  setDialogState(() => isSubmitting = true);
+                  final authProvider = context.read<AuthProvider>();
+                  final success = await authProvider.changePassword(
+                    currentPassword: currentCtrl.text,
+                    newPassword: newCtrl.text,
+                  );
+                  if (!ctx.mounted) return;
+                  if (success) {
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Đã đổi mật khẩu thành công!'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  } else {
+                    setDialogState(() => isSubmitting = false);
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(
+                        content: Text(authProvider.error ?? 'Không thể đổi mật khẩu.'),
+                        behavior: SnackBarBehavior.floating,
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                  }
+                },
+          child: isSubmitting
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white))
+              : const Text('Đổi mật khẩu'),
+        ),
+      ],
+    );
+  }
+
+  void _showAboutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Về ứng dụng'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(AppRadius.row),
+                  ),
+                  child: const Icon(Icons.storefront_rounded, color: AppColors.primary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    "Bi'S MART",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textDark),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text('Phiên bản $_appVersion', style: AppTextStyles.bodyText),
+            const SizedBox(height: 6),
+            Text(
+              'Hệ thống quản lý chuỗi cửa hàng dinh dưỡng.',
+              style: AppTextStyles.caption,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Đóng')),
+        ],
+      ),
     );
   }
 }
@@ -660,9 +1026,10 @@ class _MenuItem {
   final IconData icon;
   final String title;
   final String subtitle;
-  final String route;
+  final String? route;
   final Color color;
   final Color bgColor;
+  final VoidCallback? onTap;
 
-  const _MenuItem(this.icon, this.title, this.subtitle, this.route, this.color, this.bgColor);
+  const _MenuItem(this.icon, this.title, this.subtitle, this.route, this.color, this.bgColor, {this.onTap});
 }
