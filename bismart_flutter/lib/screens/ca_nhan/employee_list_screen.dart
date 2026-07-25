@@ -31,20 +31,27 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
     });
   }
 
-  /// Plain title (+ subtitle on wide screens), matching the headerless
-  /// style the other tabs use instead of a bordered icon-avatar card.
-  Widget _buildHeader(String subtitle) {
-    final isCompactMobile = MediaQuery.of(context).size.width < 430;
-    if (isCompactMobile) {
-      return Text('Danh sách nhân viên', style: AppTextStyles.appTitle);
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Danh sách nhân viên', style: AppTextStyles.appTitle),
-        const SizedBox(height: 2),
-        Text(subtitle, style: AppTextStyles.caption),
-      ],
+  /// Small pill badge showing the item count, placed in the AppBar's
+  /// actions — same spot phan_quyen_screen.dart uses for its counts.
+  Widget _buildCountBadge(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            text,
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -98,10 +105,13 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        toolbarHeight: 40,
-        title: const SizedBox.shrink(),
+        title: const Text('Danh sách nhân viên'),
+        actions: [
+          Consumer<EmployeeProvider>(
+            builder: (context, provider, _) =>
+                _buildCountBadge('${provider.employees.length} nhân viên'),
+          ),
+        ],
       ),
       floatingActionButton: GradientFab(
         icon: Icons.add_rounded,
@@ -127,13 +137,6 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
 
           return Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _buildHeader('${employees.length} nhân viên'),
-                ),
-              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: TextField(
