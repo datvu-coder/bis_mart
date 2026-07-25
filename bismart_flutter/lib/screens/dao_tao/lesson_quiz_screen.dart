@@ -162,12 +162,12 @@ class _LessonQuizScreenState extends State<LessonQuizScreen> {
       padding: const EdgeInsets.only(bottom: 8),
       child: InkWell(
         onTap: () => setState(() => _answers[qid] = letter),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: active ? AppColors.primaryLight : AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.chip),
             border: Border.all(
               color: active
                   ? AppColors.primary
@@ -210,7 +210,9 @@ class _LessonQuizScreenState extends State<LessonQuizScreen> {
     final correct = (r['correctCount'] as num?)?.toInt() ?? 0;
     final qcount = (r['questionCount'] as num?)?.toInt() ?? 0;
     final percent = (r['scorePercent'] as num?)?.toDouble() ?? 0.0;
-    final passed = percent >= 50;
+    // Server is the source of truth for pass/fail (and is what gets stored
+    // in the history admins see); only recompute locally as a fallback.
+    final passed = (r['passed'] as bool?) ?? percent >= 50;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),

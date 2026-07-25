@@ -50,10 +50,10 @@ class TrainingProvider extends ChangeNotifier {
   // Track in-flight toggleLike to prevent rapid double-taps from racing.
   final Set<String> _likeInFlight = <String>{};
 
-  void toggleLike(String postId) async {
-    if (_likeInFlight.contains(postId)) return;
+  Future<bool> toggleLike(String postId) async {
+    if (_likeInFlight.contains(postId)) return true;
     final index = _posts.indexWhere((p) => p.id == postId);
-    if (index == -1) return;
+    if (index == -1) return true;
     final post = _posts[index];
     final prevLiked = post.isLiked;
     final prevCount = post.likeCount;
@@ -67,10 +67,12 @@ class TrainingProvider extends ChangeNotifier {
       // Reconcile with server truth
       post.isLiked = (res['liked'] as bool?) ?? post.isLiked;
       post.likeCount = (res['likeCount'] as int?) ?? post.likeCount;
+      return true;
     } catch (_) {
       // Rollback on failure
       post.isLiked = prevLiked;
       post.likeCount = prevCount;
+      return false;
     } finally {
       _likeInFlight.remove(postId);
       notifyListeners();
@@ -99,15 +101,6 @@ class TrainingProvider extends ChangeNotifier {
     final post = CommunityPost.fromJson(result);
     _posts.insert(0, post);
     notifyListeners();
-  }
-
-  void addComment(String postId) async {
-    final index = _posts.indexWhere((p) => p.id == postId);
-    if (index != -1) {
-      _posts[index].commentCount++;
-      notifyListeners();
-      try { await _api.addComment(int.parse(postId), text: '', authorName: 'Bạn'); } catch (_) {}
-    }
   }
 
   /// Posts a comment. Adds it to the local list optimistically, but rolls
@@ -201,10 +194,18 @@ class TrainingProvider extends ChangeNotifier {
     _posts[index] = updated;
     notifyListeners();
 
-    await _api.updatePost(int.parse(postId), {
-      'content': content,
-      'visibility': visibility,
-    });
+    try {
+      await _api.updatePost(int.parse(postId), {
+        'content': content,
+        'visibility': visibility,
+      });
+    } catch (e) {
+      // Roll back the optimistic edit so the feed doesn't show unsaved
+      // content as if it had been persisted.
+      _posts[index] = old;
+      notifyListeners();
+      rethrow;
+    }
   }
 
   Future<void> createLesson(Map<String, dynamic> data) async {
@@ -222,25 +223,35 @@ class TrainingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addEvent(DateTime date, String title) async {
+  Future<bool> addEvent(DateTime date, String title) async {
     final key = DateTime.utc(date.year, date.month, date.day);
-    await _api.createEvent({'title': title, 'date': key.toIso8601String()});
+    try {
+      await _api.createEvent({'title': title, 'date': key.toIso8601String()});
+    } catch (_) {
+      return false;
+    }
     if (_events.containsKey(key)) {
       _events[key]!.add(title);
     } else {
       _events[key] = [title];
     }
     notifyListeners();
+    return true;
   }
 
-  Future<void> removeEvent(DateTime date, String title) async {
+  Future<bool> removeEvent(DateTime date, String title) async {
     final key = DateTime.utc(date.year, date.month, date.day);
-    await _api.deleteEvent({'title': title, 'date': key.toIso8601String()});
+    try {
+      await _api.deleteEvent({'title': title, 'date': key.toIso8601String()});
+    } catch (_) {
+      return false;
+    }
     _events[key]?.remove(title);
     if (_events[key]?.isEmpty ?? false) {
       _events.remove(key);
     }
     notifyListeners();
+    return true;
   }
 
   List<String> getEventsForDay(DateTime day) {

@@ -47,6 +47,7 @@ except Exception:
     POST_VIDEO_DIR = Path(os.getenv("BASE_DIR", ".")) / "post_videos"
     POST_VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 MAX_VIDEO_BYTES = int(os.getenv("MAX_VIDEO_BYTES", str(1024 * 1024 * 1024)))  # 1GB
+QUIZ_PASS_THRESHOLD = 50  # percent; below this a submission is recorded as not-passed
 ALLOWED_VIDEO_EXT = {".mp4", ".webm", ".mov", ".m4v"}
 CORS_ALLOW_HEADERS = "Content-Type, Authorization"
 CORS_ALLOW_METHODS = "GET, POST, PUT, DELETE, OPTIONS"
@@ -2903,20 +2904,42 @@ def _post_to_api_json(row, comments=None, is_liked=False):
         "comments": comments or [],
     }
 
+def _post_visibility_where():
+    """WHERE fragment + params restricting community_posts to ones the
+    caller may see: not store-scoped, un-scoped, authored by them, or in a
+    store they belong to/manage. Admins get no restriction (empty fragment).
+    Mirrors the client-side filter in dao_tao_screen.dart's _buildCommunityPanel
+    so a direct API call can't read another store's "store"-visibility posts."""
+    user_id = (g.current_user or {}).get("user_id")
+    allowed_codes = _allowed_store_codes_for_current_user()
+    if allowed_codes is None:
+        return "", []
+    condition = "(p.visibility != 'store' OR p.store_code IS NULL OR p.store_code = '' OR p.author_id = %s"
+    params = [user_id]
+    if allowed_codes:
+        condition += " OR UPPER(p.store_code) = ANY(%s::text[])"
+        params.append(list(allowed_codes))
+    condition += ")"
+    return condition, params
+
+
 @app.get("/api/posts")
 @login_required
 def api_get_posts():
     db = get_db()
     _ensure_posts_columns(db)
     user_id = (g.current_user or {}).get("user_id")
+    where_sql, where_params = _post_visibility_where()
+    query = (
+        "SELECT p.id, p.author_id, p.author_name, p.content, p.image_url, p.images_json, p.video_url, "
+        "p.visibility, p.store_code, p.like_count, p.comment_count, p.created_at, "
+        "EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = %s) AS liked_by_me "
+        "FROM community_posts p "
+        f"{'WHERE ' + where_sql if where_sql else ''} "
+        "ORDER BY p.id DESC LIMIT 100"
+    )
     with db.cursor() as cur:
-        cur.execute(
-            "SELECT p.id, p.author_id, p.author_name, p.content, p.image_url, p.images_json, p.video_url, "
-            "p.visibility, p.store_code, p.like_count, p.comment_count, p.created_at, "
-            "EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = %s) AS liked_by_me "
-            "FROM community_posts p ORDER BY p.id DESC LIMIT 100",
-            (user_id,),
-        )
+        cur.execute(query, [user_id, *where_params])
         rows = cur.fetchall()
     return jsonify([_post_to_api_json(r) for r in rows])
 
@@ -2927,6 +2950,7 @@ def api_create_post():
     db = get_db()
     _ensure_posts_columns(db)
     author_id = g.current_user.get("user_id") if g.current_user else None
+    author_name = _current_employee_info().get("full_name") or "Ẩn danh"
     image_urls = data.get("imageUrls") or []
     if not isinstance(image_urls, list):
         image_urls = []
@@ -2941,7 +2965,7 @@ def api_create_post():
                 "like_count, comment_count, created_at",
                 (
                     author_id,
-                    data.get("authorName", "Ẩn danh"),
+                    author_name,
                     data.get("content", ""),
                     data.get("visibility", "public"),
                     data.get("storeCode"),
@@ -3049,15 +3073,18 @@ def api_stream_post_video(post_id: int):
     user = _resolve_video_token()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
+    g.current_user = user
     db = get_db()
     _ensure_posts_columns(db)
     with db.cursor() as cur:
         cur.execute(
-            "SELECT video_url FROM community_posts WHERE id = %s", (post_id,)
+            "SELECT video_url, visibility, store_code, author_id FROM community_posts WHERE id = %s", (post_id,)
         )
         row = cur.fetchone()
     if not row or not row.get("video_url"):
         return jsonify({"error": "no video"}), 404
+    if not _can_view_post(row):
+        return _forbidden()
     fname = secure_filename(row["video_url"])
     full = POST_VIDEO_DIR / fname
     if not full.is_file():
@@ -3142,10 +3169,38 @@ def api_toggle_like(post_id: int):
     db.commit()
     return jsonify({"liked": liked, "likeCount": int(count_row["like_count"]) if count_row else 0})
 
+def _can_view_post(post_row) -> bool:
+    """True if the current caller (g.current_user) may view a post with
+    this visibility/store_code/author_id — same rule _post_visibility_where()
+    applies to the list endpoint, checked here per-post for the comment/video
+    endpoints so a direct call can't bypass the "store" visibility scoping."""
+    if (post_row.get("visibility") or "public") != "store":
+        return True
+    if post_row.get("author_id") == (g.current_user or {}).get("user_id"):
+        return True
+    store_code = (post_row.get("store_code") or "").strip()
+    if not store_code:
+        return True
+    allowed_codes = _allowed_store_codes_for_current_user()
+    if allowed_codes is None:
+        return True
+    return store_code.upper() in allowed_codes
+
+
 @app.get("/api/posts/<int:post_id>/comments")
 @login_required
 def api_get_comments(post_id: int):
     db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT visibility, store_code, author_id FROM community_posts WHERE id = %s",
+            (post_id,),
+        )
+        post = cur.fetchone()
+    if not post:
+        return jsonify({"error": "Not found"}), 404
+    if not _can_view_post(post):
+        return _forbidden()
     with db.cursor() as cur:
         cur.execute(
             "SELECT id, author_name, content, created_at FROM comments WHERE post_id = %s ORDER BY id ASC",
@@ -3162,12 +3217,13 @@ def api_get_comments(post_id: int):
 @login_required
 def api_add_comment(post_id: int):
     data = request.get_json(silent=True) or {}
+    author_name = _current_employee_info().get("full_name") or "Ẩn danh"
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
             "INSERT INTO comments (post_id, author_name, content) VALUES (%s, %s, %s) "
             "RETURNING id, author_name, content, created_at",
-            (post_id, data.get("authorName", "Ẩn danh"), data.get("text", "")),
+            (post_id, author_name, data.get("text", "")),
         )
         row = cur.fetchone()
         cur.execute("UPDATE community_posts SET comment_count = comment_count + 1 WHERE id = %s", (post_id,))
@@ -3237,6 +3293,7 @@ def _ensure_training_tables(db):
                 answers_json TEXT
             )
         """)
+        cur.execute("ALTER TABLE quiz_results ADD COLUMN IF NOT EXISTS passed BOOLEAN")
         cur.execute("""
             CREATE TABLE IF NOT EXISTS training_events (
                 id SERIAL PRIMARY KEY,
@@ -3418,6 +3475,18 @@ def _lesson_to_json(row, parts=None, user_completed_part_ids=None):
     }
 
 
+def _can_view_lesson(target_role: str | None) -> bool:
+    """A lesson targeted at a specific position (PG/TLD/ADM) is only for
+    employees in that position; 'ALL' (or unset) is open to everyone.
+    Admins can always see every lesson so they can manage it regardless
+    of who it's targeted at."""
+    role = (target_role or "ALL").upper()
+    if role == "ALL" or _is_admin_user():
+        return True
+    position = (_current_employee_info().get("position") or "").upper()
+    return position == role
+
+
 @app.get("/api/lessons")
 @login_required
 def api_get_lessons():
@@ -3430,7 +3499,7 @@ def api_get_lessons():
             "SELECT l.id, l.title, l.thumbnail_url, l.description, l.target_role, l.is_restricted "
             "FROM lessons l ORDER BY l.id DESC"
         )
-        lessons = cur.fetchall()
+        lessons = [l for l in cur.fetchall() if _can_view_lesson(l.get("target_role"))]
         cur.execute(
             "SELECT p.id, p.lesson_id, p.title, p.description, p.video_path, p.order_index, "
             "(SELECT COUNT(*) FROM quiz_questions q WHERE q.content_id = ('part_' || p.id::text)) AS question_count "
@@ -3477,6 +3546,8 @@ def api_get_lesson_detail(lesson_id: int):
         row = cur.fetchone()
         if not row:
             return jsonify({"error": "Not found"}), 404
+        if not _can_view_lesson(row.get("target_role")):
+            return _forbidden()
         cur.execute(
             "SELECT id, lesson_id, title, description, video_path, order_index "
             "FROM lesson_parts WHERE lesson_id = %s ORDER BY order_index ASC, id ASC",
@@ -3799,6 +3870,7 @@ def api_stream_part_video(lesson_id: int, part_id: int):
     user = _resolve_video_token()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
+    g.current_user = user
     db = get_db()
     _ensure_training_tables(db)
     with db.cursor() as cur:
@@ -3807,8 +3879,12 @@ def api_stream_part_video(lesson_id: int, part_id: int):
             (part_id, lesson_id),
         )
         row = cur.fetchone()
+        cur.execute("SELECT target_role FROM lessons WHERE id = %s", (lesson_id,))
+        lesson_row = cur.fetchone()
     if not row or not row.get("video_path"):
         return jsonify({"error": "no video"}), 404
+    if not lesson_row or not _can_view_lesson(lesson_row.get("target_role")):
+        return _forbidden()
     fname = secure_filename(row["video_path"])
     full = LESSON_VIDEO_DIR / fname
     if not full.is_file():
@@ -3892,6 +3968,12 @@ def api_quiz_submit():
         content_id = f"lesson_{lesson_id}"
         resolved_lesson_id = lesson_id
     with db.cursor() as cur:
+        cur.execute("SELECT target_role FROM lessons WHERE id = %s", (resolved_lesson_id,))
+        lesson_row = cur.fetchone()
+        if not lesson_row:
+            return jsonify({"error": "Lesson not found"}), 404
+        if not _can_view_lesson(lesson_row.get("target_role")):
+            return _forbidden()
         cur.execute(
             "SELECT id, correct_answer, points FROM quiz_questions WHERE content_id = %s",
             (content_id,),
@@ -3911,6 +3993,7 @@ def api_quiz_submit():
             earned += pts
             correct_count += 1
     score_percent = (earned / total * 100) if total else 0
+    passed = score_percent >= QUIZ_PASS_THRESHOLD
     user = _current_employee_info()
     submitted_at = datetime.now(VN_TZ).strftime("%Y-%m-%d %H:%M:%S")
     employee_code = user["employee_code"]
@@ -3920,9 +4003,9 @@ def api_quiz_submit():
     score_text = f"{earned}/{total}"
     with db.cursor() as cur:
         cur.execute(
-            "INSERT INTO quiz_results (submitted_at, employee_code, full_name, store_name, content_id, score, answers_json) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
-            (submitted_at, employee_code, full_name, store_name, content_id, score_text, json.dumps(answers)),
+            "INSERT INTO quiz_results (submitted_at, employee_code, full_name, store_name, content_id, score, answers_json, passed) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (submitted_at, employee_code, full_name, store_name, content_id, score_text, json.dumps(answers), passed),
         )
         result_id = cur.fetchone()["id"]
     db.commit()
@@ -3936,8 +4019,56 @@ def api_quiz_submit():
         "correctCount": correct_count,
         "questionCount": len(qs),
         "scorePercent": round(score_percent, 2),
+        "passed": passed,
         "submittedAt": submitted_at,
     }), 201
+
+
+@app.post("/api/lessons/parts/<int:part_id>/watch")
+@login_required
+def api_mark_part_watched(part_id: int):
+    """Record completion for a video-only part (no quiz) once its video has
+    played to the end, so progress can reach 100% for lessons that include
+    parts with nothing to quiz on. Parts that do have a quiz must still be
+    completed by actually submitting it — this route 400s for those."""
+    db = get_db()
+    _ensure_training_tables(db)
+    with db.cursor() as cur:
+        cur.execute("SELECT lesson_id FROM lesson_parts WHERE id = %s", (part_id,))
+        prow = cur.fetchone()
+    if not prow:
+        return jsonify({"error": "Part not found"}), 404
+    lesson_id = prow["lesson_id"]
+    content_id = f"part_{part_id}"
+    with db.cursor() as cur:
+        cur.execute("SELECT target_role FROM lessons WHERE id = %s", (lesson_id,))
+        lesson_row = cur.fetchone()
+        if not lesson_row or not _can_view_lesson(lesson_row.get("target_role")):
+            return _forbidden()
+        cur.execute("SELECT COUNT(*) AS c FROM quiz_questions WHERE content_id = %s", (content_id,))
+        if (cur.fetchone() or {}).get("c"):
+            return jsonify({"error": "Part has a quiz; submit the quiz instead"}), 400
+    user = _current_employee_info()
+    employee_code = user["employee_code"]
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM quiz_results WHERE content_id = %s AND employee_code = %s LIMIT 1",
+            (content_id, employee_code),
+        )
+        if cur.fetchone():
+            return jsonify({"ok": True})
+    submitted_at = datetime.now(VN_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    full_name = user["full_name"]
+    _, resolved_store_name = _get_store_info_by_code(db, user.get("store_code"))
+    store_name = resolved_store_name or user["store_code"]
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO quiz_results (submitted_at, employee_code, full_name, store_name, content_id, score, answers_json, passed) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+            (submitted_at, employee_code, full_name, store_name, content_id, "Đã xem", "{}", True),
+        )
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @app.get("/api/quiz/results")
@@ -3950,7 +4081,7 @@ def api_quiz_results():
     part_id = request.args.get("partId")
     scope = (request.args.get("scope") or "self").lower()
     sql = (
-        "SELECT r.id, r.submitted_at, r.employee_code, r.full_name, r.store_name, r.content_id, r.score "
+        "SELECT r.id, r.submitted_at, r.employee_code, r.full_name, r.store_name, r.content_id, r.score, r.passed "
         "FROM quiz_results r"
     )
     args: list = []
@@ -3990,6 +4121,7 @@ def api_quiz_results():
             "lessonId": rec_lesson_id,
             "partId": rec_part_id,
             "score": r.get("score"),
+            "passed": r.get("passed"),
         })
     return jsonify(out)
 
@@ -4008,7 +4140,7 @@ def api_lesson_history(lesson_id: int):
         part_ids = [p["id"] for p in cur.fetchall()]
         total_parts = len(part_ids)
         sql = (
-            "SELECT r.id, r.submitted_at, r.employee_code, r.full_name, r.store_name, r.content_id, r.score "
+            "SELECT r.id, r.submitted_at, r.employee_code, r.full_name, r.store_name, r.content_id, r.score, r.passed "
             "FROM quiz_results r WHERE r.content_id IN ("
             "  SELECT 'part_' || p.id::text FROM lesson_parts p WHERE p.lesson_id = %s"
             ") OR r.content_id = %s"
@@ -4044,6 +4176,7 @@ def api_lesson_history(lesson_id: int):
             "submittedAt": r.get("submitted_at"),
             "partId": pid_str,
             "score": r.get("score"),
+            "passed": r.get("passed"),
         })
     out = []
     for emp, info in agg.items():

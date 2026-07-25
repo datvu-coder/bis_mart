@@ -180,7 +180,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   children: [
                     Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
                     const SizedBox(height: 2),
-                    Text('Cộng đồng, bài học & lịch đào tạo',
+                    Text('Cộng đồng, bài giảng & lịch đào tạo',
                         style: AppTextStyles.caption),
                   ],
                 ),
@@ -494,7 +494,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 post: post,
                 onTap: () => _openPostDetail(post.id),
                 onTapMedia: () => _openPostDetail(post.id),
-                onLike: () => provider.toggleLike(post.id),
+                onLike: () => _toggleLike(provider, post.id),
                 onComment: () => _openPostDetail(post.id),
                 onShare: () => _sharePost(post),
                 onEdit: _canManagePost(post, currentUser)
@@ -580,11 +580,13 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       padding: isMobile
           ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
           : null,
-      trailing: IconButton(
-        onPressed: () => _showAddEventDialog(provider),
-        icon: const Icon(Icons.add_rounded),
-        tooltip: 'Thêm sự kiện',
-      ),
+      trailing: _isAdmin()
+          ? IconButton(
+              onPressed: () => _showAddEventDialog(provider),
+              icon: const Icon(Icons.add_rounded),
+              tooltip: 'Thêm sự kiện',
+            )
+          : null,
       child: Column(
         children: [
           TableCalendar(
@@ -630,40 +632,58 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           ),
           if (events.isNotEmpty) ...[
             const Divider(height: 20),
-            ...events.map((event) => Dismissible(
-                  key: Key(event),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (_) =>
-                      provider.removeEvent(_selectedDay ?? _focusedDay, event),
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 16),
-                    color: AppColors.error,
-                    child: const Icon(Icons.delete_rounded,
-                        color: Colors.white, size: 20),
-                  ),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 6),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.infoLight,
-                      borderRadius: BorderRadius.circular(AppRadius.chip),
+            ...events.map((event) {
+              final eventRow = Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.infoLight,
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.event_note_rounded,
+                        size: 16, color: AppColors.info),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(event,
+                          style: AppTextStyles.bodyText
+                              .copyWith(color: AppColors.info)),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.event_note_rounded,
-                            size: 16, color: AppColors.info),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(event,
-                              style: AppTextStyles.bodyText
-                                  .copyWith(color: AppColors.info)),
-                        ),
-                      ],
-                    ),
-                  ),
-                )),
+                  ],
+                ),
+              );
+              if (!_isAdmin()) return eventRow;
+              return Dismissible(
+                key: Key(event),
+                direction: DismissDirection.endToStart,
+                // confirmDismiss (rather than onDismissed) lets the swipe
+                // snap back on failure instead of playing the removal
+                // animation before we know whether the server call worked.
+                confirmDismiss: (_) async {
+                  final ok = await provider.removeEvent(
+                      _selectedDay ?? _focusedDay, event);
+                  if (!ok && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Không thể xoá sự kiện. Vui lòng thử lại.'),
+                        backgroundColor: AppColors.error,
+                      ),
+                    );
+                  }
+                  return ok;
+                },
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 16),
+                  color: AppColors.error,
+                  child: const Icon(Icons.delete_rounded,
+                      color: AppColors.white, size: 20),
+                ),
+                child: eventRow,
+              );
+            }),
           ] else ...[
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1323,6 +1343,18 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         ),
       );
 
+  Future<void> _toggleLike(TrainingProvider provider, String postId) async {
+    final ok = await provider.toggleLike(postId);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể thích bài viết. Vui lòng thử lại.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   void _openPostDetail(String postId) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -1601,11 +1633,13 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
 
   bool _canManagePost(CommunityPost post, dynamic currentUser) {
     if (currentUser == null) return false;
+    // Match by author id only — matching by display name showed Edit/Delete
+    // (and then a guaranteed-to-fail request) for anyone who merely shares
+    // the real author's name.
     final isOwnerById = post.authorId != null && post.authorId == currentUser.id;
-    final isOwnerByName = post.authorName == currentUser.fullName;
     final role = (currentUser.position ?? '').toString().toUpperCase();
     final isPrivileged = role == 'ADM' || role == 'ADMIN' || role == 'TMK';
-    return isOwnerById || isOwnerByName || isPrivileged;
+    return isOwnerById || isPrivileged;
   }
 
   void _showEditPostDialog(TrainingProvider provider, CommunityPost post) {
@@ -2164,7 +2198,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Hủy')),
         ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             if (controller.text.trim().isEmpty) {
               ScaffoldMessenger.of(ctx).showSnackBar(
                 const SnackBar(
@@ -2173,13 +2207,23 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               );
               return;
             }
-            provider.addEvent(targetDay, controller.text.trim());
-            Navigator.pop(ctx);
+            final ok = await provider.addEvent(targetDay, controller.text.trim());
+            if (!ctx.mounted) return;
+            if (ok) {
+              Navigator.pop(ctx);
+            } else {
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(
+                  content: Text('Không thể thêm sự kiện. Vui lòng thử lại.'),
+                  backgroundColor: AppColors.error,
+                ),
+              );
+            }
           },
           child: const Text('Thêm'),
         ),
       ],
-    );
+    ).then((_) => controller.dispose());
   }
 
   bool _isTmkAccount(String? position) {
@@ -2280,7 +2324,10 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           child: Text(saving ? 'Đang lưu...' : 'Thêm'),
         ),
       ],
-    );
+    ).then((_) {
+      nameController.dispose();
+      urlController.dispose();
+    });
   }
 }
 

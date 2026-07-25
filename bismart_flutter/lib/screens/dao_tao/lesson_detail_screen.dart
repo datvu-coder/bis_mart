@@ -30,6 +30,10 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
   Lesson? _lesson;
   // Map<partId, true> for parts whose quiz has been submitted.
   final Set<String> _completedPartIds = {};
+  // Parts whose video has been watched to the end at least once — kept here
+  // (rather than in _PartContentState) because collapsing/re-expanding a
+  // part tile unmounts and remounts _PartContent entirely.
+  final Set<String> _videoFinishedPartIds = {};
   String? _activePartId;
 
   bool get _isAdmin {
@@ -354,6 +358,8 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
                 lesson: _lesson!,
                 part: part,
                 alreadyCompleted: completed,
+                initiallyVideoFinished: _videoFinishedPartIds.contains(part.id),
+                onVideoFinished: () => _videoFinishedPartIds.add(part.id),
                 onQuizSubmitted: () {
                   setState(() {
                     _completedPartIds.add(part.id);
@@ -475,14 +481,18 @@ class _PartContent extends StatefulWidget {
   final Lesson lesson;
   final LessonPart part;
   final bool alreadyCompleted;
+  final bool initiallyVideoFinished;
   final VoidCallback onQuizSubmitted;
+  final VoidCallback onVideoFinished;
 
   const _PartContent({
     super.key,
     required this.lesson,
     required this.part,
     required this.alreadyCompleted,
+    required this.initiallyVideoFinished,
     required this.onQuizSubmitted,
+    required this.onVideoFinished,
   });
 
   @override
@@ -490,7 +500,11 @@ class _PartContent extends StatefulWidget {
 }
 
 class _PartContentState extends State<_PartContent> {
-  bool _videoFinished = false;
+  // Seeded from the parent's cache so collapsing and re-expanding this part
+  // (which unmounts/remounts this whole widget) doesn't forget that the
+  // video was already watched and force the user to re-watch it to unlock
+  // the quiz again.
+  late bool _videoFinished = widget.initiallyVideoFinished;
 
   Future<void> _openQuiz() async {
     if (widget.part.questions.isEmpty) {
@@ -533,7 +547,19 @@ class _PartContentState extends State<_PartContent> {
           LessonVideoPlayer(
             lessonId: widget.lesson.id,
             partId: widget.part.id,
-            onFinished: () => setState(() => _videoFinished = true),
+            onFinished: () {
+              setState(() => _videoFinished = true);
+              widget.onVideoFinished();
+              // Video-only parts (no quiz) have no other way to ever be
+              // recorded as complete, so record it here once the video is
+              // watched through — otherwise a lesson made of such parts
+              // could never reach 100% progress.
+              if (!widget.part.hasQuiz && !widget.alreadyCompleted) {
+                ApiService().markPartWatched(widget.part.id).then((_) {
+                  widget.onQuizSubmitted();
+                }).catchError((_) {});
+              }
+            },
           ),
         if (widget.part.hasVideo) const SizedBox(height: 10),
         _buildQuizCta(),

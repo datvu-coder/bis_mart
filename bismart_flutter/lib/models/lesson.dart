@@ -91,16 +91,4 @@ class Lesson {
       questionCount: (json['questionCount'] as num?)?.toInt() ?? 0,
     );
   }
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'title': title,
-        'description': description,
-        'thumbnailUrl': thumbnailUrl,
-        'targetRole': targetRole,
-        'isRestricted': isRestricted,
-        'partCount': partCount,
-        'completedPartCount': completedPartCount,
-        'progress': progress,
-      };
 }

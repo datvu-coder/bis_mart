@@ -35,7 +35,7 @@ class LessonCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       elevation: 0,
       child: InkWell(
-        onTap: lesson.isRestricted ? null : onJoin,
+        onTap: onJoin,
         child: Container(
           decoration: BoxDecoration(
             border: Border.all(
@@ -81,20 +81,6 @@ class LessonCard extends StatelessWidget {
               const Center(
                 child: Icon(Icons.play_circle_fill_rounded,
                     size: 36, color: AppColors.primary),
-              ),
-            if (lesson.isRestricted)
-              Positioned(
-                right: 4,
-                top: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Icon(Icons.lock_rounded,
-                      size: 12, color: Colors.white),
-                ),
               ),
           ],
         ),
