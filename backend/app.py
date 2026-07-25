@@ -1413,6 +1413,15 @@ def api_get_products():
     return jsonify([_product_to_api_json(row) for row in rows])
 
 
+def _parse_nonneg_float(value: Any, default: float = 0) -> float:
+    """Coerce to a non-negative float; falls back to default on bad/missing input."""
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(parsed, 0)
+
+
 @app.post("/api/products")
 @login_required
 def api_create_product():
@@ -1432,14 +1441,14 @@ def api_create_product():
             (
                 data.get("name", ""),
                 data.get("unit", "Lon"),
-                data.get("priceWithVAT", 0),
+                _parse_nonneg_float(data.get("priceWithVAT"), 0),
                 data.get("productGroup", "DELI"),
                 data.get("productCondition"),
                 (data.get("barcode") or "").strip() or None,
                 data.get("imageUrl") or None,
                 conversions_json,
-                data.get("stockQuantity", 0),
-                data.get("lowStockThreshold", 5),
+                _parse_nonneg_float(data.get("stockQuantity"), 0),
+                _parse_nonneg_float(data.get("lowStockThreshold"), 5),
             ),
         )
         row = cur.fetchone()
@@ -1466,14 +1475,14 @@ def api_update_product(product_id: int):
             (
                 data.get("name", ""),
                 data.get("unit", "Lon"),
-                data.get("priceWithVAT", 0),
+                _parse_nonneg_float(data.get("priceWithVAT"), 0),
                 data.get("productGroup", "DELI"),
                 data.get("productCondition"),
                 (data.get("barcode") or "").strip() or None,
                 data.get("imageUrl") or None,
                 conversions_json,
-                data.get("stockQuantity", 0),
-                data.get("lowStockThreshold", 5),
+                _parse_nonneg_float(data.get("stockQuantity"), 0),
+                _parse_nonneg_float(data.get("lowStockThreshold"), 5),
                 product_id,
             ),
         )
@@ -1821,6 +1830,14 @@ def api_create_report():
     if not pg_name and me:
         pg_name = (me.get("full_name") or "").strip()
 
+    # A client-supplied storeCode is only honored if the caller actually
+    # belongs to / manages that store — otherwise fall back to their own
+    # store so a report can't be misattributed to one they have no
+    # relationship with.
+    allowed_codes = _allowed_store_codes_for_current_user()
+    if store_code and allowed_codes is not None and store_code.upper() not in allowed_codes:
+        store_code = _normalize_store_code(me.get("store_code")) if me else None
+
     resolved_code, resolved_store_name = _get_store_info_by_code(db, store_code)
     store_code = resolved_code
     if not store_name:
@@ -1868,35 +1885,67 @@ def api_create_report():
     report_id = report["id"]
     db.commit()
 
-    # Insert sale items for THIS exact report_id, and decrement stock for
-    # any line sold in the product's own base unit — a line sold via a
-    # "Quy đổi" conversion unit has no stored multiplier back to the base
-    # unit, so it's left out of the automatic decrement rather than
+    # Insert all sale items in one batched statement, and decrement stock in
+    # one bulk UPDATE for lines sold in the product's own base unit — a line
+    # sold via a "Quy đổi" conversion unit has no stored multiplier back to
+    # the base unit, so it's left out of the automatic decrement rather than
     # guessing a wrong number (use "Điều chỉnh tồn kho" to correct manually).
-    for item in products_payload:
+    # (Previously one INSERT+SELECT+UPDATE per line item — up to 3N round
+    # trips for an N-item report.)
+    if products_payload:
+        insert_rows = []
+        insert_params: list[Any] = []
+        product_ids: set[int] = set()
+        for item in products_payload:
+            insert_rows.append("(%s, %s, %s, %s, %s, %s, %s)")
+            insert_params.extend([
+                report_id, item.get("productId"), item.get("productName", ""),
+                item.get("quantity", 0), item.get("unitPrice", 0),
+                item.get("unit"), item.get("productGroup"),
+            ])
+            try:
+                if item.get("productId"):
+                    product_ids.add(int(item["productId"]))
+            except (TypeError, ValueError):
+                pass
+
         with db.cursor() as cur:
             cur.execute(
                 "INSERT INTO sale_items (report_id, product_id, product_name, quantity, unit_price, unit, product_group) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (report_id, item.get("productId"), item.get("productName", ""),
-                 item.get("quantity", 0), item.get("unitPrice", 0),
-                 item.get("unit"), item.get("productGroup")),
+                "VALUES " + ", ".join(insert_rows),
+                insert_params,
             )
-        product_id = item.get("productId")
-        item_unit = (item.get("unit") or "").strip()
-        if product_id:
+
+        product_units: dict[int, str] = {}
+        if product_ids:
+            with db.cursor() as cur:
+                cur.execute(
+                    "SELECT id, unit FROM products WHERE id = ANY(%s::int[])",
+                    (list(product_ids),),
+                )
+                product_units = {r["id"]: (r.get("unit") or "") for r in cur.fetchall()}
+
+        decrements: dict[int, float] = {}
+        for item in products_payload:
             try:
-                with db.cursor() as cur:
-                    cur.execute("SELECT unit FROM products WHERE id = %s", (int(product_id),))
-                    prod_row = cur.fetchone()
-                if prod_row and (not item_unit or item_unit == (prod_row.get("unit") or "")):
-                    with db.cursor() as cur:
-                        cur.execute(
-                            "UPDATE products SET stock_quantity = GREATEST(stock_quantity - %s, 0) WHERE id = %s",
-                            (item.get("quantity", 0), int(product_id)),
-                        )
+                pid = int(item.get("productId"))
             except (TypeError, ValueError):
-                pass
+                continue
+            if pid not in product_units:
+                continue
+            item_unit = (item.get("unit") or "").strip()
+            if item_unit and item_unit != product_units[pid]:
+                continue
+            decrements[pid] = decrements.get(pid, 0) + float(item.get("quantity", 0) or 0)
+
+        if decrements:
+            with db.cursor() as cur:
+                cur.execute(
+                    "UPDATE products AS p SET stock_quantity = GREATEST(p.stock_quantity - v.qty, 0) "
+                    "FROM (SELECT * FROM unnest(%s::int[], %s::float[]) AS t(id, qty)) AS v "
+                    "WHERE p.id = v.id",
+                    (list(decrements.keys()), list(decrements.values())),
+                )
     db.commit()
 
     with db.cursor() as cur:
@@ -1922,20 +1971,32 @@ def api_create_report():
 def api_get_reports():
     filter_type = (request.args.get("filter") or "all").strip().lower()
     now = datetime.now(tz=VN_TZ)
-    where_clause = ""
+    where_clauses: list[str] = []
     params: list[Any] = []
 
     if filter_type == "today":
-        where_clause = "WHERE LEFT(report_date, 10) = %s"
-        params = [now.strftime("%Y-%m-%d")]
+        where_clauses.append("LEFT(sr.report_date, 10) = %s")
+        params.append(now.strftime("%Y-%m-%d"))
     elif filter_type == "week":
-        where_clause = "WHERE LEFT(report_date, 10) >= %s"
-        params = [(now - timedelta(days=7)).strftime("%Y-%m-%d")]
+        where_clauses.append("LEFT(sr.report_date, 10) >= %s")
+        params.append((now - timedelta(days=7)).strftime("%Y-%m-%d"))
     elif filter_type == "month":
-        where_clause = "WHERE LEFT(report_date, 10) >= %s AND LEFT(report_date, 10) < %s"
+        where_clauses.append("LEFT(sr.report_date, 10) >= %s AND LEFT(sr.report_date, 10) < %s")
         month_start = now.replace(day=1).strftime("%Y-%m-%d")
         next_month = (now.replace(day=28) + timedelta(days=4)).replace(day=1).strftime("%Y-%m-%d")
-        params = [month_start, next_month]
+        params.extend([month_start, next_month])
+
+    # Scope to the caller's own store + any stores they manage — mirrors
+    # PermissionProvider's client-side filtering, but enforced server-side
+    # so a direct API call can't see other stores' revenue/customer data.
+    allowed_codes = _allowed_store_codes_for_current_user()
+    if allowed_codes is not None:
+        if not allowed_codes:
+            return jsonify([])
+        where_clauses.append("UPPER(sr.store_code) = ANY(%s::text[])")
+        params.append(list(allowed_codes))
+
+    where_clause = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
 
     db = get_db()
     with db.cursor() as cur:
@@ -1989,6 +2050,12 @@ def api_update_report(report_id: int):
 
     report_date = _normalize_report_date(data.get("date")) if "date" in data else existing.get("report_date")
     store_code = _normalize_store_code(data.get("storeCode")) if "storeCode" in data else existing.get("store_code")
+    # Same store-misattribution guard as report creation — a non-crud user
+    # can't move their own report to a store they don't belong to / manage.
+    if "storeCode" in data and not _has_crud_permission():
+        allowed_codes = _allowed_store_codes_for_current_user()
+        if allowed_codes is not None and (not store_code or store_code.upper() not in allowed_codes):
+            store_code = existing.get("store_code")
     resolved_code, resolved_store_name = _get_store_info_by_code(db, store_code)
     store_code = resolved_code
     store_name = (data.get("storeName") or "").strip() or resolved_store_name or existing.get("store_name") or ""
@@ -2230,6 +2297,12 @@ def api_checkin():
     emp_id = data.get("employeeId")
     if not emp_id:
         return jsonify({"error": "Missing employeeId"}), 400
+    # GPS check-in proves the requester is physically at the store, so it can
+    # only ever be self-service — never trust a client-supplied employeeId
+    # for someone else, even for managers (that would defeat the GPS check).
+    current_employee_id = (g.current_user or {}).get("employee_id")
+    if str(emp_id) != str(current_employee_id):
+        return _forbidden()
 
     lat = data.get("latitude")
     lng = data.get("longitude")
@@ -2295,6 +2368,10 @@ def api_checkout():
     emp_id = data.get("employeeId")
     if not emp_id:
         return jsonify({"error": "Missing employeeId"}), 400
+    # Same self-service-only rule as check-in — see comment there.
+    current_employee_id = (g.current_user or {}).get("employee_id")
+    if str(emp_id) != str(current_employee_id):
+        return _forbidden()
 
     lat = data.get("latitude")
     lng = data.get("longitude")
@@ -2675,6 +2752,42 @@ def _forbidden():
     return jsonify({"error": "Forbidden"}), 403
 
 
+def _allowed_store_codes_for_current_user() -> set[str] | None:
+    """Store codes the caller may see: their own store plus any they manage
+    via store_managers. Returns None for unrestricted access (admin/TMK).
+    Mirrors PermissionProvider's client-side scoping (isAdmin -> all stores,
+    else ownStoreCode + managedStoreIds) so the server enforces the same
+    rule instead of trusting the client to filter."""
+    if _is_admin_user():
+        return None
+    user_id = (g.current_user or {}).get("user_id")
+    if not user_id:
+        return set()
+    db = get_db()
+    codes: set[str] = set()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT e.store_code FROM users u LEFT JOIN employees e ON e.id = u.employee_id WHERE u.id = %s",
+            (user_id,),
+        )
+        row = cur.fetchone() or {}
+        own = (row.get("store_code") or "").strip().upper()
+        if own:
+            codes.add(own)
+        cur.execute(
+            "SELECT s.store_code FROM store_managers sm "
+            "JOIN stores s ON s.id = sm.store_id "
+            "JOIN users u ON u.employee_id = sm.employee_id "
+            "WHERE u.id = %s",
+            (user_id,),
+        )
+        for r in cur.fetchall():
+            code = (r.get("store_code") or "").strip().upper()
+            if code:
+                codes.add(code)
+    return codes
+
+
 def _parse_attendance_time(value: Any, attend_date: str | None) -> str | None:
     """Accepts 'HH:MM', 'HH:MM:SS' or full ISO. Returns 'YYYY-MM-DDTHH:MM:SS' or None."""
     if value is None:
@@ -2839,9 +2952,10 @@ def api_create_post():
             row = cur.fetchone()
         db.commit()
         return jsonify(_post_to_api_json(row)), 201
-    except Exception as e:
+    except Exception:
         db.rollback()
-        return jsonify({"error": str(e)}), 400
+        app.logger.exception("Failed to create community post")
+        return jsonify({"error": "Không thể đăng bài. Vui lòng thử lại."}), 400
 
 @app.put("/api/posts/<int:post_id>")
 @login_required
