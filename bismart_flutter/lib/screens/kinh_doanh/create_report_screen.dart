@@ -365,7 +365,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: AppColors.primaryLight,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.row),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
       ),
       child: Row(
@@ -489,7 +489,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                       Container(
                         decoration: BoxDecoration(
                           color: AppColors.cardBg,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(AppRadius.chip),
                           border: Border.all(color: AppColors.border),
                         ),
                         child: Row(
@@ -660,7 +660,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
                               color: AppColors.errorLight,
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(AppRadius.chip),
                             ),
                             child: Text(
                               provider.error!,
@@ -670,27 +670,60 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
                         TextField(
                           controller: searchCtrl,
                           onChanged: (_) => setDialogState(() {}),
-                          decoration: AppDecorations.searchField('Tìm sản phẩm...'),
-                        ),
-                        const SizedBox(height: 10),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: ['Tất cả', 'DELI', 'DELIMIL', 'AUMIL', 'GOODLIFE', 'TP']
-                                .map((group) => Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: ChoiceChip(
-                                        label: Text(group),
-                                        selected: selectedGroup == group,
-                                        selectedColor: AppColors.primaryLight,
-                                        onSelected: (_) {
-                                          setDialogState(() {
-                                            selectedGroup = group;
-                                          });
-                                        },
-                                      ),
-                                    ))
-                                .toList(),
+                          decoration: AppDecorations.searchField(
+                            'Tìm sản phẩm...',
+                            suffixIcon: PopupMenuButton<String>(
+                              icon: const Icon(Icons.tune_rounded, size: 20),
+                              tooltip: 'Lọc theo nhóm',
+                              color: AppColors.white,
+                              elevation: 6,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                side: const BorderSide(color: AppColors.borderLight),
+                              ),
+                              onSelected: (group) => setDialogState(() => selectedGroup = group),
+                              itemBuilder: (context) => [
+                                for (final group in const [
+                                  'Tất cả',
+                                  'DELI',
+                                  'DELIMIL',
+                                  'AUMIL',
+                                  'GOODLIFE',
+                                  'TP'
+                                ])
+                                  PopupMenuItem<String>(
+                                    value: group,
+                                    child: Builder(builder: (context) {
+                                      final isSelected = selectedGroup == group;
+                                      return Row(
+                                        children: [
+                                          Icon(
+                                            isSelected
+                                                ? Icons.radio_button_checked_rounded
+                                                : Icons.radio_button_unchecked_rounded,
+                                            size: 18,
+                                            color: isSelected
+                                                ? AppColors.primary
+                                                : AppColors.textHint,
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            group,
+                                            style: TextStyle(
+                                              color: isSelected
+                                                  ? AppColors.primary
+                                                  : AppColors.textPrimary,
+                                              fontWeight: isSelected
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }),
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -792,9 +825,8 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Doanh thu phải lớn hơn 0'),
-            behavior: SnackBarBehavior.floating,
             backgroundColor: AppColors.error,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
           ),
         );
         return;
@@ -836,8 +868,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_editingReport != null ? 'Cập nhật báo cáo thành công!' : 'Tạo phiếu báo cáo thành công!'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
             backgroundColor: AppColors.success,
           ),
         );
@@ -846,8 +877,7 @@ class _CreateReportScreenState extends State<CreateReportScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(_editingReport != null ? 'Cập nhật thất bại. Vui lòng thử lại.' : 'Tạo phiếu thất bại. Vui lòng thử lại.'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
             backgroundColor: AppColors.error,
           ),
         );

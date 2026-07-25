@@ -306,7 +306,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadius.row),
                       onTap: () => _openAiTool(item.link ?? ''),
                       child: Padding(
                         padding: const EdgeInsets.all(14),
@@ -317,7 +317,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                               height: 40,
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(10),
+                                borderRadius: BorderRadius.circular(AppRadius.chip),
                               ),
                               child: const Icon(Icons.auto_awesome_rounded,
                                   color: Colors.white, size: 20),
@@ -379,7 +379,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               margin: EdgeInsets.fromLTRB(hMargin, 12, hMargin, 12),
               decoration: BoxDecoration(
                 color: AppColors.white,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.row),
                 border: Border.all(
                     color: AppColors.border.withValues(alpha: 0.6)),
                 boxShadow: [
@@ -466,7 +466,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 padding: const EdgeInsets.all(40),
                 decoration: BoxDecoration(
                   color: AppColors.white,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(AppRadius.row),
                   border: Border.all(
                       color: AppColors.border.withValues(alpha: 0.6)),
                 ),
@@ -648,7 +648,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                         horizontal: 12, vertical: 10),
                     decoration: BoxDecoration(
                       color: AppColors.infoLight,
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(AppRadius.chip),
                     ),
                     child: Row(
                       children: [
@@ -713,7 +713,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         const SnackBar(
                           content: Text('Mỗi bài chỉ được đính kèm 1 video.'),
-                          behavior: SnackBarBehavior.floating,
                         ),
                       );
                     }
@@ -724,7 +723,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         const SnackBar(
                           content: Text('Video vượt quá 1GB.'),
-                          behavior: SnackBarBehavior.floating,
                         ),
                       );
                     }
@@ -761,7 +759,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         SnackBar(
                           content: Text('Tải video lỗi: $e'),
-                          behavior: SnackBarBehavior.floating,
                         ),
                       );
                     }
@@ -783,7 +780,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   const SnackBar(
                     content: Text('Không thể mở cửa sổ chọn file.'),
-                    behavior: SnackBarBehavior.floating,
                   ),
                 );
               }
@@ -1090,7 +1086,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                               const SnackBar(
                                 content: Text(
                                     'Vui lòng đợi video tải lên hoàn tất.'),
-                                behavior: SnackBarBehavior.floating,
                               ),
                             );
                             return;
@@ -1125,8 +1120,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                               ScaffoldMessenger.of(ctx).showSnackBar(
                                 SnackBar(
                                   content: Text('Đăng bài thất bại: $e'),
-                                  backgroundColor: Colors.red,
-                                  behavior: SnackBarBehavior.floating,
+                                  backgroundColor: AppColors.error,
                                 ),
                               );
                             }
@@ -1137,7 +1131,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(AppRadius.chip)),
                         ),
                         child: const Text('Đăng',
                             style: TextStyle(
@@ -1160,7 +1154,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       return Stack(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(AppRadius.chip),
             child: _mediaPreview(files[0], height: 200),
           ),
           Positioned(
@@ -1204,7 +1198,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
         height: height ?? 160,
         decoration: BoxDecoration(
           gradient: const LinearGradient(
-            colors: [Color(0xFF111827), Color(0xFF374151)],
+            colors: [AppColors.gradientDarkStart, AppColors.gradientDarkEnd],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -1259,7 +1253,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                     horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.success.withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
                 ),
                 child: const Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.check_circle_rounded,
@@ -1599,7 +1593,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             Text('Đã sao chép nội dung bài viết'),
           ],
         ),
-        behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.success,
         duration: Duration(seconds: 2),
       ),
@@ -1664,7 +1657,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               ScaffoldMessenger.of(ctx).showSnackBar(
                 const SnackBar(
                   content: Text('Nội dung bài viết không được để trống'),
-                  behavior: SnackBarBehavior.floating,
                 ),
               );
               return;
@@ -1681,8 +1673,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   SnackBar(
                     content: Text('Lưu thất bại: $e'),
-                    backgroundColor: Colors.red,
-                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.error,
                   ),
                 );
               }
@@ -1717,8 +1708,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Xóa thất bại: $e'),
-                      backgroundColor: Colors.red,
-                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: AppColors.error,
                     ),
                   );
                 }
@@ -1764,7 +1754,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               onPressed: () => Navigator.pop(context, false),
               child: const Text('Huỷ')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Xoá'),
           ),
@@ -1781,7 +1771,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Xoá thất bại: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Xoá thất bại: $e'), backgroundColor: AppColors.error),
       );
     }
   }
@@ -1880,7 +1870,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: AppColors.surfaceVariant,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(AppRadius.chip),
                             border: Border.all(
                                 color: AppColors.border.withValues(alpha: 0.4)),
                           ),
@@ -1999,11 +1989,11 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                 if (errorMsg != null)
                   Container(
                     width: double.infinity,
-                    color: Colors.red.shade50,
+                    color: AppColors.errorLight,
                     padding: const EdgeInsets.all(10),
                     child: Text(
                       errorMsg!,
-                      style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+                      style: TextStyle(color: AppColors.error, fontSize: 13),
                     ),
                   ),
                 Padding(
@@ -2104,7 +2094,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
         border: Border.all(color: AppColors.border.withValues(alpha: 0.4)),
       ),
       child: Column(
@@ -2179,7 +2169,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               ScaffoldMessenger.of(ctx).showSnackBar(
                 const SnackBar(
                   content: Text('Vui lòng nhập tên sự kiện'),
-                  behavior: SnackBarBehavior.floating,
                 ),
               );
               return;
@@ -2214,7 +2203,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Chỉ tài khoản TMK mới được thêm AI mới.'),
-          behavior: SnackBarBehavior.floating,
         ),
       );
       return;
@@ -2268,7 +2256,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Vui lòng nhập đầy đủ và URL hợp lệ.'),
-                        behavior: SnackBarBehavior.floating,
                       ),
                     );
                     return;
@@ -2286,7 +2273,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                     ScaffoldMessenger.of(ctx).showSnackBar(
                       const SnackBar(
                         content: Text('Không thể thêm trợ lý AI. Vui lòng thử lại.'),
-                        behavior: SnackBarBehavior.floating,
                       ),
                     );
                   }

@@ -326,7 +326,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(AppRadius.row),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

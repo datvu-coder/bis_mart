@@ -136,7 +136,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
             child: Container(
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppRadius.chip),
               ),
               child: TabBar(
                 controller: _tabController,
@@ -352,7 +352,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
               foregroundColor: AppColors.white,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(AppRadius.chip)),
               elevation: 0,
             ),
           ),
@@ -494,18 +494,16 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('Đã xóa quyền cho "$position"'),
-            behavior: SnackBarBehavior.floating,
             backgroundColor: AppColors.success,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
           ));
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('Xóa quyền thất bại: $e'),
-            behavior: SnackBarBehavior.floating,
             backgroundColor: AppColors.error,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
           ));
         }
       }
@@ -596,18 +594,16 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                   content: Text(existing == null
                       ? 'Đã thêm chức vụ mới'
                       : 'Đã cập nhật quyền cho ${existing.position}'),
-                  behavior: SnackBarBehavior.floating,
                   backgroundColor: AppColors.success,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
                 ));
               }
             } catch (e) {
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                   content: Text('Lưu quyền thất bại: $e'),
-                  behavior: SnackBarBehavior.floating,
                   backgroundColor: AppColors.error,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
                 ));
               }
             }
@@ -779,7 +775,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
             height: 36,
             decoration: BoxDecoration(
               color: AppColors.infoLight,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadius.chip),
             ),
             child: const Icon(Icons.store_rounded,
                 size: 18, color: AppColors.info),
@@ -884,10 +880,9 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text('Xoá phân công thất bại: $e'),
-                      behavior: SnackBarBehavior.floating,
                       backgroundColor: AppColors.error,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
+                          borderRadius: BorderRadius.circular(AppRadius.chip)),
                     ));
                   }
                 }
@@ -1035,9 +1030,8 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                 content: const Text(
                   'Hãy chọn đúng nhân viên và cửa hàng từ danh sách gợi ý hoặc nhập đúng mã.',
                 ),
-                behavior: SnackBarBehavior.floating,
                 backgroundColor: AppColors.warning,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
               ));
               return;
             }
@@ -1051,9 +1045,8 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
             if (duplicated) {
               ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                 content: const Text('Nhân viên này đã được phân công vào cửa hàng đã chọn.'),
-                behavior: SnackBarBehavior.floating,
                 backgroundColor: AppColors.warning,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
               ));
               return;
             }
@@ -1072,9 +1065,8 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                   content: Text('Phân công thất bại: $e'),
-                  behavior: SnackBarBehavior.floating,
                   backgroundColor: AppColors.error,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
                 ));
               }
             }
@@ -1126,9 +1118,8 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
               if (ctx.mounted) {
                 ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
                   content: Text('Cập nhật chức vụ thất bại: $e'),
-                  behavior: SnackBarBehavior.floating,
                   backgroundColor: AppColors.error,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
                 ));
               }
             }
@@ -1169,9 +1160,8 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: const Text('File CSV trống.'),
-          behavior: SnackBarBehavior.floating,
           backgroundColor: AppColors.error,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
         ));
       }
       return;
@@ -1243,9 +1233,8 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
         setState(() => _importingAssign = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Import xong: $success thành công, $failed thất bại.'),
-          behavior: SnackBarBehavior.floating,
           backgroundColor: failed == 0 ? AppColors.success : AppColors.warning,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
         ));
       }
     }

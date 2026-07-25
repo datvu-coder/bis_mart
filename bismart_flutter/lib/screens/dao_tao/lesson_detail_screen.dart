@@ -122,7 +122,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
                     padding: const EdgeInsets.all(24),
                     child: Text(_error!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.red)),
+                        style: const TextStyle(color: AppColors.error)),
                   ),
                 )
               : _buildBody(),
@@ -258,7 +258,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.row),
         border: Border.all(
           color: completed
               ? AppColors.success.withValues(alpha: 0.4)
@@ -446,7 +446,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
               onPressed: () => Navigator.pop(context, false),
               child: const Text('Huỷ')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Xoá'),
           ),
@@ -462,7 +462,7 @@ class _LessonDetailScreenState extends State<LessonDetailScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Xoá thất bại: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('Xoá thất bại: $e'), backgroundColor: AppColors.error),
       );
     }
   }
@@ -552,7 +552,7 @@ class _PartContentState extends State<_PartContent> {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.background,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
         border: Border.all(
             color: AppColors.border.withValues(alpha: 0.5)),
       ),
@@ -738,7 +738,7 @@ class _PartEditorDialogState extends State<_PartEditorDialog> {
                       if (_err != null) ...[
                         const SizedBox(height: 8),
                         Text(_err!,
-                            style: const TextStyle(color: Colors.red)),
+                            style: const TextStyle(color: AppColors.error)),
                       ],
                     ],
                   ),
@@ -862,7 +862,7 @@ class _PartEditorDialogState extends State<_PartEditorDialog> {
             IconButton(
               onPressed: () => setState(() => _questions.removeAt(i).dispose()),
               icon: const Icon(Icons.delete_outline_rounded,
-                  color: Colors.red),
+                  color: AppColors.error),
             ),
           ]),
           TextField(

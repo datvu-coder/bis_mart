@@ -398,7 +398,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             height: 44,
             decoration: BoxDecoration(
               color: AppColors.primaryLight,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.row),
             ),
             child: const Icon(Icons.campaign_rounded, color: AppColors.primary, size: 22),
           ),
@@ -437,7 +437,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 height: 32,
                 decoration: BoxDecoration(
                   color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
                 ),
                 child: Icon(icon, color: AppColors.primary, size: 18),
               ),
@@ -467,7 +467,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 height: 32,
                 decoration: BoxDecoration(
                   color: AppColors.warningLight,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
                 ),
                 child: const Icon(Icons.star_rounded, color: AppColors.warning, size: 18),
               ),
@@ -514,7 +514,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 height: 32,
                 decoration: BoxDecoration(
                   color: AppColors.warningLight,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
                 ),
                 child: const Icon(Icons.emoji_events_rounded, color: AppColors.warning, size: 18),
               ),

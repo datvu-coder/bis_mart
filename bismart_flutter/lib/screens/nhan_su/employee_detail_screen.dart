@@ -79,9 +79,9 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: AppColors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(AppRadius.panel),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
+                      border: Border.all(color: AppColors.white.withValues(alpha: 0.3), width: 2),
                     ),
                     child: Center(
                       child: Text(
@@ -109,7 +109,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: AppColors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -268,7 +268,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
             height: 36,
             decoration: BoxDecoration(
               color: AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadius.chip),
             ),
             child: Icon(icon, size: 18, color: AppColors.primary),
           ),
@@ -372,9 +372,8 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                       ScaffoldMessenger.of(this.context).showSnackBar(
                         SnackBar(
                           content: const Text('Đã cập nhật thông tin!'),
-                          behavior: SnackBarBehavior.floating,
                           backgroundColor: AppColors.success,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
                         ),
                       );
                     } else {
@@ -382,9 +381,8 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                       ScaffoldMessenger.of(ctx).showSnackBar(
                         SnackBar(
                           content: Text(provider.error ?? 'Cập nhật thất bại. Vui lòng thử lại.'),
-                          behavior: SnackBarBehavior.floating,
                           backgroundColor: AppColors.error,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
                         ),
                       );
                     }
@@ -426,9 +424,8 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: const Text('Đã xóa nhân viên!'),
-                            behavior: SnackBarBehavior.floating,
                             backgroundColor: AppColors.success,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
                           ),
                         );
                       } else {
@@ -436,9 +433,8 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                         ScaffoldMessenger.of(ctx).showSnackBar(
                           SnackBar(
                             content: Text(provider.error ?? 'Xóa thất bại. Vui lòng thử lại.'),
-                            behavior: SnackBarBehavior.floating,
                             backgroundColor: AppColors.error,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.chip)),
                           ),
                         );
                       }
@@ -465,14 +461,14 @@ class _StatBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        color: AppColors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
           Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.white)),
           const SizedBox(height: 2),
-          Text(label, style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.8))),
+          Text(label, style: TextStyle(fontSize: 11, color: AppColors.white.withValues(alpha: 0.8))),
         ],
       ),
     );
