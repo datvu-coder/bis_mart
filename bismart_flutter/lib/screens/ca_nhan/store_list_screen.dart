@@ -28,20 +28,27 @@ class _StoreListScreenState extends State<StoreListScreen> {
     });
   }
 
-  /// Plain title (+ subtitle on wide screens), matching the headerless
-  /// style the other tabs use instead of a bordered icon-avatar card.
-  Widget _buildHeader(String subtitle) {
-    final isCompactMobile = MediaQuery.of(context).size.width < 430;
-    if (isCompactMobile) {
-      return Text('Danh sách cửa hàng', style: AppTextStyles.appTitle);
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Danh sách cửa hàng', style: AppTextStyles.appTitle),
-        const SizedBox(height: 2),
-        Text(subtitle, style: AppTextStyles.caption),
-      ],
+  /// Small pill badge showing the item count, placed in the AppBar's
+  /// actions — same spot phan_quyen_screen.dart uses for its counts.
+  Widget _buildCountBadge(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 16),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            text,
+            style: AppTextStyles.caption.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -107,10 +114,8 @@ class _StoreListScreenState extends State<StoreListScreen> {
         return Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            toolbarHeight: 40,
-            title: const SizedBox.shrink(),
+            title: const Text('Danh sách cửa hàng'),
+            actions: [_buildCountBadge('${stores.length} cửa hàng')],
           ),
           floatingActionButton: canCreate
               ? GradientFab(
@@ -121,14 +126,6 @@ class _StoreListScreenState extends State<StoreListScreen> {
               : null,
           body: Column(
         children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _buildHeader('${stores.length} cửa hàng'),
-            ),
-          ),
           // Search
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
