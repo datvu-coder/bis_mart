@@ -77,17 +77,4 @@ class CommunityPost {
           [],
     );
   }
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'authorId': authorId,
-        'authorName': authorName,
-        'createdAt': createdAt.toIso8601String(),
-        'content': content,
-        'imageUrls': imageUrls,
-        'visibility': visibility,
-        'storeCode': storeCode,
-        'likeCount': likeCount,
-        'commentCount': commentCount,
-      };
 }

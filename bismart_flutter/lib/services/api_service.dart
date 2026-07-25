@@ -513,6 +513,13 @@ class ApiService {
     return response.data as List<dynamic>;
   }
 
+  /// Records completion for a video-only part (no quiz) once its video has
+  /// finished playing, so lessons made only of video parts can still reach
+  /// 100% progress instead of completion being possible only via a quiz.
+  Future<void> markPartWatched(String partId) async {
+    await _dio.post('/api/lessons/parts/$partId/watch');
+  }
+
   Future<Map<String, dynamic>> getLessonHistory(String lessonId) async {
     final res = await _dio.get('/api/lessons/$lessonId/history');
     return res.data as Map<String, dynamic>;

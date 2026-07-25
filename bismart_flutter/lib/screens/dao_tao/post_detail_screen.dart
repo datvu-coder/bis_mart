@@ -45,6 +45,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (mounted) setState(() => _loadingComments = false);
   }
 
+  Future<void> _toggleLike(TrainingProvider provider, String postId) async {
+    final ok = await provider.toggleLike(postId);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể thích bài viết. Vui lòng thử lại.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
   CommunityPost? _findPost(TrainingProvider p) {
     for (final post in p.posts) {
       if (post.id == widget.postId) return post;
@@ -273,7 +285,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                           : Icons.favorite_border_rounded,
                       'Thích',
                       post.isLiked ? AppColors.error : AppColors.textGrey,
-                      () => provider.toggleLike(post.id))),
+                      () => _toggleLike(provider, post.id))),
               Expanded(
                   child: _action(
                       Icons.chat_bubble_outline_rounded,

@@ -64,7 +64,7 @@ class _LessonHistoryScreenState extends State<LessonHistoryScreen> {
                       padding: const EdgeInsets.all(24),
                       child: Text(_error!,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(color: Colors.red)),
+                          style: const TextStyle(color: AppColors.error)),
                     ),
                   ])
                 : _buildList(),
@@ -196,6 +196,12 @@ class _LessonHistoryScreenState extends State<LessonHistoryScreen> {
     final partId = (s['partId'] as String?) ?? '';
     final score = (s['score'] as String?) ?? '';
     final at = (s['submittedAt'] as String?) ?? '';
+    // null means this row predates the pass/fail column — fall back to the
+    // neutral color rather than implying a fail for old data.
+    final passed = s['passed'] as bool?;
+    final scoreColor = passed == null
+        ? AppColors.primary
+        : (passed ? AppColors.success : AppColors.error);
     String partTitle = 'Phần';
     if (partId.isNotEmpty) {
       try {
@@ -234,14 +240,14 @@ class _LessonHistoryScreenState extends State<LessonHistoryScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: scoreColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
               score,
               style: AppTextStyles.caption.copyWith(
                 fontWeight: FontWeight.bold,
-                color: AppColors.primary,
+                color: scoreColor,
               ),
             ),
           ),
