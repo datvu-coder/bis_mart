@@ -16,12 +16,59 @@ class ProductListScreen extends StatefulWidget {
 }
 
 class _ProductListScreenState extends State<ProductListScreen> {
+  static const _groups = ['Tất cả', 'DELI', 'DELIMIL', 'AUMIL', 'GOODLIFE', 'TP'];
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProductProvider>().loadProducts();
     });
+  }
+
+  /// Group filter as a dropdown menu anchored to the search field's own
+  /// icon instead of a full-width chip row — same "tune" pattern as Kinh
+  /// doanh's Bán hàng, so the list itself gets the vertical space back.
+  Widget _buildGroupFilterButton(ProductProvider provider) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.tune_rounded, size: 20),
+      tooltip: 'Lọc theo nhóm',
+      color: AppColors.white,
+      elevation: 6,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.borderLight),
+      ),
+      onSelected: provider.setGroup,
+      itemBuilder: (context) => [
+        for (final group in _groups)
+          PopupMenuItem<String>(
+            value: group,
+            child: Builder(builder: (context) {
+              final isSelected = provider.selectedGroup == group;
+              return Row(
+                children: [
+                  Icon(
+                    isSelected
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    size: 18,
+                    color: isSelected ? AppColors.primary : AppColors.textHint,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    group,
+                    style: TextStyle(
+                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              );
+            }),
+          ),
+      ],
+    );
   }
 
   @override
@@ -57,30 +104,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: TextField(
-                  decoration: AppDecorations.searchField('Tìm sản phẩm...'),
+                  decoration: AppDecorations.searchField(
+                    'Tìm sản phẩm...',
+                    suffixIcon: _buildGroupFilterButton(provider),
+                  ),
                   onChanged: (v) => provider.setSearch(v),
                 ),
               ),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: Row(
-                  children: ['Tất cả', 'DELI', 'DELIMIL', 'AUMIL', 'GOODLIFE', 'TP']
-                      .map((group) {
-                    final selected = provider.selectedGroup == group;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(group),
-                        selected: selected,
-                        selectedColor: AppColors.primaryLight,
-                        checkmarkColor: AppColors.primary,
-                        onSelected: (_) => provider.setGroup(group),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
+              const SizedBox(height: 12),
               Expanded(
                 child: provider.isLoading
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
