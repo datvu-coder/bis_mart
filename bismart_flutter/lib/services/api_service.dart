@@ -191,6 +191,32 @@ class ApiService {
     await _dio.delete('/api/employee-schedules/$id');
   }
 
+  // ---- LEAVE REQUESTS ----
+  Future<List<dynamic>> getLeaveRequests({String? storeCode, String? status}) async {
+    final params = <String, dynamic>{};
+    if (storeCode != null && storeCode.isNotEmpty) params['storeCode'] = storeCode;
+    if (status != null && status.isNotEmpty) params['status'] = status;
+    final response = await _dio.get(
+      '/api/leave-requests',
+      queryParameters: params.isEmpty ? null : params,
+    );
+    return response.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> createLeaveRequest(Map<String, dynamic> data) async {
+    final response = await _dio.post('/api/leave-requests', data: data);
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> updateLeaveRequestStatus(int id, String status) async {
+    final response = await _dio.put('/api/leave-requests/$id', data: {'status': status});
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<void> deleteLeaveRequest(int id) async {
+    await _dio.delete('/api/leave-requests/$id');
+  }
+
   // ---- STORES ----
   Future<List<dynamic>> getStores() async {
     final response = await _dio.get('/api/stores');

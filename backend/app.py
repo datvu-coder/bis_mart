@@ -1181,6 +1181,182 @@ def api_delete_schedule(schedule_id: int):
     return jsonify({"ok": True})
 
 
+def _leave_request_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(row["id"]),
+        "employeeId": str(row["employee_id"]),
+        "employeeName": row.get("employee_name"),
+        "storeCode": row.get("store_code"),
+        "startDate": str(row["start_date"]),
+        "endDate": str(row["end_date"]),
+        "leaveType": row.get("leave_type"),
+        "reason": row.get("reason"),
+        "status": row.get("status"),
+        "requestedAt": row.get("requested_at"),
+        "approvedByName": row.get("approved_by_name"),
+        "approvedAt": row.get("approved_at"),
+    }
+
+
+def _my_employee_id() -> int | None:
+    user_id = (g.current_user or {}).get("user_id")
+    if not user_id:
+        return None
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT employee_id FROM users WHERE id = %s", (user_id,))
+        row = cur.fetchone()
+    return int(row["employee_id"]) if row and row.get("employee_id") else None
+
+
+@app.get("/api/leave-requests")
+@login_required
+def api_get_leave_requests():
+    """Managers (can_manage_attendance) see every request for their store;
+    everyone else sees only their own requests."""
+    can_manage = _can_manage_attendance_user()
+    store_code = (request.args.get("storeCode") or "").strip()
+    status = (request.args.get("status") or "").strip()
+    db = get_db()
+
+    base_select = (
+        "SELECT lr.id, lr.employee_id, lr.store_code, lr.start_date::text, lr.end_date::text, "
+        "       lr.leave_type, lr.reason, lr.status, lr.requested_at, lr.approved_at, "
+        "       e.full_name AS employee_name, ab.full_name AS approved_by_name "
+        "FROM leave_requests lr "
+        "JOIN employees e ON e.id = lr.employee_id "
+        "LEFT JOIN employees ab ON ab.id = lr.approved_by "
+    )
+    where_parts: list[str] = []
+    params: list[Any] = []
+    if can_manage:
+        if store_code:
+            where_parts.append("UPPER(lr.store_code) = UPPER(%s)")
+            params.append(store_code)
+    else:
+        my_emp_id = _my_employee_id()
+        if my_emp_id is None:
+            return jsonify([])
+        where_parts.append("lr.employee_id = %s")
+        params.append(my_emp_id)
+    if status:
+        where_parts.append("lr.status = %s")
+        params.append(status)
+    where_sql = (" WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    with db.cursor() as cur:
+        cur.execute(base_select + where_sql + " ORDER BY lr.requested_at DESC", tuple(params))
+        rows = cur.fetchall()
+    return jsonify([_leave_request_to_api_json(row) for row in rows])
+
+
+@app.post("/api/leave-requests")
+@login_required
+def api_create_leave_request():
+    """Self-service: the request is always filed for the caller's own
+    employee record, never a client-supplied employeeId, so one employee
+    can't file leave on another's behalf."""
+    my_emp_id = _my_employee_id()
+    if my_emp_id is None:
+        return jsonify({"error": "Tài khoản chưa gắn với hồ sơ nhân viên"}), 400
+    data = request.get_json(silent=True) or {}
+    start_date = data.get("startDate")
+    end_date = data.get("endDate")
+    if not start_date or not end_date:
+        return jsonify({"error": "Thiếu ngày bắt đầu/kết thúc"}), 400
+
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT store_code FROM employees WHERE id = %s", (my_emp_id,))
+        emp_row = cur.fetchone() or {}
+        cur.execute(
+            "INSERT INTO leave_requests (employee_id, store_code, start_date, end_date, leave_type, reason) "
+            "VALUES (%s, %s, %s::date, %s::date, %s, %s) "
+            "RETURNING id",
+            (
+                my_emp_id,
+                emp_row.get("store_code"),
+                start_date,
+                end_date,
+                data.get("leaveType") or "Nghỉ phép năm",
+                data.get("reason"),
+            ),
+        )
+        new_id = cur.fetchone()["id"]
+        cur.execute(
+            "SELECT lr.id, lr.employee_id, lr.store_code, lr.start_date::text, lr.end_date::text, "
+            "       lr.leave_type, lr.reason, lr.status, lr.requested_at, lr.approved_at, "
+            "       e.full_name AS employee_name, ab.full_name AS approved_by_name "
+            "FROM leave_requests lr "
+            "JOIN employees e ON e.id = lr.employee_id "
+            "LEFT JOIN employees ab ON ab.id = lr.approved_by "
+            "WHERE lr.id = %s",
+            (new_id,),
+        )
+        row = cur.fetchone()
+    db.commit()
+    return jsonify(_leave_request_to_api_json(row)), 201
+
+
+@app.put("/api/leave-requests/<int:request_id>")
+@login_required
+def api_update_leave_request(request_id: int):
+    """Approve/reject — manager only."""
+    if not _can_manage_attendance_user():
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    if status not in ("approved", "rejected"):
+        return jsonify({"error": "status phải là approved hoặc rejected"}), 400
+    my_emp_id = _my_employee_id()
+
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE leave_requests SET status = %s, approved_by = %s, approved_at = CURRENT_TIMESTAMP "
+            "WHERE id = %s AND status = 'pending' "
+            "RETURNING id",
+            (status, my_emp_id, request_id),
+        )
+        updated = cur.fetchone()
+        if not updated:
+            db.rollback()
+            return jsonify({"error": "Không tìm thấy đơn đang chờ duyệt"}), 404
+        cur.execute(
+            "SELECT lr.id, lr.employee_id, lr.store_code, lr.start_date::text, lr.end_date::text, "
+            "       lr.leave_type, lr.reason, lr.status, lr.requested_at, lr.approved_at, "
+            "       e.full_name AS employee_name, ab.full_name AS approved_by_name "
+            "FROM leave_requests lr "
+            "JOIN employees e ON e.id = lr.employee_id "
+            "LEFT JOIN employees ab ON ab.id = lr.approved_by "
+            "WHERE lr.id = %s",
+            (request_id,),
+        )
+        row = cur.fetchone()
+    db.commit()
+    return jsonify(_leave_request_to_api_json(row))
+
+
+@app.delete("/api/leave-requests/<int:request_id>")
+@login_required
+def api_delete_leave_request(request_id: int):
+    """The requester can cancel their own still-pending request; managers
+    can remove any request."""
+    can_manage = _can_manage_attendance_user()
+    my_emp_id = _my_employee_id()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT employee_id, status FROM leave_requests WHERE id = %s", (request_id,))
+        existing = cur.fetchone()
+        if not existing:
+            return jsonify({"error": "Not found"}), 404
+        is_owner = my_emp_id is not None and int(existing["employee_id"]) == my_emp_id
+        if not can_manage and not (is_owner and existing["status"] == "pending"):
+            return _forbidden()
+        cur.execute("DELETE FROM leave_requests WHERE id = %s", (request_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
 @app.get("/api/products")
 @login_required
 def api_get_products():

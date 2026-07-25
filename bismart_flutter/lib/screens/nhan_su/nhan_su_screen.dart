@@ -14,11 +14,13 @@ import '../../models/work_schedule.dart';
 import '../../models/work_shift.dart';
 import '../../providers/permission_provider.dart';
 import '../../services/location_service.dart';
+import '../../services/export_service.dart';
 import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/responsive_form.dart';
 import '../../widgets/common/header_action_cluster.dart';
 import '../../widgets/cards/rank_list_tile.dart';
+import 'leave_requests_screen.dart';
 
 class NhanSuScreen extends StatefulWidget {
   const NhanSuScreen({super.key});
@@ -47,6 +49,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       provider.loadMonthlySummary(employeeId: currentUser?.id);
       provider.loadSchedules(storeCode: currentUser?.storeCode);
       provider.loadHoursReport(storeCode: currentUser?.storeCode);
+      provider.loadTodaySchedule(storeCode: currentUser?.storeCode);
       context.read<StoreProvider>().loadStores().then((_) {
         // Auto-filter shifts to current user's store
         if (currentUser?.storeCode != null && mounted) {
@@ -166,13 +169,42 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     );
   }
 
+  void _openLeaveScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const LeaveRequestsScreen()),
+    );
+  }
+
   void _openHoursReportScreen(bool canManage) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => Scaffold(
           backgroundColor: AppColors.background,
-          appBar: AppBar(title: const Text('Bảng giờ công nhân viên')),
+          appBar: AppBar(
+            title: const Text('Bảng giờ công nhân viên'),
+            actions: [
+              Builder(
+                builder: (appBarCtx) => IconButton(
+                  icon: const Icon(Icons.file_download_outlined),
+                  tooltip: 'Xuất Excel',
+                  onPressed: () {
+                    final provider = appBarCtx.read<EmployeeProvider>();
+                    final rows = provider.hoursReportRows;
+                    if (rows.isEmpty) {
+                      ScaffoldMessenger.of(appBarCtx).showSnackBar(
+                        const SnackBar(content: Text('Chưa có dữ liệu để xuất'), behavior: SnackBarBehavior.floating),
+                      );
+                      return;
+                    }
+                    final now = DateTime.now();
+                    ExportService.exportHoursReportToCsv(rows, monthLabel: 'Thang_${now.month}_${now.year}');
+                  },
+                ),
+              ),
+            ],
+          ),
           body: Consumer<EmployeeProvider>(
             builder: (context, provider, _) => SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -214,6 +246,11 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           icon: Icons.table_chart_rounded,
           label: 'Bảng giờ công nhân viên',
           onPressed: () => _openHoursReportScreen(canManage),
+        ),
+        HeaderAction(
+          icon: Icons.event_busy_rounded,
+          label: 'Nghỉ phép',
+          onPressed: _openLeaveScreen,
         ),
         HeaderAction(
           icon: Icons.emoji_events_rounded,
@@ -398,6 +435,25 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     final hasCheckedOut = todayAtt.isNotEmpty && todayAtt.first.checkOutTime != null;
     final isMobile = MediaQuery.of(context).size.width < 900;
 
+    // Checked in, never checked out, and the shift's end time has already
+    // passed by more than half an hour — most likely just forgotten.
+    int? missedCheckoutMinutes;
+    if (hasCheckedIn && !hasCheckedOut && todayAtt.isNotEmpty) {
+      final range = todayAtt.first.shiftTimeRange;
+      final endPart = range?.split('-').last.trim();
+      final endParts = endPart?.split(':');
+      if (endParts != null && endParts.length == 2) {
+        final eh = int.tryParse(endParts[0]);
+        final em = int.tryParse(endParts[1]);
+        if (eh != null && em != null) {
+          final now = DateTime.now();
+          final shiftEnd = DateTime(now.year, now.month, now.day, eh, em);
+          final diff = now.difference(shiftEnd).inMinutes;
+          if (diff > 30) missedCheckoutMinutes = diff;
+        }
+      }
+    }
+
     return Container(
       padding: EdgeInsets.all(isMobile ? 10 : 16),
       decoration: BoxDecoration(
@@ -414,6 +470,29 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       ),
       child: Column(
         children: [
+          if (missedCheckoutMinutes != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: AppColors.errorLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.notification_important_rounded, size: 18, color: AppColors.error),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Ca làm đã kết thúc — đừng quên chấm công ra!',
+                      style: AppTextStyles.caption.copyWith(color: AppColors.error, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           // Store info
           if (myStore != null) ...[
             Row(
@@ -962,7 +1041,12 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     );
   }
   Widget _buildTodayAttendanceList(EmployeeProvider provider) {
-    if (provider.attendances.isEmpty) {
+    final checkedInIds = provider.attendances.map((a) => a.employeeId).toSet();
+    final notCheckedIn = provider.todaySchedules
+        .where((s) => !checkedInIds.contains(s.employeeId))
+        .toList();
+
+    if (provider.attendances.isEmpty && notCheckedIn.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(12),
         child: Text('Chưa có ai chấm công hôm nay', style: AppTextStyles.caption),
@@ -972,9 +1056,18 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Chấm công hôm nay (${provider.attendances.length})',
-          style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 8),
+        if (notCheckedIn.isNotEmpty) ...[
+          Text('Chưa chấm công (${notCheckedIn.length})',
+              style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600, color: AppColors.error)),
+          const SizedBox(height: 8),
+          ...notCheckedIn.map((s) => _buildNotCheckedInTile(s, provider)),
+          const SizedBox(height: 14),
+        ],
+        if (provider.attendances.isNotEmpty) ...[
+          Text('Chấm công hôm nay (${provider.attendances.length})',
+            style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 8),
+        ],
         ...provider.attendances.map((att) {
           Employee? employee;
           try {
@@ -1005,20 +1098,24 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           final shiftLabel = (att.shiftName != null && att.shiftName!.isNotEmpty)
               ? '${att.shiftName} ${att.shiftTimeRange ?? ''}'.trim()
               : null;
-          final nameBlock = Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(employee.fullName, style: AppTextStyles.bodyText),
-              if (shiftLabel != null)
-                Text(shiftLabel,
-                    style: AppTextStyles.caption.copyWith(fontSize: 11, color: AppColors.textSecondary)),
-              if (statusLabel != null)
-                Text(statusLabel,
-                    style: AppTextStyles.caption.copyWith(color: _attendanceStatusColor(att))),
-              if (att.distanceIn != null)
-                Text('📍 ${_formatDistance(att.distanceIn!)}',
-                  style: AppTextStyles.caption.copyWith(fontSize: 11)),
-            ],
+          final nameBlock = GestureDetector(
+            onTap: () => Navigator.pushNamed(context, AppRoutes.employeeDetail, arguments: employee),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(employee.fullName,
+                    style: AppTextStyles.bodyText.copyWith(decoration: TextDecoration.underline, decorationColor: AppColors.borderLight)),
+                if (shiftLabel != null)
+                  Text(shiftLabel,
+                      style: AppTextStyles.caption.copyWith(fontSize: 11, color: AppColors.textSecondary)),
+                if (statusLabel != null)
+                  Text(statusLabel,
+                      style: AppTextStyles.caption.copyWith(color: _attendanceStatusColor(att))),
+                if (att.distanceIn != null)
+                  Text('📍 ${_formatDistance(att.distanceIn!)}',
+                    style: AppTextStyles.caption.copyWith(fontSize: 11)),
+              ],
+            ),
           );
           final chips = <Widget>[
             if (att.checkInTime != null)
@@ -1112,6 +1209,55 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           );
         }),
       ],
+    );
+  }
+
+  Widget _buildNotCheckedInTile(WorkSchedule s, EmployeeProvider provider) {
+    final subtitle = [
+      if (s.shiftName != null && s.shiftName!.isNotEmpty) s.shiftName,
+      s.timeRange,
+    ].where((v) => v != null && v.isNotEmpty).join(' · ');
+    final employee = provider.getEmployeeById(s.employeeId);
+    return InkWell(
+      onTap: employee == null
+          ? null
+          : () => Navigator.pushNamed(context, AppRoutes.employeeDetail, arguments: employee),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.errorLight,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(s.employeeName ?? '', style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600)),
+                  if (subtitle.isNotEmpty)
+                    Text(subtitle, style: AppTextStyles.caption.copyWith(fontSize: 11, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                'Chưa chấm công',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.error),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1559,20 +1705,30 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     return DataPanel(
       title: '${AppStrings.bangXepHang} 🔥',
       child: Column(
-        children: ranked.take(20).map((emp) {
-          return RankListTile(
-            rank: emp.rank,
-            name: emp.fullName,
-            score: emp.score,
-            onTap: () {
-              Navigator.pushNamed(
-                context,
-                AppRoutes.employeeDetail,
-                arguments: emp,
-              );
-            },
-          );
-        }).toList(),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              'Điểm đã cộng/trừ theo hiệu suất chấm công tháng này (đi trễ, về sớm, tăng ca).',
+              style: AppTextStyles.caption,
+            ),
+          ),
+          ...ranked.take(20).map((emp) {
+            return RankListTile(
+              rank: emp.rank,
+              name: emp.fullName,
+              score: emp.score,
+              onTap: () {
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.employeeDetail,
+                  arguments: emp,
+                );
+              },
+            );
+          }),
+        ],
       ),
     );
   }
@@ -2056,9 +2212,27 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
     );
   }
 
+  static const _kRepeatWeekOptions = [1, 2, 3, 4];
+
+  /// Existing schedule (if any) for this employee on this day — used both
+  /// to warn before overwriting and, after confirmation, is simply
+  /// replaced since employee_schedules has one row per employee/day.
+  WorkSchedule? _existingScheduleFor(EmployeeProvider provider, String employeeId, DateTime day) {
+    try {
+      return provider.schedules.firstWhere((s) =>
+          s.employeeId == employeeId &&
+          s.workDate.year == day.year &&
+          s.workDate.month == day.month &&
+          s.workDate.day == day.day);
+    } catch (_) {
+      return null;
+    }
+  }
+
   void _showAssignShiftDialog(EmployeeProvider provider, DateTime day) {
     String? selectedEmployeeId;
     String? selectedShiftId;
+    int repeatWeeks = 1;
     final currentUser = context.read<AuthProvider>().currentUser;
     final storeCode = currentUser?.storeCode;
     // Filter employees and shifts to current user's store so the schedule
@@ -2120,6 +2294,21 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
             onChanged: (v) =>
                 setDialogState(() => selectedShiftId = v),
           ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<int>(
+            decoration: const InputDecoration(
+              labelText: 'Lặp lại',
+              helperText: 'Áp dụng ca này cho cùng thứ ở các tuần kế tiếp',
+            ),
+            initialValue: repeatWeeks,
+            items: _kRepeatWeekOptions
+                .map((n) => DropdownMenuItem(
+                      value: n,
+                      child: Text(n == 1 ? 'Chỉ tuần này' : '$n tuần liên tiếp'),
+                    ))
+                .toList(),
+            onChanged: (v) => setDialogState(() => repeatWeeks = v ?? repeatWeeks),
+          ),
         ],
       ),
       actionsBuilder: (ctx, setDialogState) => [
@@ -2130,11 +2319,33 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
         ElevatedButton(
           onPressed: (selectedEmployeeId != null && selectedShiftId != null)
               ? () async {
+                  final existing = _existingScheduleFor(provider, selectedEmployeeId!, day);
+                  if (existing != null) {
+                    final overwrite = await showDialog<bool>(
+                      context: ctx,
+                      builder: (confirmCtx) => AlertDialog(
+                        title: const Text('Ghi đè ca đã phân?'),
+                        content: Text(
+                          '${existing.employeeName ?? 'Nhân viên này'} đã có ca "${existing.shiftName ?? ''}" vào ngày ${day.day}/${day.month}/${day.year}. Bạn có muốn thay bằng ca mới không?',
+                        ),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(confirmCtx, false), child: const Text('Không')),
+                          TextButton(
+                            onPressed: () => Navigator.pop(confirmCtx, true),
+                            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                            child: const Text('Ghi đè'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (overwrite != true) return;
+                  }
                   try {
                     await provider.addSchedule(
                       employeeId: selectedEmployeeId!,
                       shiftId: selectedShiftId!,
                       workDate: day,
+                      repeatWeeks: repeatWeeks,
                     );
                     if (!ctx.mounted) return;
                     Navigator.pop(ctx);

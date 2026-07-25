@@ -1168,3 +1168,22 @@ DO $$ BEGIN
         ALTER TABLE products ADD COLUMN barcode TEXT;
     END IF;
 END $$;
+
+-- Leave requests (nghỉ phép): employee self-service request, manager
+-- approves/rejects. store_code is denormalized from the employee at
+-- request time so manager queries can filter by store without a join.
+CREATE TABLE IF NOT EXISTS leave_requests (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    store_code TEXT,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    leave_type TEXT NOT NULL DEFAULT 'Nghỉ phép năm',
+    reason TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    approved_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    approved_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_leave_requests_employee ON leave_requests(employee_id);
+CREATE INDEX IF NOT EXISTS idx_leave_requests_store ON leave_requests(store_code);
