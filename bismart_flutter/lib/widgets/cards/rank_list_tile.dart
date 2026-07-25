@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../common/initials_avatar.dart';
 
 class RankListTile extends StatelessWidget {
   final int rank;
@@ -50,7 +51,14 @@ class RankListTile extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
+            InitialsAvatar(
+              name: name,
+              size: 32,
+              background: isTop ? AppColors.white : AppColors.cardBg,
+              foreground: isTop ? AppColors.primary : AppColors.textGrey,
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

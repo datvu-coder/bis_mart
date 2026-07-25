@@ -19,6 +19,7 @@ import '../../widgets/common/data_panel.dart';
 import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/responsive_form.dart';
 import '../../widgets/common/header_action_cluster.dart';
+import '../../widgets/common/initials_avatar.dart';
 import '../../widgets/cards/rank_list_tile.dart';
 import 'leave_requests_screen.dart';
 
@@ -308,18 +309,21 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   label: 'Nhân viên',
                   value: '$memberCount',
                   color: AppColors.primary,
+                  onTap: () => Navigator.pushNamed(context, AppRoutes.employeeList),
                 ),
                 _buildHeaderKpiChip(
                   icon: Icons.login_rounded,
                   label: 'Đã vào ca',
                   value: '$checkedInCount',
                   color: AppColors.success,
+                  onTap: () => _showAttendanceHistory(provider, canManage: canManage),
                 ),
                 _buildHeaderKpiChip(
                   icon: Icons.schedule_rounded,
                   label: 'Ca làm',
                   value: '$activeShiftCount',
                   color: AppColors.info,
+                  onTap: _openShiftScreen,
                 ),
               ],
             ),
@@ -334,15 +338,16 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     required String value,
     required Color color,
     bool compact = false,
+    VoidCallback? onTap,
   }) {
-    return Container(
+    final content = Container(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? 8 : 12,
         vertical: compact ? 8 : 10,
       ),
       decoration: BoxDecoration(
         color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.row),
         border: Border.all(color: AppColors.borderLight),
       ),
       child: compact
@@ -387,6 +392,15 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 ),
               ],
             ),
+    );
+    if (onTap == null) return content;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.row),
+        child: content,
+      ),
     );
   }
 
@@ -461,12 +475,12 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           colors: hasCheckedOut
               ? [AppColors.surfaceVariant, AppColors.surfaceVariant]
               : hasCheckedIn
-                  ? [AppColors.successLight, const Color(0xFFD1FAE5)]
-                  : [AppColors.primaryLight, const Color(0xFFFFE4D6)],
+                  ? [AppColors.successLight, AppColors.success.withValues(alpha: 0.16)]
+                  : [AppColors.primaryLight, AppColors.primary.withValues(alpha: 0.14)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.panel),
       ),
       child: Column(
         children: [
@@ -477,7 +491,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
                 color: AppColors.errorLight,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppRadius.row),
               ),
               child: Row(
                 children: [
@@ -607,7 +621,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
                 color: AppColors.errorLight,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.row),
               ),
               child: Row(
                 children: [
@@ -628,7 +642,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
                 color: _lastDistance! <= 50 ? AppColors.successLight : AppColors.errorLight,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppRadius.row),
               ),
               child: Row(
                 children: [
@@ -666,7 +680,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                     ),
                     style: ElevatedButton.styleFrom(
                       padding: EdgeInsets.symmetric(vertical: isMobile ? 12 : 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.row)),
                     ),
                   ),
                 ),
@@ -683,7 +697,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                     ),
                     style: OutlinedButton.styleFrom(
                       padding: EdgeInsets.symmetric(vertical: isMobile ? 12 : 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.row)),
                     ),
                   ),
                 ),
@@ -727,7 +741,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: AppColors.white.withValues(alpha: 0.8),
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
         child: Row(
           children: [
@@ -766,7 +780,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: AppColors.white.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -797,7 +811,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       padding: EdgeInsets.all(isMobile ? 10 : 14),
       decoration: BoxDecoration(
         color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.row),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -846,7 +860,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: AppColors.white,
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(AppRadius.row),
         ),
         child: Column(
           children: [
@@ -875,103 +889,33 @@ class _NhanSuScreenState extends State<NhanSuScreen>
 
   Widget _buildHoursReportSection(EmployeeProvider provider, bool canManage) {
     final rows = provider.hoursReportRows;
-    final isMobile = MediaQuery.of(context).size.width < 600;
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 600;
 
     if (rows.isEmpty) {
       return Text('Chưa có dữ liệu trong tháng', style: AppTextStyles.caption);
     }
 
-    Widget headerCell(String text, {double? width, TextAlign align = TextAlign.left}) {
-      return SizedBox(
-        width: width,
-        child: Text(text,
-            textAlign: align,
-            style: AppTextStyles.caption.copyWith(
-                fontWeight: FontWeight.w700, color: AppColors.textSecondary)),
-      );
-    }
-
-    Widget bodyCell(String text,
-        {double? width, TextAlign align = TextAlign.left, Color? color, FontWeight? fw}) {
-      return SizedBox(
-        width: width,
-        child: Text(text,
-            textAlign: align,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: AppTextStyles.caption.copyWith(
-                color: color ?? AppColors.textPrimary,
-                fontWeight: fw ?? FontWeight.w500)),
-      );
-    }
-
+    // Card grid instead of a raw pixel-column table — on wide screens the
+    // same card used on mobile just wraps into multiple columns, so the
+    // layout reads as a native list at every width instead of a
+    // spreadsheet-style grid of SizedBox columns.
     if (isMobile) {
       return Column(
         children: rows.map((r) => _buildHoursReportMobileCard(r)).toList(),
       );
     }
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              children: [
-                headerCell('Nhân viên', width: 150),
-                headerCell('Ngày', width: 50, align: TextAlign.center),
-                headerCell('Giờ', width: 60, align: TextAlign.center),
-                headerCell('Muộn', width: 70, align: TextAlign.center),
-                headerCell('Về sớm', width: 80, align: TextAlign.center),
-                headerCell('OT', width: 60, align: TextAlign.center),
-              ],
-            ),
-          ),
-          ...rows.map((r) {
-                    final name = (r['fullName'] ?? '').toString();
-                    final daysWorked = (r['daysWorked'] ?? 0).toString();
-                    final totalHours = (r['totalHours'] ?? 0).toString();
-                    final lateCount = (r['lateCount'] ?? 0) as int;
-                    final lateMinutes = (r['lateMinutes'] ?? 0) as int;
-                    final earlyCount = (r['earlyLeaveCount'] ?? 0) as int;
-                    final earlyMinutes = (r['earlyLeaveMinutes'] ?? 0) as int;
-                    final overtimeMin = (r['overtimeMinutes'] ?? 0) as int;
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 4),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          bodyCell(name, width: 150, fw: FontWeight.w600),
-                          bodyCell(daysWorked, width: 50, align: TextAlign.center),
-                          bodyCell('${totalHours}h', width: 60, align: TextAlign.center,
-                              color: AppColors.info, fw: FontWeight.w700),
-                          bodyCell(lateCount > 0 ? '$lateCount/${lateMinutes}\'' : '0',
-                              width: 70,
-                              align: TextAlign.center,
-                              color: lateCount > 0 ? AppColors.error : AppColors.textGrey,
-                              fw: lateCount > 0 ? FontWeight.w700 : FontWeight.w500),
-                          bodyCell(earlyCount > 0 ? '$earlyCount/${earlyMinutes}\'' : '0',
-                              width: 80,
-                              align: TextAlign.center,
-                              color: earlyCount > 0 ? AppColors.error : AppColors.textGrey,
-                              fw: earlyCount > 0 ? FontWeight.w700 : FontWeight.w500),
-                          bodyCell(overtimeMin > 0 ? '${overtimeMin}\'' : '0',
-                              width: 60,
-                              align: TextAlign.center,
-                              color: overtimeMin > 0 ? AppColors.success : AppColors.textGrey,
-                              fw: overtimeMin > 0 ? FontWeight.w700 : FontWeight.w500),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            );
+    final cardWidth = width >= 1280 ? 340.0 : (width - 44) / 2;
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: rows
+          .map((r) => SizedBox(
+                width: cardWidth,
+                child: _buildHoursReportMobileCard(r),
+              ))
+          .toList(),
+    );
   }
 
   Widget _buildHoursReportMobileCard(Map<String, dynamic> r) {
@@ -989,7 +933,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
         decoration: BoxDecoration(
           color: (color ?? AppColors.textGrey).withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(AppRadius.chip),
         ),
         child: Text(
           '$label $value',
@@ -1007,7 +951,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surfaceVariant,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadius.row),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1081,18 +1025,29 @@ class _NhanSuScreenState extends State<NhanSuScreen>
             workingTime = '${diff.inHours}h${(diff.inMinutes % 60).toString().padLeft(2, '0')}';
           }
           final isMobile = MediaQuery.of(context).size.width < 600;
-          final statusIcon = Icon(
-            hasCheckOut
-                ? Icons.check_circle_outline_rounded
-                : att.isCheckedIn
-                    ? Icons.check_circle_rounded
-                    : Icons.circle_outlined,
-            color: hasCheckOut
-                ? AppColors.textGrey
-                : att.isCheckedIn
-                    ? AppColors.success
-                    : AppColors.textHint,
-            size: 20,
+          final statusColor = hasCheckOut
+              ? AppColors.textGrey
+              : att.isCheckedIn
+                  ? AppColors.success
+                  : AppColors.textHint;
+          final statusIcon = Stack(
+            clipBehavior: Clip.none,
+            children: [
+              InitialsAvatar(name: employee.fullName, size: 38),
+              Positioned(
+                right: -2,
+                bottom: -2,
+                child: Container(
+                  width: 14,
+                  height: 14,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.cardBg, width: 2),
+                  ),
+                ),
+              ),
+            ],
           );
           final statusLabel = _attendanceStatusLabel(att);
           final shiftLabel = (att.shiftName != null && att.shiftName!.isNotEmpty)
@@ -1123,7 +1078,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.cardBg,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
                   'Vào ${att.checkInTime!.hour.toString().padLeft(2, '0')}:${att.checkInTime!.minute.toString().padLeft(2, '0')}',
@@ -1135,7 +1090,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.cardBg,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
                   'Ra ${att.checkOutTime!.hour.toString().padLeft(2, '0')}:${att.checkOutTime!.minute.toString().padLeft(2, '0')}',
@@ -1147,7 +1102,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.infoLight,
-                  borderRadius: BorderRadius.circular(6),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
                 child: Text(
                   workingTime,
@@ -1164,7 +1119,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   : att.isCheckedIn
                       ? AppColors.successLight
                       : AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(AppRadius.row),
             ),
             child: isMobile
                 ? Column(
@@ -1222,17 +1177,22 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       onTap: employee == null
           ? null
           : () => Navigator.pushNamed(context, AppRoutes.employeeDetail, arguments: employee),
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(AppRadius.row),
       child: Container(
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: AppColors.errorLight,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.row),
         ),
         child: Row(
           children: [
-            const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 20),
+            InitialsAvatar(
+              name: s.employeeName ?? '',
+              size: 36,
+              background: AppColors.error.withValues(alpha: 0.14),
+              foreground: AppColors.error,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -1248,7 +1208,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: AppColors.error.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
               child: const Text(
                 'Chưa chấm công',
@@ -1466,7 +1426,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
             content: Text('Chấm công vào thành công!${_lastDistance != null ? ' (${_formatDistance(_lastDistance!)})' : ''}'),
             behavior: SnackBarBehavior.floating,
             backgroundColor: AppColors.success,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -1509,7 +1468,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
             content: Text('Chấm công ra thành công!${_lastDistance != null ? ' (${_formatDistance(_lastDistance!)})' : ''}'),
             behavior: SnackBarBehavior.floating,
             backgroundColor: AppColors.success,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -1589,7 +1547,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(AppRadius.chip)),
               ),
               items: [
                 const DropdownMenuItem(
@@ -1609,7 +1567,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 color: AppColors.surfaceVariant,
-                borderRadius: BorderRadius.circular(14),
+                borderRadius: BorderRadius.circular(AppRadius.row),
               ),
               child: Row(
                 children: [
@@ -1618,7 +1576,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                     height: 40,
                     decoration: BoxDecoration(
                       color: AppColors.primaryLight,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.row),
                     ),
                     child: const Icon(Icons.schedule_rounded,
                         size: 18, color: AppColors.primary),
@@ -1644,7 +1602,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                                     horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: AppColors.infoLight,
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(AppRadius.pill),
                                 ),
                                 child: Text(
                                   shift.storeName!,
@@ -1671,7 +1629,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                           ScaffoldMessenger.of(this.context).showSnackBar(
                             SnackBar(
                               content: Text('Xóa ca thất bại: $e'),
-                              backgroundColor: Colors.red,
+                              backgroundColor: AppColors.error,
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
@@ -1703,7 +1661,8 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     final ranked = provider.rankedEmployees;
 
     return DataPanel(
-      title: '${AppStrings.bangXepHang} 🔥',
+      title: AppStrings.bangXepHang,
+      trailing: const Icon(Icons.local_fire_department_rounded, color: AppColors.primary, size: 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1990,8 +1949,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   content: Text('Đã thêm ca "${nameCtrl.text}"'),
                   behavior: SnackBarBehavior.floating,
                   backgroundColor: AppColors.success,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
                 ),
               );
             } catch (e) {
@@ -2000,9 +1957,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 SnackBar(
                   content: Text('Thêm ca thất bại: $e'),
                   behavior: SnackBarBehavior.floating,
-                  backgroundColor: Colors.red,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: AppColors.error,
                 ),
               );
             }
@@ -2076,7 +2031,7 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: isToday ? AppColors.primaryLight : AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(AppRadius.row),
             border: isToday
                 ? Border.all(color: AppColors.primary.withValues(alpha: 0.35))
                 : null,
@@ -2122,13 +2077,13 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
                     if (canManage)
                       InkWell(
                         onTap: () => _showAssignShiftDialog(provider, day),
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(AppRadius.chip),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
                             border: Border.all(color: AppColors.borderLight),
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(AppRadius.chip),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -2167,7 +2122,7 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: AppColors.infoLight,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(AppRadius.chip),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -2198,7 +2153,7 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
                   ScaffoldMessenger.of(this.context).showSnackBar(
                     SnackBar(
                       content: Text('Xóa lịch thất bại: $e'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: AppColors.error,
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
@@ -2354,8 +2309,6 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
                         content: const Text('Đã phân ca thành công!'),
                         behavior: SnackBarBehavior.floating,
                         backgroundColor: AppColors.success,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
                       ),
                     );
                   } catch (e) {
@@ -2365,9 +2318,7 @@ extension _NhanSuScheduleWidgets on _NhanSuScreenState {
                       SnackBar(
                         content: Text('Phân ca thất bại: $e'),
                         behavior: SnackBarBehavior.floating,
-                        backgroundColor: Colors.red,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
+                        backgroundColor: AppColors.error,
                       ),
                     );
                   }
