@@ -511,6 +511,29 @@ CREATE TABLE IF NOT EXISTS einvoice_settings (
     FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- Draft e-invoice issuance attempts for a sales report/order. This is a
+-- best-effort integration against whichever generic endpoint is configured
+-- in einvoice_settings — it has not been validated against any specific
+-- licensed provider's certified schema, so "issued" here means "the
+-- provider endpoint accepted our request", not "this is a tax-valid
+-- invoice". Kept as its own append-only log rather than a single column
+-- on sales_reports so a failed attempt can be retried without losing the
+-- history of previous tries.
+CREATE TABLE IF NOT EXISTS einvoice_records (
+    id SERIAL PRIMARY KEY,
+    report_id INTEGER NOT NULL REFERENCES sales_reports(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'failed',
+    invoice_number TEXT,
+    provider TEXT,
+    error_message TEXT,
+    response_snippet TEXT,
+    issued_at TEXT,
+    created_by INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_einvoice_records_report ON einvoice_records(report_id);
+
 -- Migration: record how a sale was paid (cash / bank transfer) from the
 -- Bán hàng POS checkout — previously collected in the UI and discarded.
 DO $$ BEGIN

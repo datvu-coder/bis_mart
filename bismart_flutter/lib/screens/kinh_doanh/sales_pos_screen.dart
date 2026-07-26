@@ -5,6 +5,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../models/product.dart';
+import '../../models/sales_report.dart';
 import '../../providers/product_provider.dart';
 import '../../providers/sales_provider.dart';
 
@@ -163,8 +164,9 @@ class _SalesPosScreenState extends State<SalesPosScreen>
 /// hàng" action) can show this list inside its own dialog.
 class SalesHistoryList extends StatelessWidget {
   final VoidCallback onRefresh;
+  final void Function(SalesReport report)? onTap;
 
-  const SalesHistoryList({super.key, required this.onRefresh});
+  const SalesHistoryList({super.key, required this.onRefresh, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -208,7 +210,7 @@ class SalesHistoryList extends StatelessWidget {
                   itemBuilder: (context, i) {
                     final r = reports[i];
                     final itemCount = r.products.fold<int>(0, (s, it) => s + it.quantity);
-                    return Padding(
+                    final row = Padding(
                       padding: const EdgeInsets.all(14),
                       child: Row(
                         children: [
@@ -235,6 +237,9 @@ class SalesHistoryList extends StatelessWidget {
                         ],
                       ),
                     );
+                    return onTap == null
+                        ? row
+                        : InkWell(onTap: () => onTap!(r), child: row);
                   },
                 ),
               ),

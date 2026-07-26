@@ -665,6 +665,29 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Latest e-invoice issuance attempt for a sales report, or null if the
+  /// report has never had one issued.
+  Future<Map<String, dynamic>?> getReportEinvoice(String reportId) async {
+    final response = await _dio.get('/api/reports/$reportId/einvoice');
+    return response.data as Map<String, dynamic>?;
+  }
+
+  Future<Map<String, dynamic>> issueReportEinvoice(String reportId) async {
+    try {
+      final response = await _dio.post('/api/reports/$reportId/einvoice');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      final body = e.response?.data;
+      String msg;
+      if (body is Map && body['error'] != null) {
+        msg = body['error'].toString();
+      } else {
+        msg = e.message ?? 'Xuất hóa đơn thất bại';
+      }
+      throw Exception(msg);
+    }
+  }
+
   // ---- EFFECTIVE PERMISSIONS ----
   Future<Map<String, dynamic>> getMyEffectivePermissions() async {
     final response = await _dio.get('/api/me/permissions');
