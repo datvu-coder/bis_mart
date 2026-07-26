@@ -79,8 +79,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final isDesktop = screenWidth >= 1280;
     final isTablet = screenWidth >= 900 && screenWidth < 1280;
     final isWide = isDesktop || isTablet;
-    final authProvider = context.watch<AuthProvider>();
-    final canManageAi = _isTmkAccount(authProvider.currentUser?.position);
 
     return Consumer<TrainingProvider>(
       builder: (context, provider, _) {
@@ -105,8 +103,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   child: Column(
                     children: [
                       _buildLessonPanel(provider),
-                      _buildSchedulePanel(provider),
-                      _buildAiAssistantPanel(canManageAi),
                     ],
                   ),
                 ),
@@ -136,6 +132,42 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     );
   }
 
+  void _openSchedulePanelScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Lịch học')),
+          body: Consumer<TrainingProvider>(
+            builder: (context, provider, _) => SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _buildSchedulePanel(provider),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openAiAssistantScreen() {
+    final canManageAi =
+        _isTmkAccount(context.read<AuthProvider>().currentUser?.position);
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(title: const Text('Trợ lý AI')),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: _buildAiAssistantPanel(canManageAi),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Header ────────────────────────────────────────────────────────────────
 
   Widget _buildScreenHeader(TrainingProvider provider, bool emphasize) {
@@ -148,6 +180,16 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           icon: Icons.forum_rounded,
           label: 'Cộng đồng',
           onPressed: _openCommunityScreen,
+        ),
+        HeaderAction(
+          icon: Icons.calendar_month_rounded,
+          label: 'Lịch học',
+          onPressed: _openSchedulePanelScreen,
+        ),
+        HeaderAction(
+          icon: Icons.auto_awesome_rounded,
+          label: 'Trợ lý AI',
+          onPressed: _openAiAssistantScreen,
         ),
       ],
     );
@@ -280,7 +322,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       // Mobile: padding ngang = 0 → nội dung cách mép màn hình 2 px
       // (do outer SingleChildScrollView = 2 px), đồng nhất toàn tab.
       padding: isMobile
-          ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
+          ? const EdgeInsets.fromLTRB(12, 18, 12, 18)
           : null,
       trailing: canManageAi
           ? IconButton(
@@ -513,7 +555,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final isMobile = MediaQuery.of(context).size.width < 900;
     // Mobile: padding ngang = 0 → cách mép màn hình 2 px (đồng nhất).
     final panelPadding = isMobile
-        ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
+        ? const EdgeInsets.fromLTRB(12, 18, 12, 18)
         : null;
     return DataPanel(
       title: 'Bài giảng',
@@ -578,7 +620,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       title: 'Lịch học',
       // Mobile: padding ngang = 0 → cách mép màn hình 2 px (đồng nhất).
       padding: isMobile
-          ? const EdgeInsets.fromLTRB(0, 18, 0, 18)
+          ? const EdgeInsets.fromLTRB(12, 18, 12, 18)
           : null,
       trailing: _isAdmin()
           ? IconButton(
