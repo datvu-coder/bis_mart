@@ -12,6 +12,8 @@ import os
 import urllib.error
 import urllib.request
 import uuid
+import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape as _xml_escape
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
@@ -1681,7 +1683,8 @@ def api_get_einvoice_settings():
         cur.execute(
             "SELECT id, provider, tax_code, api_base_url, api_key, username, is_active, updated_at, "
             "seller_legal_name, seller_address, seller_phone, seller_email, seller_bank_name, "
-            "seller_bank_account, invoice_template_code, invoice_series, vat_percent "
+            "seller_bank_account, invoice_template_code, invoice_series, vat_percent, "
+            "misa_app_id, misa_pin_code, vnpt_account, vnpt_account_pass "
             "FROM einvoice_settings ORDER BY id DESC LIMIT 1"
         )
         row = cur.fetchone()
@@ -1703,6 +1706,10 @@ def api_get_einvoice_settings():
             "invoiceTemplateCode": None,
             "invoiceSeries": None,
             "vatPercent": 8,
+            "misaAppId": None,
+            "misaPinCodeMasked": None,
+            "vnptAccount": None,
+            "vnptAccountPassMasked": None,
         })
     return jsonify({
         "provider": row.get("provider"),
@@ -1722,6 +1729,10 @@ def api_get_einvoice_settings():
         "invoiceTemplateCode": row.get("invoice_template_code"),
         "invoiceSeries": row.get("invoice_series"),
         "vatPercent": float(row.get("vat_percent") or 8),
+        "misaAppId": row.get("misa_app_id"),
+        "misaPinCodeMasked": _mask_secret(row.get("misa_pin_code")),
+        "vnptAccount": row.get("vnpt_account"),
+        "vnptAccountPassMasked": _mask_secret(row.get("vnpt_account_pass")),
     })
 
 
@@ -1734,14 +1745,23 @@ def api_update_einvoice_settings():
     user_id = g.current_user.get("user_id")
     db = get_db()
     with db.cursor() as cur:
-        cur.execute("SELECT id, api_key FROM einvoice_settings ORDER BY id DESC LIMIT 1")
+        cur.execute(
+            "SELECT id, api_key, misa_pin_code, vnpt_account_pass "
+            "FROM einvoice_settings ORDER BY id DESC LIMIT 1"
+        )
         existing = cur.fetchone()
 
-    # Keep the existing key if the client sends a blank value (i.e. the admin
-    # only changed other fields and didn't retype the key).
+    # Keep existing secrets if the client sends a blank value (i.e. the admin
+    # only changed other fields and didn't retype them).
     new_api_key = (data.get("apiKey") or "").strip()
     if not new_api_key and existing:
         new_api_key = existing.get("api_key")
+    new_misa_pin_code = (data.get("misaPinCode") or "").strip()
+    if not new_misa_pin_code and existing:
+        new_misa_pin_code = existing.get("misa_pin_code")
+    new_vnpt_account_pass = (data.get("vnptAccountPass") or "").strip()
+    if not new_vnpt_account_pass and existing:
+        new_vnpt_account_pass = existing.get("vnpt_account_pass")
 
     common_params = (
         (data.get("provider") or "misa").strip().lower(),
@@ -1759,6 +1779,10 @@ def api_update_einvoice_settings():
         (data.get("invoiceTemplateCode") or "").strip() or None,
         (data.get("invoiceSeries") or "").strip() or None,
         float(data.get("vatPercent", 8) or 8),
+        (data.get("misaAppId") or "").strip() or None,
+        new_misa_pin_code,
+        (data.get("vnptAccount") or "").strip() or None,
+        new_vnpt_account_pass,
     )
 
     with db.cursor() as cur:
@@ -1768,6 +1792,7 @@ def api_update_einvoice_settings():
                 "api_key=%s, username=%s, is_active=%s, seller_legal_name=%s, seller_address=%s, "
                 "seller_phone=%s, seller_email=%s, seller_bank_name=%s, seller_bank_account=%s, "
                 "invoice_template_code=%s, invoice_series=%s, vat_percent=%s, "
+                "misa_app_id=%s, misa_pin_code=%s, vnpt_account=%s, vnpt_account_pass=%s, "
                 "updated_by=%s, updated_at=CURRENT_TIMESTAMP "
                 "WHERE id=%s",
                 common_params + (user_id, existing["id"]),
@@ -1777,8 +1802,9 @@ def api_update_einvoice_settings():
                 "INSERT INTO einvoice_settings "
                 "(provider, tax_code, api_base_url, api_key, username, is_active, "
                 "seller_legal_name, seller_address, seller_phone, seller_email, seller_bank_name, "
-                "seller_bank_account, invoice_template_code, invoice_series, vat_percent, updated_by) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                "seller_bank_account, invoice_template_code, invoice_series, vat_percent, "
+                "misa_app_id, misa_pin_code, vnpt_account, vnpt_account_pass, updated_by) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                 common_params + (user_id,),
             )
     db.commit()
@@ -2024,6 +2050,294 @@ def _issue_viettel_invoice(settings: dict, report: dict, items: list[dict]):
     return "issued", invoice_no, None, raw[:2000]
 
 
+def _compute_invoice_lines(settings: dict, items: list[dict]):
+    """Shared VAT back-out math for the MISA/VNPT integrations below
+    (Viettel's does this inline). Product prices in this app are
+    VAT-inclusive, so pre-tax line amounts are derived from the configured
+    VAT rate. Returns (lines, total_without_tax, total_tax, vat_percent)."""
+    vat_percent = float(settings.get("vat_percent") or 0)
+    lines = []
+    total_without_tax = 0.0
+    total_tax = 0.0
+    for it in items:
+        qty = float(it.get("quantity") or 0)
+        unit_price_incl_vat = float(it.get("unit_price") or 0)
+        line_incl_vat = qty * unit_price_incl_vat
+        without_tax = (
+            round(line_incl_vat / (1 + vat_percent / 100), 2) if vat_percent else line_incl_vat
+        )
+        tax = round(line_incl_vat - without_tax, 2)
+        total_without_tax += without_tax
+        total_tax += tax
+        lines.append({
+            "name": it.get("product_name"),
+            "unit": it.get("unit"),
+            "quantity": qty,
+            "unit_price_incl_vat": unit_price_incl_vat,
+            "without_tax": without_tax,
+            "tax": tax,
+        })
+    return lines, round(total_without_tax, 2), round(total_tax, 2), vat_percent
+
+
+def _build_standard_invoice_xml(
+    settings: dict, report: dict, lines: list[dict],
+    total_without_tax: float, total_tax: float, vat_percent: float,
+) -> str:
+    """Best-effort reconstruction of the common Vietnamese e-invoice XML
+    convention (HDon/DLHDon/TTChung/NDHDon) that MISA/VNPT/BKAV's
+    underlying data format is built on. The outer element names are
+    grounded in fragments confirmed from provider documentation, but the
+    full leaf tag set was not confirmed against an official XSD — verify
+    against your provider's real sample/sandbox before relying on this for
+    tax filings.
+    """
+    discount = float(report.get("discount_amount") or 0)
+    total_with_tax = max(total_without_tax + total_tax - discount, 0)
+    buyer_name = (report.get("customer_name") or "").strip() or "Khách lẻ"
+    buyer_phone = report.get("customer_phone") or ""
+
+    item_xml = "".join(
+        f"<HHDVu><STT>{i + 1}</STT><THHDVu>{_xml_escape(str(ln['name'] or ''))}</THHDVu>"
+        f"<DVTinh>{_xml_escape(str(ln['unit'] or ''))}</DVTinh>"
+        f"<SLuong>{ln['quantity']}</SLuong>"
+        f"<DGia>{ln['unit_price_incl_vat']}</DGia>"
+        f"<ThTien>{ln['without_tax']}</ThTien>"
+        f"<TSuat>{vat_percent}%</TSuat></HHDVu>"
+        for i, ln in enumerate(lines)
+    )
+
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        "<HDon><DLHDon Id=\"data\">"
+        "<TTChung>"
+        "<PBan>2.0.0</PBan>"
+        "<THDon>Hóa đơn giá trị gia tăng</THDon>"
+        f"<KHMSHDon>{_xml_escape(str(settings.get('invoice_template_code') or ''))}</KHMSHDon>"
+        f"<KHHDon>{_xml_escape(str(settings.get('invoice_series') or ''))}</KHHDon>"
+        f"<NLap>{_xml_escape(str(report.get('report_date') or ''))}</NLap>"
+        "<DVTTe>VND</DVTTe><TGia>1</TGia>"
+        "</TTChung>"
+        "<NDHDon>"
+        "<NBan>"
+        f"<Ten>{_xml_escape(str(settings.get('seller_legal_name') or ''))}</Ten>"
+        f"<MST>{_xml_escape(str(settings.get('tax_code') or ''))}</MST>"
+        f"<DChi>{_xml_escape(str(settings.get('seller_address') or ''))}</DChi>"
+        f"<SDThoai>{_xml_escape(str(settings.get('seller_phone') or ''))}</SDThoai>"
+        f"<DCTDTu>{_xml_escape(str(settings.get('seller_email') or ''))}</DCTDTu>"
+        "</NBan>"
+        "<NMua>"
+        f"<Ten>{_xml_escape(buyer_name)}</Ten>"
+        f"<SDThoai>{_xml_escape(str(buyer_phone))}</SDThoai>"
+        "</NMua>"
+        f"<DSHHDVu>{item_xml}</DSHHDVu>"
+        "<TToan>"
+        f"<TgTCThue>{total_without_tax}</TgTCThue>"
+        f"<TgTThue>{total_tax}</TgTThue>"
+        f"<TgTTTBSo>{total_with_tax}</TgTTTBSo>"
+        "</TToan>"
+        "</NDHDon>"
+        "</DLHDon></HDon>"
+    )
+
+
+def _issue_misa_invoice(settings: dict, report: dict, items: list[dict]):
+    """Best-effort integration against MISA meInvoice's documented REST API:
+    POST {apiBaseUrl}/api/v3/auth/token for a JWT (appid/taxcode/username/
+    password), then POST {apiBaseUrl}/api/v3/code/invoicepublishing with
+    {"PinCode": ..., "XmlContent": <invoice xml>}. The endpoints, auth flow
+    and headers (Authorization Bearer + CompanyTaxCode) are grounded in
+    MISA's public docs; the exact leaf tags inside the invoice XML are a
+    best-effort reconstruction (see _build_standard_invoice_xml) — verify
+    against your account's real sample/sandbox before relying on this for
+    tax filings.
+    """
+    base_url = (settings.get("api_base_url") or "").rstrip("/")
+    tax_code = settings.get("tax_code") or ""
+    username = settings.get("username") or ""
+    password = settings.get("api_key") or ""
+
+    login_req = urllib.request.Request(
+        f"{base_url}/api/v3/auth/token",
+        data=json.dumps({
+            "appid": settings.get("misa_app_id") or "",
+            "taxcode": tax_code,
+            "username": username,
+            "password": password,
+        }).encode("utf-8"),
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(login_req, timeout=15) as resp:
+            login_data = json.loads(resp.read().decode("utf-8", errors="replace") or "{}")
+    except urllib.error.HTTPError as e:
+        return "failed", None, f"Đăng nhập MISA meInvoice thất bại (HTTP {e.code})", None
+    except Exception as e:
+        return "failed", None, f"Không kết nối được MISA meInvoice: {e}", None
+
+    if login_data.get("Success") is False:
+        err = login_data.get("Errors") or login_data.get("ErrorCode") or "đăng nhập thất bại"
+        return "failed", None, f"Đăng nhập MISA meInvoice thất bại: {err}", None
+    token = login_data.get("Data")
+    if not token:
+        return "failed", None, "Đăng nhập MISA meInvoice không trả về token", None
+
+    lines, total_without_tax, total_tax, vat_percent = _compute_invoice_lines(settings, items)
+    xml_content = _build_standard_invoice_xml(
+        settings, report, lines, total_without_tax, total_tax, vat_percent
+    )
+
+    invoice_req = urllib.request.Request(
+        f"{base_url}/api/v3/code/invoicepublishing",
+        data=json.dumps({
+            "PinCode": settings.get("misa_pin_code") or "",
+            "XmlContent": xml_content,
+        }).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "CompanyTaxCode": tax_code,
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(invoice_req, timeout=20) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        err_body = None
+        try:
+            err_body = e.read().decode("utf-8", errors="replace")[:2000]
+        except Exception:
+            pass
+        return "failed", None, f"MISA meInvoice phản hồi lỗi HTTP {e.code}", err_body
+    except Exception as e:
+        return "failed", None, str(e), None
+
+    try:
+        resp_json = json.loads(raw) if raw else {}
+    except ValueError:
+        resp_json = {}
+
+    if resp_json.get("Success") is False:
+        err = resp_json.get("Errors") or resp_json.get("ErrorCode") or "phát hành thất bại"
+        return "failed", None, f"Lỗi MISA meInvoice: {err}", raw[:2000]
+
+    payload_data = resp_json.get("Data") or resp_json.get("Payload") or {}
+    invoice_no = None
+    if isinstance(payload_data, dict):
+        invoice_no = (
+            payload_data.get("invoiceNumber") or payload_data.get("SHDon")
+            or payload_data.get("fkey")
+        )
+    if not invoice_no:
+        invoice_no = f"DRAFT-{report['id']}-{int(datetime.now().timestamp())}"
+    return "issued", invoice_no, None, raw[:2000]
+
+
+def _issue_vnpt_invoice(settings: dict, report: dict, items: list[dict]):
+    """Best-effort integration against VNPT Invoice's documented SOAP
+    webservice: PublishService.asmx, operation
+    ImportAndPublishInv(Account, ACpass, xmlInvData, username, pass,
+    pattern, serial, convert). The operation name and parameter order are
+    grounded in VNPT's published function signature; the SOAP namespace
+    (assumed to be the ASP.NET .asmx default "http://tempuri.org/") and the
+    inner xmlInvData/result XML schemas were not fully confirmed against an
+    official sample — verify against your account's real sandbox before
+    relying on this for tax filings.
+    """
+    base_url = (settings.get("api_base_url") or "").rstrip("/")
+    account = settings.get("vnpt_account") or ""
+    ac_pass = settings.get("vnpt_account_pass") or ""
+    username = settings.get("username") or ""
+    password = settings.get("api_key") or ""
+    pattern = settings.get("invoice_template_code") or ""
+    serial = settings.get("invoice_series") or ""
+
+    lines, total_without_tax, total_tax, vat_percent = _compute_invoice_lines(settings, items)
+    xml_inv_data = _build_standard_invoice_xml(
+        settings, report, lines, total_without_tax, total_tax, vat_percent
+    )
+
+    envelope = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" '
+        'xmlns:xsd="http://www.w3.org/2001/XMLSchema" '
+        'xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">'
+        "<soap:Body>"
+        '<ImportAndPublishInv xmlns="http://tempuri.org/">'
+        f"<Account>{_xml_escape(account)}</Account>"
+        f"<ACpass>{_xml_escape(ac_pass)}</ACpass>"
+        f"<xmlInvData><![CDATA[{xml_inv_data}]]></xmlInvData>"
+        f"<username>{_xml_escape(username)}</username>"
+        f"<pass>{_xml_escape(password)}</pass>"
+        f"<pattern>{_xml_escape(pattern)}</pattern>"
+        f"<serial>{_xml_escape(serial)}</serial>"
+        "<convert>0</convert>"
+        "</ImportAndPublishInv>"
+        "</soap:Body></soap:Envelope>"
+    )
+
+    req = urllib.request.Request(
+        f"{base_url}/PublishService.asmx",
+        data=envelope.encode("utf-8"),
+        method="POST",
+        headers={
+            "Content-Type": "text/xml; charset=utf-8",
+            "SOAPAction": "http://tempuri.org/ImportAndPublishInv",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        err_body = None
+        try:
+            err_body = e.read().decode("utf-8", errors="replace")[:2000]
+        except Exception:
+            pass
+        return "failed", None, f"VNPT Invoice phản hồi lỗi HTTP {e.code}", err_body
+    except Exception as e:
+        return "failed", None, str(e), None
+
+    try:
+        root = ET.fromstring(raw)
+    except ET.ParseError:
+        return "failed", None, "Không đọc được phản hồi SOAP từ VNPT Invoice", raw[:2000]
+
+    # Strip namespaces for simpler lookup regardless of the SOAP prefix used.
+    result_text = None
+    for el in root.iter():
+        if el.tag.split("}")[-1] == "ImportAndPublishInvResult":
+            result_text = el.text
+            break
+    if not result_text:
+        return "failed", None, "VNPT Invoice không trả về kết quả", raw[:2000]
+
+    invoice_no = None
+    error_message = None
+    try:
+        result_root = ET.fromstring(result_text)
+        for el in result_root.iter():
+            tag = el.tag.split("}")[-1].lower()
+            if tag in ("shdon", "invoiceno", "so_hd") and el.text:
+                invoice_no = el.text
+            if tag in ("description", "error", "message") and el.text and not invoice_no:
+                error_message = el.text
+    except ET.ParseError:
+        # Result wasn't itself XML — fall back to treating any non-empty,
+        # error-keyword-free string as a raw reference.
+        lowered = result_text.lower()
+        if "error" in lowered or "loi" in lowered or "lỗi" in lowered:
+            error_message = result_text
+        else:
+            invoice_no = result_text.strip() or None
+
+    if invoice_no:
+        return "issued", invoice_no, None, raw[:2000]
+    return "failed", None, error_message or "VNPT Invoice không trả về số hóa đơn", raw[:2000]
+
+
 def _issue_generic_einvoice(settings: dict, report: dict, items: list[dict]):
     """Best-effort e-invoice issuance for any provider without a dedicated
     integration: posts a generic invoice payload to whichever endpoint is
@@ -2146,8 +2460,17 @@ def api_issue_report_einvoice(report_id: int):
         )
         items = cur.fetchall()
 
-    if settings.get("provider") == "viettel":
+    provider = settings.get("provider")
+    if provider == "viettel":
         status, invoice_number, error_message, response_snippet = _issue_viettel_invoice(
+            settings, report, items
+        )
+    elif provider == "misa":
+        status, invoice_number, error_message, response_snippet = _issue_misa_invoice(
+            settings, report, items
+        )
+    elif provider == "vnpt":
+        status, invoice_number, error_message, response_snippet = _issue_vnpt_invoice(
             settings, report, items
         )
     else:

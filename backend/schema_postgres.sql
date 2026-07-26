@@ -526,6 +526,16 @@ ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS invoice_template_code TEX
 ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS invoice_series TEXT;
 ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS vat_percent REAL NOT NULL DEFAULT 8;
 
+-- Migration: extra per-provider credentials that don't fit the generic
+-- username/api_key pair — MISA meInvoice needs a separate partner "appid"
+-- (and optionally a signing PIN) alongside the merchant's own login, and
+-- VNPT Invoice's ImportAndPublishInv call needs a separate Account/ACpass
+-- service credential alongside the merchant's own username/pass.
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS misa_app_id TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS misa_pin_code TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS vnpt_account TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS vnpt_account_pass TEXT;
+
 -- Draft e-invoice issuance attempts for a sales report/order. This is a
 -- best-effort integration against whichever generic endpoint is configured
 -- in einvoice_settings — it has not been validated against any specific
