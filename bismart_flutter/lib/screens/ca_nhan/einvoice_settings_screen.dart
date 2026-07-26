@@ -42,6 +42,18 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
   bool _isActive = false;
   bool _configured = false;
 
+  // Viettel S-Invoice specific fields — needed to build a real createInvoice
+  // request (sellerInfo + which pre-registered invoice template to use).
+  final _sellerLegalNameCtrl = TextEditingController();
+  final _sellerAddressCtrl = TextEditingController();
+  final _sellerPhoneCtrl = TextEditingController();
+  final _sellerEmailCtrl = TextEditingController();
+  final _sellerBankNameCtrl = TextEditingController();
+  final _sellerBankAccountCtrl = TextEditingController();
+  final _invoiceTemplateCodeCtrl = TextEditingController();
+  final _invoiceSeriesCtrl = TextEditingController();
+  final _vatPercentCtrl = TextEditingController(text: '8');
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +70,15 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
     _apiBaseUrlCtrl.dispose();
     _usernameCtrl.dispose();
     _apiKeyCtrl.dispose();
+    _sellerLegalNameCtrl.dispose();
+    _sellerAddressCtrl.dispose();
+    _sellerPhoneCtrl.dispose();
+    _sellerEmailCtrl.dispose();
+    _sellerBankNameCtrl.dispose();
+    _sellerBankAccountCtrl.dispose();
+    _invoiceTemplateCodeCtrl.dispose();
+    _invoiceSeriesCtrl.dispose();
+    _vatPercentCtrl.dispose();
     super.dispose();
   }
 
@@ -75,6 +96,15 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
       _apiKeyMasked = data['apiKeyMasked'] as String?;
       _isActive = data['isActive'] as bool? ?? false;
       _configured = data['configured'] as bool? ?? false;
+      _sellerLegalNameCtrl.text = (data['sellerLegalName'] as String?) ?? '';
+      _sellerAddressCtrl.text = (data['sellerAddress'] as String?) ?? '';
+      _sellerPhoneCtrl.text = (data['sellerPhone'] as String?) ?? '';
+      _sellerEmailCtrl.text = (data['sellerEmail'] as String?) ?? '';
+      _sellerBankNameCtrl.text = (data['sellerBankName'] as String?) ?? '';
+      _sellerBankAccountCtrl.text = (data['sellerBankAccount'] as String?) ?? '';
+      _invoiceTemplateCodeCtrl.text = (data['invoiceTemplateCode'] as String?) ?? '';
+      _invoiceSeriesCtrl.text = (data['invoiceSeries'] as String?) ?? '';
+      _vatPercentCtrl.text = ((data['vatPercent'] as num?) ?? 8).toString();
     } catch (_) {
       _error = 'Không thể tải cấu hình';
     }
@@ -92,6 +122,15 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
         'username': _usernameCtrl.text.trim(),
         'apiKey': _apiKeyCtrl.text.trim(),
         'isActive': _isActive,
+        'sellerLegalName': _sellerLegalNameCtrl.text.trim(),
+        'sellerAddress': _sellerAddressCtrl.text.trim(),
+        'sellerPhone': _sellerPhoneCtrl.text.trim(),
+        'sellerEmail': _sellerEmailCtrl.text.trim(),
+        'sellerBankName': _sellerBankNameCtrl.text.trim(),
+        'sellerBankAccount': _sellerBankAccountCtrl.text.trim(),
+        'invoiceTemplateCode': _invoiceTemplateCodeCtrl.text.trim(),
+        'invoiceSeries': _invoiceSeriesCtrl.text.trim(),
+        'vatPercent': double.tryParse(_vatPercentCtrl.text.trim()) ?? 8,
       });
       if (!mounted) return;
       _apiKeyCtrl.clear();
@@ -181,9 +220,8 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
                     Text(_error!, style: AppTextStyles.caption.copyWith(color: AppColors.error)),
                     const SizedBox(height: 12),
                   ],
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: AppDecorations.card,
+                  _sectionCard(
+                    title: 'Kết nối',
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -204,21 +242,31 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
                         const SizedBox(height: 12),
                         TextField(
                           controller: _apiBaseUrlCtrl,
-                          decoration: const InputDecoration(labelText: 'Địa chỉ API (endpoint)'),
+                          decoration: InputDecoration(
+                            labelText: 'Địa chỉ API (endpoint)',
+                            hintText: _provider == 'viettel'
+                                ? 'VD: https://demo-sinvoice.viettel.vn:8443'
+                                : null,
+                          ),
                           keyboardType: TextInputType.url,
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: _usernameCtrl,
-                          decoration:
-                              const InputDecoration(labelText: 'Tên đăng nhập / tài khoản API'),
+                          decoration: InputDecoration(
+                            labelText: _provider == 'viettel'
+                                ? 'Tài khoản đăng nhập Viettel S-Invoice'
+                                : 'Tên đăng nhập / tài khoản API',
+                          ),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: _apiKeyCtrl,
                           obscureText: true,
                           decoration: InputDecoration(
-                            labelText: 'API Key / Mật khẩu',
+                            labelText: _provider == 'viettel'
+                                ? 'Mật khẩu đăng nhập Viettel S-Invoice'
+                                : 'API Key / Mật khẩu',
                             hintText: _apiKeyMasked != null
                                 ? 'Đã lưu: $_apiKeyMasked (để trống nếu không đổi)'
                                 : 'Nhập API key',
@@ -235,6 +283,95 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
                       ],
                     ),
                   ),
+                  if (_provider == 'viettel') ...[
+                    const SizedBox(height: 16),
+                    _sectionCard(
+                      title: 'Thông tin xuất hóa đơn (Viettel S-Invoice)',
+                      subtitle: 'Bắt buộc để tạo được hóa đơn hợp lệ theo mẫu đã đăng ký',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: _sellerLegalNameCtrl,
+                            decoration:
+                                const InputDecoration(labelText: 'Tên đơn vị bán (theo ĐKKD)'),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _sellerAddressCtrl,
+                            decoration: const InputDecoration(labelText: 'Địa chỉ đơn vị bán'),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _sellerPhoneCtrl,
+                                  decoration: const InputDecoration(labelText: 'SĐT (tùy chọn)'),
+                                  keyboardType: TextInputType.phone,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: _sellerEmailCtrl,
+                                  decoration: const InputDecoration(labelText: 'Email (tùy chọn)'),
+                                  keyboardType: TextInputType.emailAddress,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _sellerBankNameCtrl,
+                                  decoration:
+                                      const InputDecoration(labelText: 'Ngân hàng (tùy chọn)'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: _sellerBankAccountCtrl,
+                                  decoration: const InputDecoration(labelText: 'Số TK (tùy chọn)'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _invoiceTemplateCodeCtrl,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Mẫu số hóa đơn', hintText: 'VD: 1/001'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: _invoiceSeriesCtrl,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Ký hiệu hóa đơn', hintText: 'VD: C25TAA'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: _vatPercentCtrl,
+                                  decoration: const InputDecoration(labelText: 'Thuế suất VAT (%)'),
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -291,11 +428,39 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
               'App không kết nối trực tiếp với hệ thống của Tổng cục Thuế. Để xuất hóa đơn '
               'điện tử tự động, công ty cần có hợp đồng với một nhà cung cấp được cấp phép '
               '(MISA, VNPT, Viettel...) và chữ ký số riêng. Nhập thông tin API do nhà cung cấp '
-              'đó cấp bên dưới — "Kiểm tra kết nối" chỉ xác minh địa chỉ API có phản hồi, '
-              'chưa đảm bảo tương thích đầy đủ với chuẩn dữ liệu của nhà cung cấp.',
+              'đó cấp bên dưới. Viettel S-Invoice đã được tích hợp theo đúng cấu trúc dữ liệu '
+              'công khai của họ; các nhà cung cấp khác vẫn chỉ gửi dữ liệu tổng quát và cần '
+              'điều chỉnh thêm khi có tài liệu API chính thức. "Kiểm tra kết nối" chỉ xác minh '
+              'địa chỉ API có phản hồi, không thay thế việc xuất hóa đơn thật.',
               style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// A titled card grouping one part of the form — same pattern as
+  /// add_product_dialog.dart's sectioned layout, so a growing settings form
+  /// reads as clear sections instead of one long list of fields.
+  Widget _sectionCard({
+    required String title,
+    String? subtitle,
+    required Widget child,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: AppDecorations.card,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: AppTextStyles.sectionHeader),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(subtitle, style: AppTextStyles.caption),
+          ],
+          const SizedBox(height: 12),
+          child,
         ],
       ),
     );
