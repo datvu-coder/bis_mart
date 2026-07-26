@@ -1797,6 +1797,193 @@ def api_test_einvoice_connection():
         return jsonify({"ok": False, "error": str(e)}), 502
 
 
+def _can_access_report(report_row: dict) -> bool:
+    """Same visibility rule as GET /api/reports (own report, crud permission,
+    or the caller's/managed store) — reused by the e-invoice endpoints so
+    issuing/viewing an invoice requires the same access as the report itself."""
+    if report_row.get("created_by") == g.current_user.get("user_id") or _has_crud_permission():
+        return True
+    allowed_codes = _allowed_store_codes_for_current_user()
+    if allowed_codes is None:
+        return True
+    return (report_row.get("store_code") or "").upper() in allowed_codes
+
+
+def _einvoice_record_to_json(row: dict) -> dict:
+    return {
+        "status": row.get("status"),
+        "invoiceNumber": row.get("invoice_number"),
+        "provider": row.get("provider"),
+        "error": row.get("error_message"),
+        "issuedAt": row.get("issued_at"),
+        "createdAt": row.get("created_at"),
+    }
+
+
+@app.get("/api/reports/<int:report_id>/einvoice")
+@login_required
+def api_get_report_einvoice(report_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT created_by, store_code FROM sales_reports WHERE id = %s",
+            (report_id,),
+        )
+        report = cur.fetchone()
+    if not report:
+        return jsonify({"error": "Report not found"}), 404
+    if not _can_access_report(report):
+        return _forbidden()
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT status, invoice_number, provider, error_message, issued_at, created_at "
+            "FROM einvoice_records WHERE report_id = %s ORDER BY id DESC LIMIT 1",
+            (report_id,),
+        )
+        row = cur.fetchone()
+    return jsonify(_einvoice_record_to_json(row) if row else None)
+
+
+@app.post("/api/reports/<int:report_id>/einvoice")
+@login_required
+def api_issue_report_einvoice(report_id: int):
+    """Best-effort e-invoice issuance: posts a generic invoice payload to
+    whichever endpoint is configured in einvoice_settings.
+
+    This has NOT been validated against any specific licensed provider's
+    certified schema — MISA/VNPT/Viettel/BKAV each have their own documented
+    API, auth flow and digital-signature requirements. Treat any "issued"
+    result here as a draft record, not a tax-valid invoice, until this is
+    adapted to a real provider's official API documentation.
+    """
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, created_by, store_code, report_date, sale_out, discount_amount, "
+            "customer_name, customer_phone, payment_method "
+            "FROM sales_reports WHERE id = %s",
+            (report_id,),
+        )
+        report = cur.fetchone()
+    if not report:
+        return jsonify({"error": "Report not found"}), 404
+    if not _can_access_report(report):
+        return _forbidden()
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM einvoice_records WHERE report_id = %s AND status = 'issued' LIMIT 1",
+            (report_id,),
+        )
+        if cur.fetchone():
+            return jsonify({"error": "Đơn này đã được xuất hóa đơn điện tử"}), 409
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT provider, tax_code, api_base_url, api_key, is_active "
+            "FROM einvoice_settings ORDER BY id DESC LIMIT 1"
+        )
+        settings = cur.fetchone()
+    if not settings or not settings.get("is_active") or not settings.get("api_base_url"):
+        return jsonify({
+            "error": "Chưa cấu hình hoặc chưa kích hoạt kết nối hóa đơn điện tử. "
+                     "Vào Cá nhân → Cài đặt hóa đơn điện tử để cấu hình."
+        }), 400
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT product_name, quantity, unit_price, unit FROM sale_items "
+            "WHERE report_id = %s ORDER BY id ASC",
+            (report_id,),
+        )
+        items = cur.fetchall()
+
+    total_amount = max(
+        float(report.get("sale_out") or 0) - float(report.get("discount_amount") or 0), 0
+    )
+    payload = {
+        "sellerTaxCode": settings.get("tax_code"),
+        "invoiceDate": report.get("report_date"),
+        "customerName": (report.get("customer_name") or "").strip() or "Khách lẻ",
+        "customerPhone": report.get("customer_phone"),
+        "paymentMethod": report.get("payment_method"),
+        "discountAmount": report.get("discount_amount"),
+        "totalAmount": total_amount,
+        "items": [
+            {
+                "name": it.get("product_name"),
+                "unit": it.get("unit"),
+                "quantity": float(it.get("quantity") or 0),
+                "unitPrice": float(it.get("unit_price") or 0),
+            }
+            for it in items
+        ],
+    }
+
+    req = urllib.request.Request(
+        settings["api_base_url"],
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {settings.get('api_key') or ''}",
+            "Content-Type": "application/json",
+        },
+    )
+
+    status = "failed"
+    invoice_number = None
+    error_message = None
+    response_snippet = None
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            response_snippet = raw[:2000]
+            try:
+                resp_json = json.loads(raw) if raw else {}
+            except ValueError:
+                resp_json = {}
+            invoice_number = (
+                resp_json.get("invoiceNumber") or resp_json.get("invoiceNo")
+                or resp_json.get("so_hoa_don") or resp_json.get("id")
+            )
+            if not invoice_number:
+                invoice_number = f"DRAFT-{report_id}-{int(datetime.now().timestamp())}"
+            status = "issued"
+    except urllib.error.HTTPError as e:
+        error_message = f"Nhà cung cấp phản hồi lỗi HTTP {e.code}"
+        try:
+            response_snippet = e.read().decode("utf-8", errors="replace")[:2000]
+        except Exception:
+            pass
+    except Exception as e:
+        error_message = str(e)
+
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO einvoice_records "
+            "(report_id, status, invoice_number, provider, error_message, response_snippet, "
+            "issued_at, created_by) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING status, invoice_number, provider, error_message, issued_at, created_at",
+            (
+                report_id,
+                status,
+                invoice_number,
+                settings.get("provider"),
+                error_message,
+                response_snippet,
+                datetime.now(tz=VN_TZ).isoformat() if status == "issued" else None,
+                g.current_user.get("user_id"),
+            ),
+        )
+        record = cur.fetchone()
+    db.commit()
+
+    result = _einvoice_record_to_json(record)
+    return jsonify(result), (201 if status == "issued" else 502)
+
+
 @app.post("/api/reports")
 @login_required
 def api_create_report():

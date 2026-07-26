@@ -12,6 +12,7 @@ import '../../providers/sales_provider.dart';
 import '../../providers/permission_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/api_service.dart';
 import '../../services/export_service.dart';
 import 'sales_pos_screen.dart';
 import 'create_order_screen.dart';
@@ -201,6 +202,10 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
             height: dialogHeight,
             child: SalesHistoryList(
               onRefresh: () => context.read<SalesProvider>().loadReports(),
+              onTap: (r) {
+                Navigator.pop(ctx);
+                _showReportDetail(r);
+              },
             ),
           ),
           actions: [
@@ -1425,6 +1430,10 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
                       ),
                     )),
               ],
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+              _EinvoicePanel(reportId: report.id),
             ],
           ),
         ),
@@ -1558,6 +1567,144 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Shows/issues the e-invoice for a sales report. Talks to whichever
+/// endpoint is configured in Cài đặt hóa đơn điện tử — that's a generic
+/// draft integration, not yet validated against any specific licensed
+/// provider's certified schema, so an "issued" result here is a draft
+/// record, not a guaranteed tax-valid invoice.
+class _EinvoicePanel extends StatefulWidget {
+  final String reportId;
+  const _EinvoicePanel({required this.reportId});
+
+  @override
+  State<_EinvoicePanel> createState() => _EinvoicePanelState();
+}
+
+class _EinvoicePanelState extends State<_EinvoicePanel> {
+  bool _loading = true;
+  bool _issuing = false;
+  Map<String, dynamic>? _record;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final record = await ApiService().getReportEinvoice(widget.reportId);
+      if (!mounted) return;
+      setState(() {
+        _record = record;
+        _loadError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadError = 'Không tải được trạng thái hóa đơn');
+    }
+    if (!mounted) return;
+    setState(() => _loading = false);
+  }
+
+  Future<void> _issue() async {
+    setState(() => _issuing = true);
+    try {
+      final record = await ApiService().issueReportEinvoice(widget.reportId);
+      if (!mounted) return;
+      setState(() => _record = record);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().replaceFirst('Exception: ', '')),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+    if (!mounted) return;
+    setState(() => _issuing = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+
+    final status = _record?['status'] as String?;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Hóa đơn điện tử', style: AppTextStyles.sectionHeader),
+        const SizedBox(height: 10),
+        if (_loadError != null)
+          Text(_loadError!,
+              style: AppTextStyles.caption.copyWith(color: AppColors.error))
+        else if (status == 'issued')
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.successLight,
+              borderRadius: BorderRadius.circular(AppRadius.row),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.check_circle_rounded,
+                    color: AppColors.success, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Đã xuất — số ${_record?['invoiceNumber'] ?? ''}',
+                          style: AppTextStyles.bodyTextMedium
+                              .copyWith(color: AppColors.success)),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Bản nháp: chưa xác thực theo chuẩn dữ liệu chính thức của nhà cung cấp.',
+                        style: AppTextStyles.caption,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          if (status == 'failed' &&
+              (_record?['error'] as String?)?.isNotEmpty == true)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(_record!['error'] as String,
+                  style: AppTextStyles.caption.copyWith(color: AppColors.error)),
+            ),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _issuing ? null : _issue,
+              icon: _issuing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.receipt_long_rounded, size: 18),
+              label: Text(
+                  status == 'failed' ? 'Thử xuất lại' : 'Xuất hóa đơn điện tử'),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
