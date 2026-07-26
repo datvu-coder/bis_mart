@@ -105,6 +105,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        titleSpacing: 4,
         title: const Text('Danh sách nhân viên'),
         actions: [
           Consumer<EmployeeProvider>(

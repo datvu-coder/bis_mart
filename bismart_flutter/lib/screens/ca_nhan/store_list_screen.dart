@@ -114,6 +114,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
         return Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
+            titleSpacing: 4,
             title: const Text('Danh sách cửa hàng'),
             actions: [_buildCountBadge('${stores.length} cửa hàng')],
           ),
