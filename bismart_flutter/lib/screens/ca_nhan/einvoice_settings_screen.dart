@@ -42,8 +42,8 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
   bool _isActive = false;
   bool _configured = false;
 
-  // Viettel S-Invoice specific fields — needed to build a real createInvoice
-  // request (sellerInfo + which pre-registered invoice template to use).
+  // Shared by Viettel/MISA/VNPT — needed to build a real invoice request
+  // (seller info + which pre-registered invoice template to use).
   final _sellerLegalNameCtrl = TextEditingController();
   final _sellerAddressCtrl = TextEditingController();
   final _sellerPhoneCtrl = TextEditingController();
@@ -53,6 +53,17 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
   final _invoiceTemplateCodeCtrl = TextEditingController();
   final _invoiceSeriesCtrl = TextEditingController();
   final _vatPercentCtrl = TextEditingController(text: '8');
+
+  // MISA meInvoice specific: separate partner "appid" + optional signing PIN.
+  final _misaAppIdCtrl = TextEditingController();
+  final _misaPinCodeCtrl = TextEditingController();
+  String? _misaPinCodeMasked;
+
+  // VNPT Invoice specific: separate Account/ACpass service credential used
+  // by the ImportAndPublishInv call, alongside the merchant's own username/pass.
+  final _vnptAccountCtrl = TextEditingController();
+  final _vnptAccountPassCtrl = TextEditingController();
+  String? _vnptAccountPassMasked;
 
   @override
   void initState() {
@@ -79,6 +90,10 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
     _invoiceTemplateCodeCtrl.dispose();
     _invoiceSeriesCtrl.dispose();
     _vatPercentCtrl.dispose();
+    _misaAppIdCtrl.dispose();
+    _misaPinCodeCtrl.dispose();
+    _vnptAccountCtrl.dispose();
+    _vnptAccountPassCtrl.dispose();
     super.dispose();
   }
 
@@ -105,6 +120,10 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
       _invoiceTemplateCodeCtrl.text = (data['invoiceTemplateCode'] as String?) ?? '';
       _invoiceSeriesCtrl.text = (data['invoiceSeries'] as String?) ?? '';
       _vatPercentCtrl.text = ((data['vatPercent'] as num?) ?? 8).toString();
+      _misaAppIdCtrl.text = (data['misaAppId'] as String?) ?? '';
+      _misaPinCodeMasked = data['misaPinCodeMasked'] as String?;
+      _vnptAccountCtrl.text = (data['vnptAccount'] as String?) ?? '';
+      _vnptAccountPassMasked = data['vnptAccountPassMasked'] as String?;
     } catch (_) {
       _error = 'Không thể tải cấu hình';
     }
@@ -131,9 +150,15 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
         'invoiceTemplateCode': _invoiceTemplateCodeCtrl.text.trim(),
         'invoiceSeries': _invoiceSeriesCtrl.text.trim(),
         'vatPercent': double.tryParse(_vatPercentCtrl.text.trim()) ?? 8,
+        'misaAppId': _misaAppIdCtrl.text.trim(),
+        'misaPinCode': _misaPinCodeCtrl.text.trim(),
+        'vnptAccount': _vnptAccountCtrl.text.trim(),
+        'vnptAccountPass': _vnptAccountPassCtrl.text.trim(),
       });
       if (!mounted) return;
       _apiKeyCtrl.clear();
+      _misaPinCodeCtrl.clear();
+      _vnptAccountPassCtrl.clear();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Đã lưu cấu hình'),
@@ -283,10 +308,12 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
                       ],
                     ),
                   ),
-                  if (_provider == 'viettel') ...[
+                  if (_provider == 'viettel' ||
+                      _provider == 'misa' ||
+                      _provider == 'vnpt') ...[
                     const SizedBox(height: 16),
                     _sectionCard(
-                      title: 'Thông tin xuất hóa đơn (Viettel S-Invoice)',
+                      title: 'Thông tin xuất hóa đơn',
                       subtitle: 'Bắt buộc để tạo được hóa đơn hợp lệ theo mẫu đã đăng ký',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -372,6 +399,60 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
                       ),
                     ),
                   ],
+                  if (_provider == 'misa') ...[
+                    const SizedBox(height: 16),
+                    _sectionCard(
+                      title: 'Thông tin bổ sung MISA meInvoice',
+                      subtitle: 'Do MISA cấp riêng cho ứng dụng tích hợp, khác với tài khoản đăng nhập ở trên',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: _misaAppIdCtrl,
+                            decoration: const InputDecoration(labelText: 'App ID (do MISA cấp)'),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _misaPinCodeCtrl,
+                            obscureText: true,
+                            decoration: InputDecoration(
+                              labelText: 'Mã PIN (tùy chọn)',
+                              hintText: _misaPinCodeMasked != null
+                                  ? 'Đã lưu: $_misaPinCodeMasked (để trống nếu không đổi)'
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (_provider == 'vnpt') ...[
+                    const SizedBox(height: 16),
+                    _sectionCard(
+                      title: 'Thông tin bổ sung VNPT Invoice',
+                      subtitle: 'Account/Mật khẩu dịch vụ do VNPT cấp, khác với tài khoản đăng nhập ở trên',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextField(
+                            controller: _vnptAccountCtrl,
+                            decoration: const InputDecoration(labelText: 'Account (do VNPT cấp)'),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _vnptAccountPassCtrl,
+                            obscureText: true,
+                            decoration: InputDecoration(
+                              labelText: 'ACpass (mật khẩu Account)',
+                              hintText: _vnptAccountPassMasked != null
+                                  ? 'Đã lưu: $_vnptAccountPassMasked (để trống nếu không đổi)'
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   Row(
                     children: [
@@ -428,10 +509,12 @@ class _EinvoiceSettingsScreenState extends State<EinvoiceSettingsScreen> {
               'App không kết nối trực tiếp với hệ thống của Tổng cục Thuế. Để xuất hóa đơn '
               'điện tử tự động, công ty cần có hợp đồng với một nhà cung cấp được cấp phép '
               '(MISA, VNPT, Viettel...) và chữ ký số riêng. Nhập thông tin API do nhà cung cấp '
-              'đó cấp bên dưới. Viettel S-Invoice đã được tích hợp theo đúng cấu trúc dữ liệu '
-              'công khai của họ; các nhà cung cấp khác vẫn chỉ gửi dữ liệu tổng quát và cần '
-              'điều chỉnh thêm khi có tài liệu API chính thức. "Kiểm tra kết nối" chỉ xác minh '
-              'địa chỉ API có phản hồi, không thay thế việc xuất hóa đơn thật.',
+              'đó cấp bên dưới. Viettel S-Invoice, MISA meInvoice và VNPT Invoice đã được tích '
+              'hợp theo đúng luồng đăng nhập/endpoint công khai của từng bên — riêng nội dung '
+              'XML hóa đơn của MISA/VNPT là bản dựng lại tốt nhất có thể, chưa đối chiếu được '
+              'với XSD chính thức nên cần kiểm thử kỹ trên tài khoản demo trước khi dùng thật. '
+              'BKAV và các nhà cung cấp khác vẫn chỉ gửi dữ liệu tổng quát. "Kiểm tra kết nối" '
+              'chỉ xác minh địa chỉ API có phản hồi, không thay thế việc xuất hóa đơn thật.',
               style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
             ),
           ),
