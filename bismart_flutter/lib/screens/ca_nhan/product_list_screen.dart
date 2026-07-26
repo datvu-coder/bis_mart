@@ -103,6 +103,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         return Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
+            titleSpacing: 4,
             title: const Text('Danh sách sản phẩm'),
             actions: [_buildCountBadge('${products.length} sản phẩm')],
           ),
