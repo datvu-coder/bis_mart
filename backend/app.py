@@ -1679,7 +1679,9 @@ def api_get_einvoice_settings():
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, provider, tax_code, api_base_url, api_key, username, is_active, updated_at "
+            "SELECT id, provider, tax_code, api_base_url, api_key, username, is_active, updated_at, "
+            "seller_legal_name, seller_address, seller_phone, seller_email, seller_bank_name, "
+            "seller_bank_account, invoice_template_code, invoice_series, vat_percent "
             "FROM einvoice_settings ORDER BY id DESC LIMIT 1"
         )
         row = cur.fetchone()
@@ -1692,6 +1694,15 @@ def api_get_einvoice_settings():
             "username": None,
             "isActive": False,
             "configured": False,
+            "sellerLegalName": None,
+            "sellerAddress": None,
+            "sellerPhone": None,
+            "sellerEmail": None,
+            "sellerBankName": None,
+            "sellerBankAccount": None,
+            "invoiceTemplateCode": None,
+            "invoiceSeries": None,
+            "vatPercent": 8,
         })
     return jsonify({
         "provider": row.get("provider"),
@@ -1702,6 +1713,15 @@ def api_get_einvoice_settings():
         "isActive": bool(row.get("is_active")),
         "configured": True,
         "updatedAt": row.get("updated_at"),
+        "sellerLegalName": row.get("seller_legal_name"),
+        "sellerAddress": row.get("seller_address"),
+        "sellerPhone": row.get("seller_phone"),
+        "sellerEmail": row.get("seller_email"),
+        "sellerBankName": row.get("seller_bank_name"),
+        "sellerBankAccount": row.get("seller_bank_account"),
+        "invoiceTemplateCode": row.get("invoice_template_code"),
+        "invoiceSeries": row.get("invoice_series"),
+        "vatPercent": float(row.get("vat_percent") or 8),
     })
 
 
@@ -1723,37 +1743,43 @@ def api_update_einvoice_settings():
     if not new_api_key and existing:
         new_api_key = existing.get("api_key")
 
+    common_params = (
+        (data.get("provider") or "misa").strip().lower(),
+        (data.get("taxCode") or "").strip() or None,
+        (data.get("apiBaseUrl") or "").strip() or None,
+        new_api_key,
+        (data.get("username") or "").strip() or None,
+        int(bool(data.get("isActive", False))),
+        (data.get("sellerLegalName") or "").strip() or None,
+        (data.get("sellerAddress") or "").strip() or None,
+        (data.get("sellerPhone") or "").strip() or None,
+        (data.get("sellerEmail") or "").strip() or None,
+        (data.get("sellerBankName") or "").strip() or None,
+        (data.get("sellerBankAccount") or "").strip() or None,
+        (data.get("invoiceTemplateCode") or "").strip() or None,
+        (data.get("invoiceSeries") or "").strip() or None,
+        float(data.get("vatPercent", 8) or 8),
+    )
+
     with db.cursor() as cur:
         if existing:
             cur.execute(
                 "UPDATE einvoice_settings SET provider=%s, tax_code=%s, api_base_url=%s, "
-                "api_key=%s, username=%s, is_active=%s, updated_by=%s, updated_at=CURRENT_TIMESTAMP "
+                "api_key=%s, username=%s, is_active=%s, seller_legal_name=%s, seller_address=%s, "
+                "seller_phone=%s, seller_email=%s, seller_bank_name=%s, seller_bank_account=%s, "
+                "invoice_template_code=%s, invoice_series=%s, vat_percent=%s, "
+                "updated_by=%s, updated_at=CURRENT_TIMESTAMP "
                 "WHERE id=%s",
-                (
-                    (data.get("provider") or "misa").strip().lower(),
-                    (data.get("taxCode") or "").strip() or None,
-                    (data.get("apiBaseUrl") or "").strip() or None,
-                    new_api_key,
-                    (data.get("username") or "").strip() or None,
-                    int(bool(data.get("isActive", False))),
-                    user_id,
-                    existing["id"],
-                ),
+                common_params + (user_id, existing["id"]),
             )
         else:
             cur.execute(
                 "INSERT INTO einvoice_settings "
-                "(provider, tax_code, api_base_url, api_key, username, is_active, updated_by) "
-                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (
-                    (data.get("provider") or "misa").strip().lower(),
-                    (data.get("taxCode") or "").strip() or None,
-                    (data.get("apiBaseUrl") or "").strip() or None,
-                    new_api_key,
-                    (data.get("username") or "").strip() or None,
-                    int(bool(data.get("isActive", False))),
-                    user_id,
-                ),
+                "(provider, tax_code, api_base_url, api_key, username, is_active, "
+                "seller_legal_name, seller_address, seller_phone, seller_email, seller_bank_name, "
+                "seller_bank_account, invoice_template_code, invoice_series, vat_percent, updated_by) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                common_params + (user_id,),
             )
     db.commit()
     return jsonify({"ok": True})
@@ -1845,60 +1871,174 @@ def api_get_report_einvoice(report_id: int):
     return jsonify(_einvoice_record_to_json(row) if row else None)
 
 
-@app.post("/api/reports/<int:report_id>/einvoice")
-@login_required
-def api_issue_report_einvoice(report_id: int):
-    """Best-effort e-invoice issuance: posts a generic invoice payload to
-    whichever endpoint is configured in einvoice_settings.
+def _viettel_map_payment(payment_method: str | None) -> tuple[str, str]:
+    pm = (payment_method or "").strip().lower()
+    if pm in ("transfer", "bank_transfer", "chuyen_khoan", "ck"):
+        return "CK", "Chuyển khoản"
+    return "TM", "Tiền mặt"
+
+
+def _issue_viettel_invoice(settings: dict, report: dict, items: list[dict]):
+    """Real (best-effort) integration against Viettel S-Invoice's documented
+    REST webservice: POST {apiBaseUrl}/auth/login for a bearer access token,
+    then POST {apiBaseUrl}/services/einvoiceapplication/api/InvoiceAPI/
+    InvoiceWS/createInvoice/{username} with the invoice payload.
+
+    Endpoint paths and the generalInvoiceInfo/sellerInfo/buyerInfo/payments/
+    itemInfo/summarizeInfo/taxBreakdowns field names follow Viettel's
+    published createInvoice schema. This has been grounded in Viettel's
+    documented API shape (not guessed from a generic template), but every
+    account's actual invoice template (templateCode/invoiceSeries) and
+    required fields can vary by contract — verify against your own account's
+    real template before relying on this for tax filings.
+
+    Returns (status, invoice_number, error_message, response_snippet).
+    """
+    base_url = (settings.get("api_base_url") or "").rstrip("/")
+    username = (settings.get("username") or "").strip()
+    password = settings.get("api_key") or ""
+
+    login_req = urllib.request.Request(
+        f"{base_url}/auth/login",
+        data=json.dumps({"username": username, "password": password}).encode("utf-8"),
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(login_req, timeout=15) as resp:
+            login_data = json.loads(resp.read().decode("utf-8", errors="replace") or "{}")
+    except urllib.error.HTTPError as e:
+        return "failed", None, f"Đăng nhập Viettel S-Invoice thất bại (HTTP {e.code})", None
+    except Exception as e:
+        return "failed", None, f"Không kết nối được Viettel S-Invoice: {e}", None
+
+    access_token = login_data.get("access_token")
+    if not access_token:
+        return "failed", None, "Đăng nhập Viettel S-Invoice không trả về access_token", None
+
+    vat_percent = float(settings.get("vat_percent") or 0)
+    payment_code, payment_name = _viettel_map_payment(report.get("payment_method"))
+
+    item_infos = []
+    total_without_tax = 0.0
+    total_tax = 0.0
+    for it in items:
+        qty = float(it.get("quantity") or 0)
+        # Product prices in this app are VAT-inclusive (products.price_with_vat),
+        # so back out the pre-tax amount using the configured VAT rate.
+        unit_price_incl_vat = float(it.get("unit_price") or 0)
+        line_incl_vat = qty * unit_price_incl_vat
+        line_without_tax = (
+            round(line_incl_vat / (1 + vat_percent / 100), 2) if vat_percent else line_incl_vat
+        )
+        line_tax = round(line_incl_vat - line_without_tax, 2)
+        total_without_tax += line_without_tax
+        total_tax += line_tax
+        item_infos.append({
+            "itemName": it.get("product_name"),
+            "unitPrice": unit_price_incl_vat,
+            "quantity": qty,
+            "itemTotalAmountWithoutTax": line_without_tax,
+            "taxPercentage": vat_percent,
+            "taxAmount": line_tax,
+        })
+
+    discount = float(report.get("discount_amount") or 0)
+    total_with_tax = max(total_without_tax + total_tax - discount, 0)
+
+    payload = {
+        "generalInvoiceInfo": {
+            "invoiceType": "1",
+            "templateCode": settings.get("invoice_template_code"),
+            "invoiceSeries": settings.get("invoice_series"),
+            "currencyCode": "VND",
+            "exchangeRate": "1",
+            "invoiceNote": f"Đơn hàng #{report.get('id')}",
+            "paymentStatus": True,
+        },
+        "sellerInfo": {
+            "sellerLegalName": settings.get("seller_legal_name"),
+            "sellerTaxCode": settings.get("tax_code"),
+            "sellerAddressLine": settings.get("seller_address"),
+            "sellerPhoneNumber": settings.get("seller_phone"),
+            "sellerEmail": settings.get("seller_email"),
+            "sellerBankName": settings.get("seller_bank_name"),
+            "sellerBankAccount": settings.get("seller_bank_account"),
+        },
+        "buyerInfo": {
+            "buyerName": (report.get("customer_name") or "").strip() or "Khách lẻ",
+            "buyerAddressLine": "",
+            "buyerPhoneNumber": report.get("customer_phone"),
+        },
+        "payments": [{"paymentMethod": payment_code, "paymentMethodName": payment_name}],
+        "itemInfo": item_infos,
+        "summarizeInfo": {
+            "sumOfTotalLineAmountWithoutTax": round(total_without_tax, 2),
+            "totalAmountWithoutTax": round(total_without_tax, 2),
+            "totalTaxAmount": round(total_tax, 2),
+            "totalAmountWithTax": round(total_with_tax, 2),
+        },
+        "taxBreakdowns": [{
+            "taxPercentage": vat_percent,
+            "taxableAmount": round(total_without_tax, 2),
+            "taxAmount": round(total_tax, 2),
+        }],
+    }
+
+    invoice_req = urllib.request.Request(
+        f"{base_url}/services/einvoiceapplication/api/InvoiceAPI/InvoiceWS/createInvoice/{username}",
+        data=json.dumps(payload).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(invoice_req, timeout=20) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as e:
+        err_body = ""
+        try:
+            err_body = e.read().decode("utf-8", errors="replace")
+        except Exception:
+            pass
+        return "failed", None, f"Viettel S-Invoice phản hồi lỗi HTTP {e.code}", err_body[:2000]
+    except Exception as e:
+        return "failed", None, str(e), None
+
+    try:
+        resp_json = json.loads(raw) if raw else {}
+    except ValueError:
+        resp_json = {}
+
+    error_code = resp_json.get("errorCode")
+    if error_code:
+        msg = resp_json.get("description") or f"Lỗi Viettel S-Invoice: {error_code}"
+        return "failed", None, msg, raw[:2000]
+
+    result = resp_json.get("result") or {}
+    invoice_no = result.get("invoiceNo") or result.get("reservationCode")
+    if not invoice_no:
+        return "failed", None, "Viettel S-Invoice không trả về số hóa đơn", raw[:2000]
+    return "issued", invoice_no, None, raw[:2000]
+
+
+def _issue_generic_einvoice(settings: dict, report: dict, items: list[dict]):
+    """Best-effort e-invoice issuance for any provider without a dedicated
+    integration: posts a generic invoice payload to whichever endpoint is
+    configured in einvoice_settings.
 
     This has NOT been validated against any specific licensed provider's
-    certified schema — MISA/VNPT/Viettel/BKAV each have their own documented
-    API, auth flow and digital-signature requirements. Treat any "issued"
-    result here as a draft record, not a tax-valid invoice, until this is
-    adapted to a real provider's official API documentation.
+    certified schema — MISA/VNPT/BKAV each have their own documented API,
+    auth flow and digital-signature requirements. Treat any "issued" result
+    here as a draft record, not a tax-valid invoice, until this is adapted
+    to that provider's official API documentation (see
+    _issue_viettel_invoice for what a real per-provider integration looks
+    like).
+
+    Returns (status, invoice_number, error_message, response_snippet).
     """
-    db = get_db()
-    with db.cursor() as cur:
-        cur.execute(
-            "SELECT id, created_by, store_code, report_date, sale_out, discount_amount, "
-            "customer_name, customer_phone, payment_method "
-            "FROM sales_reports WHERE id = %s",
-            (report_id,),
-        )
-        report = cur.fetchone()
-    if not report:
-        return jsonify({"error": "Report not found"}), 404
-    if not _can_access_report(report):
-        return _forbidden()
-
-    with db.cursor() as cur:
-        cur.execute(
-            "SELECT 1 FROM einvoice_records WHERE report_id = %s AND status = 'issued' LIMIT 1",
-            (report_id,),
-        )
-        if cur.fetchone():
-            return jsonify({"error": "Đơn này đã được xuất hóa đơn điện tử"}), 409
-
-    with db.cursor() as cur:
-        cur.execute(
-            "SELECT provider, tax_code, api_base_url, api_key, is_active "
-            "FROM einvoice_settings ORDER BY id DESC LIMIT 1"
-        )
-        settings = cur.fetchone()
-    if not settings or not settings.get("is_active") or not settings.get("api_base_url"):
-        return jsonify({
-            "error": "Chưa cấu hình hoặc chưa kích hoạt kết nối hóa đơn điện tử. "
-                     "Vào Cá nhân → Cài đặt hóa đơn điện tử để cấu hình."
-        }), 400
-
-    with db.cursor() as cur:
-        cur.execute(
-            "SELECT product_name, quantity, unit_price, unit FROM sale_items "
-            "WHERE report_id = %s ORDER BY id ASC",
-            (report_id,),
-        )
-        items = cur.fetchall()
-
     total_amount = max(
         float(report.get("sale_out") or 0) - float(report.get("discount_amount") or 0), 0
     )
@@ -1931,14 +2071,9 @@ def api_issue_report_einvoice(report_id: int):
         },
     )
 
-    status = "failed"
-    invoice_number = None
-    error_message = None
-    response_snippet = None
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             raw = resp.read().decode("utf-8", errors="replace")
-            response_snippet = raw[:2000]
             try:
                 resp_json = json.loads(raw) if raw else {}
             except ValueError:
@@ -1948,16 +2083,77 @@ def api_issue_report_einvoice(report_id: int):
                 or resp_json.get("so_hoa_don") or resp_json.get("id")
             )
             if not invoice_number:
-                invoice_number = f"DRAFT-{report_id}-{int(datetime.now().timestamp())}"
-            status = "issued"
+                invoice_number = f"DRAFT-{report['id']}-{int(datetime.now().timestamp())}"
+            return "issued", invoice_number, None, raw[:2000]
     except urllib.error.HTTPError as e:
-        error_message = f"Nhà cung cấp phản hồi lỗi HTTP {e.code}"
+        response_snippet = None
         try:
             response_snippet = e.read().decode("utf-8", errors="replace")[:2000]
         except Exception:
             pass
+        return "failed", None, f"Nhà cung cấp phản hồi lỗi HTTP {e.code}", response_snippet
     except Exception as e:
-        error_message = str(e)
+        return "failed", None, str(e), None
+
+
+@app.post("/api/reports/<int:report_id>/einvoice")
+@login_required
+def api_issue_report_einvoice(report_id: int):
+    """Issue an e-invoice for a sales report, dispatching to a provider-
+    specific integration when one exists (currently Viettel S-Invoice) and
+    falling back to a generic best-effort POST otherwise."""
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, created_by, store_code, report_date, sale_out, discount_amount, "
+            "customer_name, customer_phone, payment_method "
+            "FROM sales_reports WHERE id = %s",
+            (report_id,),
+        )
+        report = cur.fetchone()
+    if not report:
+        return jsonify({"error": "Report not found"}), 404
+    if not _can_access_report(report):
+        return _forbidden()
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM einvoice_records WHERE report_id = %s AND status = 'issued' LIMIT 1",
+            (report_id,),
+        )
+        if cur.fetchone():
+            return jsonify({"error": "Đơn này đã được xuất hóa đơn điện tử"}), 409
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT provider, tax_code, api_base_url, api_key, username, is_active, "
+            "seller_legal_name, seller_address, seller_phone, seller_email, seller_bank_name, "
+            "seller_bank_account, invoice_template_code, invoice_series, vat_percent "
+            "FROM einvoice_settings ORDER BY id DESC LIMIT 1"
+        )
+        settings = cur.fetchone()
+    if not settings or not settings.get("is_active") or not settings.get("api_base_url"):
+        return jsonify({
+            "error": "Chưa cấu hình hoặc chưa kích hoạt kết nối hóa đơn điện tử. "
+                     "Vào Cá nhân → Cài đặt hóa đơn điện tử để cấu hình."
+        }), 400
+
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT product_name, quantity, unit_price, unit FROM sale_items "
+            "WHERE report_id = %s ORDER BY id ASC",
+            (report_id,),
+        )
+        items = cur.fetchall()
+
+    if settings.get("provider") == "viettel":
+        status, invoice_number, error_message, response_snippet = _issue_viettel_invoice(
+            settings, report, items
+        )
+    else:
+        status, invoice_number, error_message, response_snippet = _issue_generic_einvoice(
+            settings, report, items
+        )
 
     with db.cursor() as cur:
         cur.execute(

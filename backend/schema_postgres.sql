@@ -511,6 +511,21 @@ CREATE TABLE IF NOT EXISTS einvoice_settings (
     FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- Migration: seller/invoice-template details needed to build a real Viettel
+-- S-Invoice createInvoice request (generalInvoiceInfo/sellerInfo fields per
+-- Viettel's documented schema) — the original columns above only covered
+-- generic connection details, not what's needed to actually construct a
+-- provider-specific invoice payload.
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS seller_legal_name TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS seller_address TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS seller_phone TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS seller_email TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS seller_bank_name TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS seller_bank_account TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS invoice_template_code TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS invoice_series TEXT;
+ALTER TABLE einvoice_settings ADD COLUMN IF NOT EXISTS vat_percent REAL NOT NULL DEFAULT 8;
+
 -- Draft e-invoice issuance attempts for a sales report/order. This is a
 -- best-effort integration against whichever generic endpoint is configured
 -- in einvoice_settings — it has not been validated against any specific
