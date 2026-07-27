@@ -5,7 +5,6 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../providers/product_provider.dart';
 import '../../widgets/common/add_product_dialog.dart';
-import '../../widgets/common/gradient_fab.dart';
 
 class ProductListScreen extends StatefulWidget {
   const ProductListScreen({super.key});
@@ -105,12 +104,14 @@ class _ProductListScreenState extends State<ProductListScreen> {
           appBar: AppBar(
             titleSpacing: 4,
             title: const Text('Danh sách sản phẩm'),
-            actions: [_buildCountBadge('${products.length} sản phẩm')],
-          ),
-          floatingActionButton: GradientFab(
-            icon: Icons.add_rounded,
-            tooltip: 'Thêm sản phẩm',
-            onPressed: () => showAddProductDialog(context),
+            actions: [
+              _buildCountBadge('${products.length} sản phẩm'),
+              IconButton(
+                icon: const Icon(Icons.add_rounded),
+                tooltip: 'Thêm sản phẩm',
+                onPressed: () => showAddProductDialog(context),
+              ),
+            ],
           ),
           body: Column(
             children: [

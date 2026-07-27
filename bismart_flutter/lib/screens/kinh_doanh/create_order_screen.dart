@@ -406,35 +406,12 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               onChanged: (_) => setDialogState(() {}),
             ),
             const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: revenueCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration:
-                        const InputDecoration(labelText: 'Doanh thu', suffixText: 'đ', isDense: true),
-                    onChanged: (_) => setDialogState(() {}),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text('NU', style: AppTextStyles.metricLabel),
-                IconButton(
-                  onPressed: nu > 0 ? () => setDialogState(() => nu--) : null,
-                  icon: const Icon(Icons.remove_circle_rounded),
-                  color: AppColors.primary,
-                  visualDensity: VisualDensity.compact,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
-                Text('$nu', style: AppTextStyles.sectionHeader),
-                IconButton(
-                  onPressed: () => setDialogState(() => nu++),
-                  icon: const Icon(Icons.add_circle_rounded),
-                  color: AppColors.primary,
-                  visualDensity: VisualDensity.compact,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
-              ],
+            TextField(
+              controller: revenueCtrl,
+              keyboardType: TextInputType.number,
+              decoration:
+                  const InputDecoration(labelText: 'Doanh thu', suffixText: 'đ', isDense: true),
+              onChanged: (_) => setDialogState(() {}),
             ),
             const SizedBox(height: 10),
             Text('Phương thức thanh toán', style: AppTextStyles.metricLabel),
@@ -511,6 +488,28 @@ class _CreateOrderScreenState extends State<CreateOrderScreen> {
               controller: customerPhoneCtrl,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(labelText: 'SĐT khách hàng', isDense: true),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Text('Số NU', style: AppTextStyles.metricLabel),
+                const Spacer(),
+                IconButton(
+                  onPressed: nu > 0 ? () => setDialogState(() => nu--) : null,
+                  icon: const Icon(Icons.remove_circle_rounded),
+                  color: AppColors.primary,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+                Text('$nu', style: AppTextStyles.sectionHeader),
+                IconButton(
+                  onPressed: () => setDialogState(() => nu++),
+                  icon: const Icon(Icons.add_circle_rounded),
+                  color: AppColors.primary,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                ),
+              ],
             ),
           ],
         );

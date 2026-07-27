@@ -985,7 +985,7 @@ def api_update_employee(employee_id: int):
 
     with db.cursor() as cur:
         cur.execute(
-            "SELECT id, full_name, employee_code, position, work_location, score, email, phone, address, status, department, province, area, store_code, rank_level "
+            "SELECT id, full_name, employee_code, position, work_location, score, email, phone, date_of_birth, cccd, address, status, department, province, area, store_code, rank_level "
             "FROM employees WHERE id = %s LIMIT 1",
             (employee_id,),
         )
@@ -1001,7 +1001,7 @@ def api_update_employee(employee_id: int):
 
     with db.cursor() as cur:
         cur.execute(
-            "UPDATE employees SET full_name = %s, employee_code = %s, position = %s, work_location = %s, score = %s, email = %s, phone = %s, address = %s, status = %s, department = %s, province = %s, area = %s, store_code = %s, rank_level = %s "
+            "UPDATE employees SET full_name = %s, employee_code = %s, position = %s, work_location = %s, score = %s, email = %s, phone = %s, date_of_birth = %s, cccd = %s, address = %s, status = %s, department = %s, province = %s, area = %s, store_code = %s, rank_level = %s "
             "WHERE id = %s "
             "RETURNING id, full_name, employee_code, position, work_location, score, email, phone, date_of_birth, cccd, address, status, department, province, area, created_date, probation_date, official_date, resign_date, resign_reason, avatar_url, store_code, rank_level",
             (
@@ -1012,6 +1012,8 @@ def api_update_employee(employee_id: int):
                 data.get("score", existing.get("score") or 0),
                 data.get("email", existing.get("email")),
                 data.get("phone", existing.get("phone")),
+                data.get("dateOfBirth", existing.get("date_of_birth")),
+                data.get("cccd", existing.get("cccd")),
                 data.get("address", existing.get("address")),
                 data.get("status", existing.get("status")),
                 data.get("department", existing.get("department")),

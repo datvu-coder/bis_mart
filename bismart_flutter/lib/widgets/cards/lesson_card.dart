@@ -161,20 +161,41 @@ class LessonCard extends StatelessWidget {
             ),
           ],
         ),
-        if (onHistory != null)
+        if (onJoin != null || onHistory != null)
           Padding(
             padding: const EdgeInsets.only(top: 6),
-            child: TextButton.icon(
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                minimumSize: const Size(0, 28),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                visualDensity: VisualDensity.compact,
-              ),
-              onPressed: onHistory,
-              icon: const Icon(Icons.history_rounded, size: 16),
-              label: const Text('Lịch sử',
-                  style: TextStyle(fontSize: 12.5)),
+            child: Row(
+              children: [
+                if (onJoin != null)
+                  Expanded(
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        minimumSize: const Size(0, 28),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                        foregroundColor: AppColors.primary,
+                      ),
+                      onPressed: onJoin,
+                      icon: const Icon(Icons.play_circle_outline_rounded, size: 16),
+                      label: const Text('Tham gia',
+                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                if (onHistory != null)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      minimumSize: const Size(0, 28),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: onHistory,
+                    icon: const Icon(Icons.history_rounded, size: 16),
+                    label: const Text('Lịch sử',
+                        style: TextStyle(fontSize: 12.5)),
+                  ),
+              ],
             ),
           ),
       ],

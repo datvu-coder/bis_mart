@@ -430,7 +430,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     return DataPanel(
       title: 'Danh sách báo cáo (${reports.length})',
       padding: isMobile
-          ? const EdgeInsets.fromLTRB(0, 14, 0, 18)
+          ? const EdgeInsets.fromLTRB(12, 14, 12, 18)
           : null,
       child: reports.isEmpty
           ? Padding(
@@ -1306,33 +1306,32 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
   // ── Detail / dialogs ──────────────────────────────────────────────────────
 
   void _showReportDetail(SalesReport report) {
-    showModalBottomSheet(
+    // Slides down from the top (rather than the usual bottom sheet) so it
+    // reads as a "drop-down" report panel when opened from Lịch sử bán hàng.
+    showGeneralDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        expand: false,
-        builder: (context, scrollController) => Padding(
-          padding: const EdgeInsets.all(20),
-          child: ListView(
-            controller: scrollController,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
+      barrierLabel: 'report-detail',
+      barrierDismissible: true,
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (ctx, animation, secondaryAnimation) {
+        return Align(
+          alignment: Alignment.topCenter,
+          child: SafeArea(
+            bottom: false,
+            child: Material(
+              color: AppColors.cardBg,
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+              clipBehavior: Clip.antiAlias,
+              child: ConstrainedBox(
+                constraints:
+                    BoxConstraints(maxHeight: MediaQuery.of(ctx).size.height * 0.85),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      Row(
                 children: [
                   Container(
                     width: 48,
@@ -1434,10 +1433,22 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
               const Divider(height: 1),
               const SizedBox(height: 16),
               _EinvoicePanel(reportId: report.id),
-            ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
+      transitionBuilder: (ctx, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero)
+              .animate(curved),
+          child: child,
+        );
+      },
     );
   }
 

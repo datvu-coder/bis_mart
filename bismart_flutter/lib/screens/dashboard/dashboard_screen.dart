@@ -7,7 +7,6 @@ import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../widgets/common/filter_dropdown.dart';
-import '../../widgets/common/header_action_cluster.dart';
 import '../../widgets/charts/revenue_bar_chart.dart';
 import '../../widgets/charts/product_h_chart.dart';
 
@@ -82,7 +81,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildHeader(provider, data, showSecondaryActions: false),
+                _buildHeader(provider, data),
                 const SizedBox(height: 20),
                 _buildMetricCards(data, true),
                 const SizedBox(height: 20),
@@ -131,8 +130,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
 
-        // Single-view layout for mobile/tablet — Biểu đồ and Xếp hạng move
-        // into header action buttons instead of separate tabs.
+        // Single-view layout for mobile/tablet — charts and ranking are
+        // shown inline below the announcement banner, same as desktop,
+        // instead of behind separate header actions.
         return SingleChildScrollView(
           padding: EdgeInsets.all(contentPad),
           child: Column(
@@ -143,6 +143,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _buildMetricCards(data, isWide),
               const SizedBox(height: 16),
               _buildAnnouncementBanner(data),
+              const SizedBox(height: 16),
+              _buildChartCard(AppStrings.bieuDoDoanhSo, Icons.bar_chart_rounded,
+                  RevenueBarChart(data: data.revenueChart)),
+              const SizedBox(height: 16),
+              _buildChartCard(AppStrings.bieuDoSanPham, Icons.pie_chart_rounded,
+                  ProductHChart(data: data.productChart)),
+              const SizedBox(height: 16),
+              if (data.featuredPrograms.isNotEmpty) ...[
+                _buildFeaturedPrograms(data),
+              ],
+              _buildTopEmployees(data),
             ],
           ),
         );
@@ -150,77 +161,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _openChartsScreen(dynamic data) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(title: const Text('Biểu đồ')),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                _buildChartCard(AppStrings.bieuDoDoanhSo, Icons.bar_chart_rounded, RevenueBarChart(data: data.revenueChart)),
-                const SizedBox(height: 16),
-                _buildChartCard(AppStrings.bieuDoSanPham, Icons.pie_chart_rounded, ProductHChart(data: data.productChart)),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _openRankingScreen(dynamic data) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          backgroundColor: AppColors.background,
-          appBar: AppBar(title: const Text('Xếp hạng')),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                if (data.featuredPrograms.isNotEmpty) _buildFeaturedPrograms(data),
-                _buildTopEmployees(data),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(DashboardProvider provider, dynamic data,
-      {bool showSecondaryActions = true}) {
+  Widget _buildHeader(DashboardProvider provider, dynamic data) {
     final isCompactMobile = MediaQuery.of(context).size.width < 430;
-    final trailing = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FilterDropdown(
-          value: provider.filterType,
-          onChanged: provider.setFilter,
-        ),
-        if (showSecondaryActions) ...[
-          const SizedBox(width: 8),
-          HeaderActionCluster(
-            actions: [
-              HeaderAction(
-                icon: Icons.bar_chart_rounded,
-                label: 'Biểu đồ',
-                onPressed: () => _openChartsScreen(data),
-              ),
-              HeaderAction(
-                icon: Icons.emoji_events_rounded,
-                label: 'Xếp hạng',
-                onPressed: () => _openRankingScreen(data),
-              ),
-            ],
-          ),
-        ],
-      ],
+    final trailing = FilterDropdown(
+      value: provider.filterType,
+      onChanged: provider.setFilter,
     );
 
     // Phones keep just the title + trailing actions, matching Nhân

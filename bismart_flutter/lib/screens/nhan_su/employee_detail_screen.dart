@@ -294,6 +294,14 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
   void _showEditDialog() {
     final nameCtrl = TextEditingController(text: _employee.fullName);
     final emailCtrl = TextEditingController(text: _employee.email ?? '');
+    final phoneCtrl = TextEditingController(text: _employee.phone ?? '');
+    final dobCtrl = TextEditingController(text: _employee.dateOfBirth ?? '');
+    final cccdCtrl = TextEditingController(text: _employee.cccd ?? '');
+    final addressCtrl = TextEditingController(text: _employee.address ?? '');
+    final departmentCtrl = TextEditingController(text: _employee.department ?? '');
+    final provinceCtrl = TextEditingController(text: _employee.province ?? '');
+    final areaCtrl = TextEditingController(text: _employee.area ?? '');
+    final statusCtrl = TextEditingController(text: _employee.status ?? '');
     String selectedPosition = _employee.position;
     String? selectedStoreCode = _employee.storeCode;
     bool isSubmitting = false;
@@ -315,6 +323,56 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
             TextField(
               controller: emailCtrl,
               decoration: const InputDecoration(labelText: 'Email'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: phoneCtrl,
+              decoration: const InputDecoration(labelText: 'Số điện thoại'),
+              keyboardType: TextInputType.phone,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: dobCtrl,
+              decoration: const InputDecoration(
+                  labelText: 'Ngày sinh', hintText: 'VD: 1995-05-20'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: cccdCtrl,
+              decoration: const InputDecoration(labelText: 'Số CCCD'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: addressCtrl,
+              decoration: const InputDecoration(labelText: 'Địa chỉ'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: departmentCtrl,
+              decoration: const InputDecoration(labelText: 'Phòng ban'),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: provinceCtrl,
+                    decoration: const InputDecoration(labelText: 'Tỉnh/Thành'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: areaCtrl,
+                    decoration: const InputDecoration(labelText: 'Khu vực'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: statusCtrl,
+              decoration: const InputDecoration(labelText: 'Trạng thái'),
             ),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
@@ -361,6 +419,15 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
                       workLocation: selectedStore?.name ?? '',
                       storeCode: selectedStoreCode,
                       email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
+                      phone: phoneCtrl.text.isNotEmpty ? phoneCtrl.text : null,
+                      dateOfBirth: dobCtrl.text.isNotEmpty ? dobCtrl.text : null,
+                      cccd: cccdCtrl.text.isNotEmpty ? cccdCtrl.text : null,
+                      address: addressCtrl.text.isNotEmpty ? addressCtrl.text : null,
+                      department:
+                          departmentCtrl.text.isNotEmpty ? departmentCtrl.text : null,
+                      province: provinceCtrl.text.isNotEmpty ? provinceCtrl.text : null,
+                      area: areaCtrl.text.isNotEmpty ? areaCtrl.text : null,
+                      status: statusCtrl.text.isNotEmpty ? statusCtrl.text : null,
                     );
                     setDialogState(() => isSubmitting = true);
                     final provider = this.context.read<EmployeeProvider>();

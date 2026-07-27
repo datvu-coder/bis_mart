@@ -48,6 +48,40 @@ class ReceiptPrinterService {
     await socket.close();
   }
 
+  /// Sends an actual short test receipt — unlike [testConnection] (which
+  /// only opens/closes a TCP socket), this confirms the printer really
+  /// prints, and lets the admin check the paper width/alignment look right
+  /// before relying on it for real receipts.
+  static Future<void> printTestPage({
+    required String ip,
+    required int port,
+    required int width,
+  }) async {
+    final bytes = _buildReceiptBytes(
+      storeName: 'BiS MART',
+      date: DateTime.now(),
+      pgName: 'In thử',
+      items: [
+        SaleItem(
+          productId: 'test',
+          productName: 'San pham mau',
+          quantity: 1,
+          unitPrice: 10000,
+        ),
+      ],
+      subtotal: 10000,
+      paymentMethod: 'cash',
+      width: width,
+    );
+    final socket = await Socket.connect(ip, port, timeout: const Duration(seconds: 5));
+    try {
+      socket.add(bytes);
+      await socket.flush();
+    } finally {
+      await socket.close();
+    }
+  }
+
   static String _padRow(String left, String right, int width) {
     final space = width - left.length - right.length;
     if (space <= 0) return '$left $right';
