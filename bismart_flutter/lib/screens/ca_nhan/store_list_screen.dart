@@ -8,7 +8,6 @@ import '../../providers/store_provider.dart';
 import '../../providers/permission_provider.dart';
 import '../../services/location_service.dart';
 import '../../widgets/common/responsive_form.dart';
-import '../../widgets/common/gradient_fab.dart';
 
 class StoreListScreen extends StatefulWidget {
   const StoreListScreen({super.key});
@@ -116,15 +115,16 @@ class _StoreListScreenState extends State<StoreListScreen> {
           appBar: AppBar(
             titleSpacing: 4,
             title: const Text('Danh sách cửa hàng'),
-            actions: [_buildCountBadge('${stores.length} cửa hàng')],
-          ),
-          floatingActionButton: canCreate
-              ? GradientFab(
-                  icon: Icons.add_rounded,
+            actions: [
+              _buildCountBadge('${stores.length} cửa hàng'),
+              if (canCreate)
+                IconButton(
+                  icon: const Icon(Icons.add_rounded),
                   tooltip: 'Thêm cửa hàng',
                   onPressed: () => _showStoreFormDialog(),
-                )
-              : null,
+                ),
+            ],
+          ),
           body: Column(
         children: [
           // Search

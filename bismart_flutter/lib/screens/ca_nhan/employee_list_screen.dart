@@ -7,7 +7,6 @@ import '../../models/employee.dart';
 import '../../providers/employee_provider.dart';
 import '../../providers/store_provider.dart';
 import '../../widgets/common/responsive_form.dart';
-import '../../widgets/common/gradient_fab.dart';
 
 class EmployeeListScreen extends StatefulWidget {
   const EmployeeListScreen({super.key});
@@ -112,12 +111,12 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
             builder: (context, provider, _) =>
                 _buildCountBadge('${provider.employees.length} nhân viên'),
           ),
+          IconButton(
+            icon: const Icon(Icons.add_rounded),
+            tooltip: 'Thêm nhân viên',
+            onPressed: () => _showAddEmployeeDialog(context),
+          ),
         ],
-      ),
-      floatingActionButton: GradientFab(
-        icon: Icons.add_rounded,
-        tooltip: 'Thêm nhân viên',
-        onPressed: () => _showAddEmployeeDialog(context),
       ),
       body: Consumer<EmployeeProvider>(
         builder: (context, provider, _) {

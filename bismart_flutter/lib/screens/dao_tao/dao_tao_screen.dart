@@ -174,6 +174,13 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     final lessonCount = provider.lessons.length;
     final todayEvents = provider.getEventsForDay(DateTime.now()).length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
+    final addLessonAction = _isAdmin()
+        ? IconButton(
+            onPressed: () => _showCreateLessonDialog(provider),
+            icon: const Icon(Icons.add_rounded),
+            tooltip: 'Thêm bài giảng',
+          )
+        : null;
     final communityAction = HeaderActionCluster(
       actions: [
         HeaderAction(
@@ -202,6 +209,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
           Expanded(
             child: Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
           ),
+          if (addLessonAction != null) addLessonAction,
           communityAction,
         ],
       );
@@ -227,6 +235,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
                   ],
                 ),
               ),
+              if (addLessonAction != null) addLessonAction,
               communityAction,
             ],
           ),
@@ -560,13 +569,6 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     return DataPanel(
       title: 'Bài giảng',
       padding: panelPadding,
-      trailing: isAdmin
-          ? IconButton(
-              onPressed: () => _showCreateLessonDialog(provider),
-              icon: const Icon(Icons.add_rounded),
-              tooltip: 'Thêm bài giảng',
-            )
-          : null,
       child: provider.lessons.isEmpty
           ? Padding(
               padding: const EdgeInsets.symmetric(vertical: 20),

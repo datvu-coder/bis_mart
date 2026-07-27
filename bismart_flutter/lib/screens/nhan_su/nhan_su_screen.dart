@@ -231,6 +231,39 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     final activeShiftCount = provider.shifts.length;
     final memberCount = scopedEmployees.length;
     final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
+
+    // Quick check-in/out shortcut — black checkmark when not checked in yet
+    // today, green once checked in, tapping mirrors the GPS check-in card's
+    // buttons below without needing to scroll to it.
+    final currentUserId = context.read<AuthProvider>().currentUser?.id;
+    final todayAtt = provider.attendances.where((a) =>
+        a.employeeId == currentUserId &&
+        a.date.year == DateTime.now().year &&
+        a.date.month == DateTime.now().month &&
+        a.date.day == DateTime.now().day).toList();
+    final headerHasCheckedIn = todayAtt.isNotEmpty && todayAtt.first.isCheckedIn;
+    final headerHasCheckedOut = todayAtt.isNotEmpty && todayAtt.first.checkOutTime != null;
+    final checkInAction = IconButton(
+      onPressed: _isCheckingIn
+          ? null
+          : headerHasCheckedOut
+              ? null
+              : headerHasCheckedIn
+                  ? () => _handleGpsCheckOut(provider)
+                  : () => _handleGpsCheckIn(provider),
+      icon: _isCheckingIn
+          ? const SizedBox(
+              width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+          : Icon(
+              Icons.check_circle_rounded,
+              color: headerHasCheckedIn ? AppColors.success : AppColors.textDark,
+            ),
+      tooltip: headerHasCheckedOut
+          ? 'Đã hoàn thành chấm công hôm nay'
+          : headerHasCheckedIn
+              ? 'Chấm công ra'
+              : 'Chấm công vào',
+    );
     final moreActions = HeaderActionCluster(
       actions: [
         HeaderAction(
@@ -269,6 +302,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           Expanded(
             child: Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
           ),
+          checkInAction,
           moreActions,
         ],
       );
@@ -296,6 +330,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   ],
                 ),
               ),
+              checkInAction,
               moreActions,
             ],
           ),

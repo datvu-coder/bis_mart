@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/sales_report.dart';
@@ -38,6 +42,7 @@ class ReceiptPreviewScreen extends StatefulWidget {
 
 class _ReceiptPreviewScreenState extends State<ReceiptPreviewScreen> {
   bool _printing = false;
+  bool _sharing = false;
 
   Future<void> _print() async {
     setState(() => _printing = true);
@@ -81,9 +86,10 @@ class _ReceiptPreviewScreenState extends State<ReceiptPreviewScreen> {
     return left + ' ' * space + right;
   }
 
-  /// Plain-text version of the receipt — used for the "Sao chép hóa đơn"
-  /// fallback so staff can paste it into Zalo/SMS/email when no WiFi
-  /// printer is configured, instead of being stuck with only "In hoá đơn".
+  /// Plain-text version of the receipt — reused both as the content laid
+  /// out in the shared PDF and previously for the clipboard fallback, so
+  /// staff can send it via Zalo/SMS/email when no WiFi printer is
+  /// configured, instead of being stuck with only "In hoá đơn".
   String _buildReceiptText() {
     const width = 32;
     final divider = '-' * width;
@@ -122,16 +128,41 @@ class _ReceiptPreviewScreenState extends State<ReceiptPreviewScreen> {
     return buffer.toString();
   }
 
-  Future<void> _copyToClipboard() async {
-    await Clipboard.setData(ClipboardData(text: _buildReceiptText()));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đã sao chép hoá đơn'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.success,
-      ),
-    );
+  Future<void> _shareReceipt() async {
+    setState(() => _sharing = true);
+    try {
+      final doc = pw.Document();
+      doc.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.roll80,
+          build: (context) => pw.Text(
+            _buildReceiptText(),
+            style: pw.TextStyle(font: pw.Font.courier(), fontSize: 9),
+          ),
+        ),
+      );
+      final bytes = await doc.save();
+      final dir = await getTemporaryDirectory();
+      final file = File(
+          '${dir.path}/hoa_don_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await file.writeAsBytes(bytes);
+      if (!mounted) return;
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'Hoá đơn bán hàng - ${widget.storeName}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Chia sẻ hoá đơn thất bại: $e'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
   }
 
   @override
@@ -228,9 +259,14 @@ class _ReceiptPreviewScreenState extends State<ReceiptPreviewScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: _copyToClipboard,
-                          icon: const Icon(Icons.copy_rounded, size: 16),
-                          label: const Text('Sao chép'),
+                          onPressed: _sharing ? null : _shareReceipt,
+                          icon: _sharing
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.share_rounded, size: 16),
+                          label: const Text('Chia sẻ'),
                         ),
                       ),
                     ],

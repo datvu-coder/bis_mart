@@ -19,6 +19,7 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
   int _width = 32;
   bool _loading = true;
   bool _testing = false;
+  bool _printingTest = false;
 
   @override
   void initState() {
@@ -90,6 +91,35 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
       );
     } finally {
       if (mounted) setState(() => _testing = false);
+    }
+  }
+
+  Future<void> _printTest() async {
+    final ip = _ipCtrl.text.trim();
+    if (ip.isEmpty) return;
+    final port = int.tryParse(_portCtrl.text.trim()) ?? 9100;
+    setState(() => _printingTest = true);
+    try {
+      await ReceiptPrinterService.printTestPage(ip: ip, port: port, width: _width);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã gửi lệnh in thử'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('In thử thất bại: $e'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _printingTest = false);
     }
   }
 
@@ -189,6 +219,21 @@ class _PrinterSettingsScreenState extends State<PrinterSettingsScreen> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _printingTest ? null : _printTest,
+                    icon: _printingTest
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                          )
+                        : const Icon(Icons.print_rounded, size: 18),
+                    label: Text(_printingTest ? 'Đang in...' : 'In thử'),
+                  ),
                 ),
               ],
             ),

@@ -991,9 +991,18 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
             ),
             const SizedBox(height: 14),
             Text('Phiên bản $_appVersion', style: AppTextStyles.bodyText),
-            const SizedBox(height: 6),
+            const SizedBox(height: 10),
             Text(
-              'Hệ thống quản lý chuỗi cửa hàng dinh dưỡng.',
+              "Bi'S MART đồng hành cùng chuỗi cửa hàng dinh dưỡng của bạn trong "
+              'vận hành hằng ngày — từ chấm công GPS, quản lý nhân sự và xếp '
+              'hạng hiệu suất, đến bán hàng tại quầy, báo cáo doanh thu, xuất '
+              'hóa đơn điện tử và đào tạo đội ngũ, tất cả trên một ứng dụng duy nhất.',
+              style: AppTextStyles.caption,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Được xây dựng để đơn giản, nhanh và đáng tin cậy, giúp đội ngũ '
+              'tập trung vào điều quan trọng nhất: chăm sóc khách hàng thật tốt.',
               style: AppTextStyles.caption,
             ),
           ],
