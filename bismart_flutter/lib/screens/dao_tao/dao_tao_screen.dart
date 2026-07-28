@@ -170,14 +170,18 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
 
   // ── Header ────────────────────────────────────────────────────────────────
 
+  // Hero-style header — mirrors Nhân sự's gradient "primary action" card:
+  // a "Tiếp tục học" shortcut to whatever lesson is in progress (or next
+  // unstarted one) up front, instead of a plain info card with no CTA.
   Widget _buildScreenHeader(TrainingProvider provider, bool emphasize) {
     final lessonCount = provider.lessons.length;
     final todayEvents = provider.getEventsForDay(DateTime.now()).length;
-    final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
+    final postCount = provider.posts.length;
+
     final addLessonAction = _isAdmin()
         ? IconButton(
             onPressed: () => _showCreateLessonDialog(provider),
-            icon: const Icon(Icons.add_rounded),
+            icon: const Icon(Icons.add_rounded, color: AppColors.white),
             tooltip: 'Thêm bài giảng',
           )
         : null;
@@ -201,125 +205,206 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
       ],
     );
 
-    // Phones keep just the title + community action — the KPI chips already
-    // dropped their icons/numbers there, so a full card adds nothing.
-    if (isCompactMobile) {
-      return Row(
-        children: [
-          Expanded(
-            child: Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
-          ),
-          if (addLessonAction != null) addLessonAction,
-          communityAction,
-        ],
-      );
+    // Resume the lesson currently in progress; if none, offer the first
+    // one not yet started; if everything is done, no CTA is shown.
+    Lesson? resumeLesson;
+    for (final l in provider.lessons) {
+      if (l.progress > 0 && l.progress < 1) {
+        resumeLesson = l;
+        break;
+      }
     }
+    resumeLesson ??= () {
+      for (final l in provider.lessons) {
+        if (l.completedPartCount == 0) return l;
+      }
+      return null;
+    }();
+    final allDone = provider.lessons.isNotEmpty && resumeLesson == null;
 
-    return Container(
+    final hero = Container(
       width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 20 : 14),
-      decoration: AppDecorations.card,
+      padding: EdgeInsets.all(emphasize ? 24 : 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.panel),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.28),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
-                    const SizedBox(height: 2),
-                    Text('Cộng đồng, bài giảng & lịch đào tạo',
-                        style: AppTextStyles.caption),
-                  ],
-                ),
+                child: Text(AppStrings.daoTao,
+                    style: AppTextStyles.appTitle.copyWith(color: AppColors.white)),
               ),
               if (addLessonAction != null) addLessonAction,
               communityAction,
             ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _buildKpiChip(
-                  icon: Icons.play_lesson_rounded,
-                  label: 'Bài giảng',
-                  value: '$lessonCount',
-                  color: AppColors.info,
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
                 ),
-                _buildKpiChip(
-                  icon: Icons.event_rounded,
-                  label: 'Hôm nay',
-                  value: '$todayEvents sự kiện',
-                  color: AppColors.warning,
+                child: const Icon(Icons.school_rounded, color: AppColors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Nâng cao kỹ năng mỗi ngày',
+                      style: TextStyle(color: AppColors.white, fontSize: 17, fontWeight: FontWeight.w700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '$lessonCount bài giảng · $todayEvents sự kiện hôm nay',
+                      style: TextStyle(color: AppColors.white.withValues(alpha: 0.8), fontSize: 12.5),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                _buildKpiChip(
-                  icon: Icons.people_rounded,
-                  label: 'Bài viết',
-                  value: '${provider.posts.length}',
-                  color: AppColors.primary,
+              ),
+            ],
+          ),
+          if (resumeLesson != null || allDone) ...[
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: resumeLesson != null ? () => _showLessonDetail(resumeLesson) : null,
+                icon: Icon(
+                  resumeLesson != null ? Icons.play_circle_rounded : Icons.check_circle_rounded,
+                  size: 20,
                 ),
-              ],
+                label: Text(
+                  resumeLesson != null
+                      ? 'Tiếp tục: ${resumeLesson.title}'
+                      : 'Đã hoàn thành tất cả bài giảng!',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor:
+                      allDone ? AppColors.white.withValues(alpha: 0.16) : AppColors.white,
+                  foregroundColor: allDone ? AppColors.white : AppColors.primary,
+                  disabledBackgroundColor: AppColors.white.withValues(alpha: 0.16),
+                  disabledForegroundColor: AppColors.white,
+                  padding: EdgeInsets.symmetric(vertical: emphasize ? 16 : 14),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
+                ),
+              ),
             ),
+          ],
         ],
       ),
     );
+
+    final statCard = Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: AppDecorations.card,
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildStatItem(
+              icon: Icons.play_lesson_rounded,
+              value: '$lessonCount',
+              label: 'Bài giảng',
+              color: AppColors.info,
+            ),
+          ),
+          const SizedBox(
+            height: 40,
+            child: VerticalDivider(width: 20, thickness: 1, color: AppColors.divider),
+          ),
+          Expanded(
+            child: _buildStatItem(
+              icon: Icons.event_rounded,
+              value: '$todayEvents',
+              label: 'Sự kiện hôm nay',
+              color: AppColors.warning,
+              onTap: _openSchedulePanelScreen,
+            ),
+          ),
+          const SizedBox(
+            height: 40,
+            child: VerticalDivider(width: 20, thickness: 1, color: AppColors.divider),
+          ),
+          Expanded(
+            child: _buildStatItem(
+              icon: Icons.people_rounded,
+              value: '$postCount',
+              label: 'Bài viết',
+              color: AppColors.primary,
+              onTap: _openCommunityScreen,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Column(
+      children: [hero, statCard],
+    );
   }
 
-  Widget _buildKpiChip({
+  Widget _buildStatItem({
     required IconData icon,
-    required String label,
     required String value,
+    required String label,
     required Color color,
-    bool compact = false,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 8 : 12,
-        vertical: compact ? 8 : 10,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: compact
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption.copyWith(
-                      fontSize: 10, color: AppColors.textGrey, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption
-                      .copyWith(color: color, fontWeight: FontWeight.w800),
-                ),
-              ],
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 16, color: color),
-                const SizedBox(width: 8),
-                Text('$label: ',
-                    style: AppTextStyles.caption.copyWith(
-                        color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
-                Text(value,
-                    style: AppTextStyles.caption
-                        .copyWith(color: color, fontWeight: FontWeight.w800)),
-              ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.row),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+              child: Icon(icon, size: 17, color: color),
             ),
+            const SizedBox(height: 6),
+            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: AppTextStyles.caption.copyWith(fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
