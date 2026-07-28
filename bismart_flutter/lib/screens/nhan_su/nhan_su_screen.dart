@@ -37,6 +37,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   bool _isCheckingIn = false;
   String? _locationError;
   double? _lastDistance;
+  bool _showAllToday = false;
 
   @override
   void initState() {
@@ -1032,6 +1033,17 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       );
     }
 
+    // Collapse to a short default list so the panel doesn't force a long
+    // scroll for stores with many staff — "Xem thêm" reveals the rest.
+    const collapsedCount = 4;
+    final totalCount = notCheckedIn.length + provider.attendances.length;
+    final showAll = _showAllToday || totalCount <= collapsedCount * 2;
+    final notCheckedInShown =
+        showAll ? notCheckedIn : notCheckedIn.take(collapsedCount).toList();
+    final attendancesShown =
+        showAll ? provider.attendances : provider.attendances.take(collapsedCount).toList();
+    final hiddenCount = totalCount - notCheckedInShown.length - attendancesShown.length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1039,7 +1051,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           Text('Chưa chấm công (${notCheckedIn.length})',
               style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600, color: AppColors.error)),
           const SizedBox(height: 8),
-          ...notCheckedIn.map((s) => _buildNotCheckedInTile(s, provider)),
+          ...notCheckedInShown.map((s) => _buildNotCheckedInTile(s, provider)),
           const SizedBox(height: 14),
         ],
         if (provider.attendances.isNotEmpty) ...[
@@ -1047,7 +1059,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
             style: AppTextStyles.bodyText.copyWith(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
         ],
-        ...provider.attendances.map((att) {
+        ...attendancesShown.map((att) {
           Employee? employee;
           try {
             employee = provider.employees.firstWhere((e) => e.id == att.employeeId);
@@ -1198,6 +1210,22 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                   ),
           );
         }),
+        if (!showAll && hiddenCount > 0)
+          Center(
+            child: TextButton.icon(
+              onPressed: () => setState(() => _showAllToday = true),
+              icon: const Icon(Icons.expand_more_rounded, size: 18),
+              label: Text('Xem thêm $hiddenCount người'),
+            ),
+          )
+        else if (_showAllToday && totalCount > collapsedCount * 2)
+          Center(
+            child: TextButton.icon(
+              onPressed: () => setState(() => _showAllToday = false),
+              icon: const Icon(Icons.expand_less_rounded, size: 18),
+              label: const Text('Thu gọn'),
+            ),
+          ),
       ],
     );
   }

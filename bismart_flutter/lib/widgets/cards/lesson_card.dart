@@ -29,6 +29,7 @@ class LessonCard extends StatelessWidget {
     final percentText = '${(progress * 100).round()}%';
     final isDone = lesson.partCount > 0 &&
         lesson.completedPartCount >= lesson.partCount;
+    final isNew = !isDone && lesson.completedPartCount == 0;
     return Material(
       color: AppColors.cardBg,
       borderRadius: BorderRadius.circular(16),
@@ -48,7 +49,7 @@ class LessonCard extends StatelessWidget {
             children: [
               _buildThumb(),
               const SizedBox(width: 12),
-              Expanded(child: _buildBody(percentText, isDone, progress)),
+              Expanded(child: _buildBody(percentText, isDone, isNew, progress)),
             ],
           ),
         ),
@@ -88,7 +89,7 @@ class LessonCard extends StatelessWidget {
     );
   }
 
-  Widget _buildBody(String percentText, bool isDone, double progress) {
+  Widget _buildBody(String percentText, bool isDone, bool isNew, double progress) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -131,7 +132,10 @@ class LessonCard extends StatelessWidget {
             _chip(Icons.group_outlined, lesson.targetRole),
             if (isDone)
               _chip(Icons.verified_rounded, 'Hoàn thành',
-                  color: AppColors.success),
+                  color: AppColors.success)
+            else if (isNew)
+              _chip(Icons.fiber_new_rounded, 'Mới',
+                  color: AppColors.warning),
           ],
         ),
         const SizedBox(height: 8),
