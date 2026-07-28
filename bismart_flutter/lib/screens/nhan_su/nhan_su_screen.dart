@@ -218,6 +218,13 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     );
   }
 
+  static const _weekdayNames = [
+    'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'
+  ];
+
+  // Hero-style header — a gradient "clock-in" card up top instead of the
+  // previous plain white info card, so the one action people open this tab
+  // for every day (chấm công) reads as the headline, not a small icon.
   Widget _buildScreenHeader(EmployeeProvider provider, bool canManage, bool emphasize) {
     final myStoreCode = context.read<AuthProvider>().currentUser?.storeCode;
     final scopedEmployees = (myStoreCode == null || myStoreCode.isEmpty)
@@ -231,40 +238,28 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         .length;
     final activeShiftCount = provider.shifts.length;
     final memberCount = scopedEmployees.length;
-    final isCompactMobile = !emphasize && MediaQuery.of(context).size.width < 430;
 
-    // Quick check-in/out shortcut — black checkmark when not checked in yet
-    // today, green once checked in, tapping mirrors the GPS check-in card's
-    // buttons below without needing to scroll to it.
-    final currentUserId = context.read<AuthProvider>().currentUser?.id;
+    final currentUser = context.read<AuthProvider>().currentUser;
+    final stores = context.watch<StoreProvider>().stores;
+    final myStore = (currentUser?.storeCode != null && stores.isNotEmpty)
+        ? stores.cast<dynamic>().firstWhere(
+            (s) => s.storeCode == currentUser!.storeCode,
+            orElse: () => null,
+          )
+        : null;
+
     final todayAtt = provider.attendances.where((a) =>
-        a.employeeId == currentUserId &&
+        a.employeeId == currentUser?.id &&
         a.date.year == DateTime.now().year &&
         a.date.month == DateTime.now().month &&
         a.date.day == DateTime.now().day).toList();
-    final headerHasCheckedIn = todayAtt.isNotEmpty && todayAtt.first.isCheckedIn;
-    final headerHasCheckedOut = todayAtt.isNotEmpty && todayAtt.first.checkOutTime != null;
-    final checkInAction = IconButton(
-      onPressed: _isCheckingIn
-          ? null
-          : headerHasCheckedOut
-              ? null
-              : headerHasCheckedIn
-                  ? () => _handleGpsCheckOut(provider)
-                  : () => _handleGpsCheckIn(provider),
-      icon: _isCheckingIn
-          ? const SizedBox(
-              width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-          : Icon(
-              Icons.check_circle_rounded,
-              color: headerHasCheckedIn ? AppColors.success : AppColors.textDark,
-            ),
-      tooltip: headerHasCheckedOut
-          ? 'Đã hoàn thành chấm công hôm nay'
-          : headerHasCheckedIn
-              ? 'Chấm công ra'
-              : 'Chấm công vào',
-    );
+    final hasCheckedIn = todayAtt.isNotEmpty && todayAtt.first.isCheckedIn;
+    final hasCheckedOut = todayAtt.isNotEmpty && todayAtt.first.checkOutTime != null;
+
+    final now = DateTime.now();
+    final dateLabel = '${_weekdayNames[now.weekday - 1]}, '
+        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}';
+
     final moreActions = HeaderActionCluster(
       actions: [
         HeaderAction(
@@ -295,147 +290,205 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       ],
     );
 
-    // Phones keep just the title + actions — the KPI chips already
-    // dropped their icons/numbers there, so a full card adds nothing.
-    if (isCompactMobile) {
-      return Row(
-        children: [
-          Expanded(
-            child: Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
-          ),
-          checkInAction,
-          moreActions,
-        ],
-      );
-    }
+    final ctaLabel = hasCheckedOut
+        ? 'Đã hoàn thành chấm công hôm nay'
+        : hasCheckedIn
+            ? 'Chấm công ra ca'
+            : 'Chấm công vào ca';
+    final ctaIcon = hasCheckedOut
+        ? Icons.check_circle_rounded
+        : hasCheckedIn
+            ? Icons.logout_rounded
+            : Icons.fingerprint_rounded;
+    final ctaOnTap = (_isCheckingIn || hasCheckedOut)
+        ? null
+        : hasCheckedIn
+            ? () => _handleGpsCheckOut(provider)
+            : () => _handleGpsCheckIn(provider);
 
-    return Container(
+    final hero = Container(
       width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 20 : 14),
-      decoration: AppDecorations.card,
+      padding: EdgeInsets.all(emphasize ? 24 : 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.panel),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.28),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
+                child: Text(AppStrings.nhanSu,
+                    style: AppTextStyles.appTitle.copyWith(color: AppColors.white)),
+              ),
+              moreActions,
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.waving_hand_rounded, color: AppColors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
+                    Text(
+                      'Xin chào, ${currentUser?.fullName ?? ''}',
+                      style: const TextStyle(
+                          color: AppColors.white, fontSize: 17, fontWeight: FontWeight.w700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     const SizedBox(height: 2),
                     Text(
-                      'Điều phối chấm công, ca làm và hiệu suất đội ngũ',
-                      style: AppTextStyles.caption,
+                      myStore != null ? '$dateLabel · ${myStore.name}' : dateLabel,
+                      style: TextStyle(color: AppColors.white.withValues(alpha: 0.8), fontSize: 12.5),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              checkInAction,
-              moreActions,
             ],
           ),
-          const SizedBox(height: 12),
-          Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _buildHeaderKpiChip(
-                  icon: Icons.badge_rounded,
-                  label: 'Nhân viên',
-                  value: '$memberCount',
-                  color: AppColors.primary,
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.employeeList),
-                ),
-                _buildHeaderKpiChip(
-                  icon: Icons.login_rounded,
-                  label: 'Đã vào ca',
-                  value: '$checkedInCount',
-                  color: AppColors.success,
-                  onTap: () => _showAttendanceHistory(provider, canManage: canManage),
-                ),
-                _buildHeaderKpiChip(
-                  icon: Icons.schedule_rounded,
-                  label: 'Ca làm',
-                  value: '$activeShiftCount',
-                  color: AppColors.info,
-                  onTap: _openShiftScreen,
-                ),
-              ],
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: ctaOnTap,
+              icon: _isCheckingIn
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                    )
+                  : Icon(ctaIcon, size: 20),
+              label: Text(
+                _isCheckingIn ? 'Đang xác định vị trí...' : ctaLabel,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor:
+                    hasCheckedOut ? AppColors.white.withValues(alpha: 0.16) : AppColors.white,
+                foregroundColor: hasCheckedOut
+                    ? AppColors.white
+                    : (hasCheckedIn ? AppColors.primaryDark : AppColors.primary),
+                disabledBackgroundColor: AppColors.white.withValues(alpha: 0.16),
+                disabledForegroundColor: AppColors.white,
+                padding: EdgeInsets.symmetric(vertical: emphasize ? 16 : 14),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
+              ),
             ),
+          ),
         ],
       ),
     );
+
+    final statCard = Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: AppDecorations.card,
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildStatItem(
+              icon: Icons.badge_rounded,
+              value: '$memberCount',
+              label: 'Nhân viên',
+              color: AppColors.primary,
+              onTap: () => Navigator.pushNamed(context, AppRoutes.employeeList),
+            ),
+          ),
+          const SizedBox(
+            height: 40,
+            child: VerticalDivider(width: 20, thickness: 1, color: AppColors.divider),
+          ),
+          Expanded(
+            child: _buildStatItem(
+              icon: Icons.login_rounded,
+              value: '$checkedInCount',
+              label: 'Đã vào ca',
+              color: AppColors.success,
+              onTap: () => _showAttendanceHistory(provider, canManage: canManage),
+            ),
+          ),
+          const SizedBox(
+            height: 40,
+            child: VerticalDivider(width: 20, thickness: 1, color: AppColors.divider),
+          ),
+          Expanded(
+            child: _buildStatItem(
+              icon: Icons.schedule_rounded,
+              value: '$activeShiftCount',
+              label: 'Ca làm',
+              color: AppColors.info,
+              onTap: _openShiftScreen,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Column(
+      children: [hero, statCard],
+    );
   }
 
-  Widget _buildHeaderKpiChip({
+  Widget _buildStatItem({
     required IconData icon,
-    required String label,
     required String value,
+    required String label,
     required Color color,
-    bool compact = false,
     VoidCallback? onTap,
   }) {
-    final content = Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: compact ? 8 : 12,
-        vertical: compact ? 8 : 10,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(AppRadius.row),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: compact
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption.copyWith(
-                      fontSize: 10, color: AppColors.textGrey, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.caption
-                      .copyWith(color: color, fontWeight: FontWeight.w800),
-                ),
-              ],
-            )
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 16, color: color),
-                const SizedBox(width: 8),
-                Text(
-                  '$label: ',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: AppTextStyles.caption.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.row),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+              child: Icon(icon, size: 17, color: color),
             ),
-    );
-    if (onTap == null) return content;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.row),
-        child: content,
+            const SizedBox(height: 6),
+            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: AppTextStyles.caption.copyWith(fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -700,72 +753,27 @@ class _NhanSuScreenState extends State<NhanSuScreen>
             ),
           ],
 
-          // Action buttons
-          Row(
-            children: [
-              if (!hasCheckedIn)
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isCheckingIn ? null : () => _handleGpsCheckIn(provider),
-                    icon: _isCheckingIn
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white))
-                        : const Icon(Icons.fingerprint_rounded, size: 20),
-                    label: Text(
-                      _isCheckingIn ? 'Đang xác định...' : 'Chấm công vào',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: isMobile ? 12 : 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.row)),
-                    ),
-                  ),
-                ),
-              if (hasCheckedIn && !hasCheckedOut)
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isCheckingIn ? null : () => _handleGpsCheckOut(provider),
-                    icon: _isCheckingIn
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.logout_rounded, size: 20),
-                    label: Text(
-                      _isCheckingIn ? 'Đang xác định...' : 'Chấm công ra',
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: isMobile ? 12 : 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.row)),
+          // The primary chấm công vào/ra action now lives in the hero card
+          // up top — this section is informational only (store, times,
+          // GPS distance) so there's a single place to tap, not two.
+          if (hasCheckedOut)
+            Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Đã hoàn thành chấm công hôm nay',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.bodyText.copyWith(
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ),
-              if (hasCheckedOut)
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: isMobile ? 14 : 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.check_circle_rounded,
-                            color: AppColors.success, size: 20),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            isMobile
-                                ? 'Đã hoàn thành'
-                                : 'Đã hoàn thành chấm công hôm nay',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.bodyText.copyWith(
-                              color: AppColors.success,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
+              ],
+            ),
         ],
       ),
     );
