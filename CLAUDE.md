@@ -90,5 +90,6 @@ Where a "drops down from the top" panel is wanted (as opposed to the conventiona
 
 ## Conventions
 
+- Communicate with the user in Vietnamese by default (chat replies only — this doesn't apply to code, comments, commit messages, or PR content, which stay in English per existing convention).
 - Never attribute commits/PRs to Claude/an AI model in the commit message, PR title, PR body, or code comments — chat-only.
 - No local Flutter/Python toolchain is available in this environment: verification is bracket-balance checks + `ast.parse()` (Python) done manually before committing, plus reading CI results after merge — there is no way to run `flutter analyze`/`flutter test`/`python3 -m py_compile` from most sessions unless the tool is confirmed present.
