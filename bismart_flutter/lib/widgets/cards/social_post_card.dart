@@ -37,7 +37,7 @@ class SocialPostCard extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.row),
         child: Material(
-          color: AppColors.surfaceTint1,
+          color: AppColors.cardBg,
           child: InkWell(
             onTap: onTap,
             child: Column(

@@ -177,25 +177,43 @@ class AppRadius {
 class AppDecorations {
   AppDecorations._();
 
-  // Material 3-style tonal surface: a subtle primary-tinted fill shows
-  // elevation through color instead of a shadow or a hard border. Every
-  // "card" in the app shares this single look instead of each screen
-  // picking its own gradient/shadow/radius combination.
+  // Clean white surface + soft shadow + hairline border. A pure-white
+  // fill guarantees visible contrast against the app's light-gray page
+  // background and against warm-tinted banners/chips no matter how
+  // subtle any of those tints are — a tonal (colored-fill) card was tried
+  // here and looked washed-out/undifferentiated against those neutrals,
+  // so elevation is shown the reliable way: color contrast + a soft
+  // shadow, the same language professional dashboard apps use.
+  static final _cardBorder = Border.all(color: AppColors.border.withValues(alpha: 0.6));
+  static final _cardShadow = <BoxShadow>[
+    BoxShadow(
+      color: Colors.black.withValues(alpha: 0.05),
+      blurRadius: 16,
+      offset: const Offset(0, 4),
+    ),
+  ];
+
   static BoxDecoration get card => BoxDecoration(
-    color: AppColors.surfaceTint1,
+    color: AppColors.cardBg,
     borderRadius: BorderRadius.circular(AppRadius.panel),
+    border: _cardBorder,
+    boxShadow: _cardShadow,
   );
 
   static BoxDecoration get cardSubtle => BoxDecoration(
-    color: AppColors.surfaceTint1,
+    color: AppColors.cardBg,
     borderRadius: BorderRadius.circular(AppRadius.row + 2),
+    border: _cardBorder,
+    boxShadow: _cardShadow,
   );
 
-  /// Same tonal-surface language as [card]/[cardSubtle] but sized for a
-  /// single list row (product/store/employee rows, etc.).
+  /// Same surface language as [card]/[cardSubtle] but sized for a single
+  /// list row (product/store/employee rows, etc.).
   static BoxDecoration get row => BoxDecoration(
-    color: AppColors.surfaceTint1,
+    color: AppColors.cardBg,
     borderRadius: BorderRadius.circular(AppRadius.row),
+    border: _cardBorder,
+    boxShadow: _cardShadow,
   );
 
   static BoxDecoration get cardFlat => BoxDecoration(

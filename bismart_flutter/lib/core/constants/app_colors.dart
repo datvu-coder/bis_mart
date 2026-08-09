@@ -15,12 +15,6 @@ class AppColors {
   static const surfaceVariant = Color(0xFFF0F2F7);
   static const surfaceElevated = Color(0xFFFFFFFF);
 
-  // Material 3-style tonal surface scale — subtle primary-tinted neutrals
-  // used to show elevation through color instead of borders/shadows.
-  // Each level blends more of `primary` into white.
-  static const surfaceTint1 = Color(0xFFFDF5F2); // cards / panels
-  static const surfaceTint2 = Color(0xFFFBEBE5); // content nested inside a card
-
   // Text
   static const textDark = Color(0xFF111827);
   static const textPrimary = Color(0xFF1F2937);

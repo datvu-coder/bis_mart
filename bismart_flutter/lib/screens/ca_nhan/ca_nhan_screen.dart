@@ -206,9 +206,9 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                 width: 68,
                 height: 68,
                 decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(AppRadius.row + 6),
-                  border: Border.all(color: AppColors.white.withValues(alpha: 0.4), width: 2),
+                  color: AppColors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: AppColors.white, width: 3),
                   image: hasAvatar
                       ? DecorationImage(
                           image: MemoryImage(_decodeAvatarDataUrl(user!.avatarUrl!)),
@@ -226,7 +226,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.white,
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
