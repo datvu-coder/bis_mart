@@ -75,10 +75,6 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(AppStrings.caNhan, style: AppTextStyles.appTitle),
-                const SizedBox(height: 4),
-                Text('Thông tin cá nhân & quản lý', style: AppTextStyles.caption),
-                const SizedBox(height: 24),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -87,9 +83,9 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildProfileCard(context, user),
-                          const SizedBox(height: 20),
-                          _buildStatsRow(user),
+                          _buildProfileHero(context, user),
+                          const SizedBox(height: 12),
+                          _buildStatsCard(user),
                         ],
                       ),
                     ),
@@ -121,17 +117,12 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(AppStrings.caNhan, style: AppTextStyles.appTitle),
-              const SizedBox(height: 4),
-              Text('Thông tin cá nhân & quản lý', style: AppTextStyles.caption),
-              const SizedBox(height: 24),
+              // Profile hero card (title, avatar, greeting all in one)
+              _buildProfileHero(context, user),
+              const SizedBox(height: 12),
 
-              // Profile header card
-              _buildProfileCard(context, user),
-              const SizedBox(height: 20),
-
-              // Quick stats row
-              _buildStatsRow(user),
+              // Quick stats card
+              _buildStatsCard(user),
               const SizedBox(height: 20),
 
               // Menu items
@@ -170,7 +161,10 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     }
   }
 
-  Widget _buildProfileCard(BuildContext context, Employee? user) {
+  // Hero-style profile card — same gradient card language as the other 4
+  // tabs (title folded in, white-on-gradient text/chips) instead of a bare
+  // title above a plain white-bordered card.
+  Widget _buildProfileHero(BuildContext context, Employee? user) {
     final stores = context.watch<StoreProvider>().stores;
     final myStore = (user?.storeCode != null && user!.storeCode!.isNotEmpty && stores.isNotEmpty)
         ? stores.cast<dynamic>().firstWhere(
@@ -184,23 +178,37 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     final hasAvatar = (user?.avatarUrl ?? '').isNotEmpty;
 
     return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: AppDecorations.card,
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.panel),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.28),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Text(AppStrings.caNhan, style: AppTextStyles.appTitle.copyWith(color: AppColors.white)),
+          const SizedBox(height: 16),
           Row(
             children: [
               Container(
                 width: 68,
                 height: 68,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: AppColors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(AppRadius.row + 6),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.3),
-                    width: 2.5,
-                  ),
+                  border: Border.all(color: AppColors.white.withValues(alpha: 0.4), width: 2),
                   image: hasAvatar
                       ? DecorationImage(
                           image: MemoryImage(_decodeAvatarDataUrl(user!.avatarUrl!)),
@@ -218,7 +226,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                           style: const TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
+                            color: AppColors.white,
                           ),
                         ),
                       ),
@@ -230,10 +238,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                   children: [
                     Text(
                       '${AppStrings.xinChao},',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textGrey,
-                      ),
+                      style: TextStyle(fontSize: 13, color: AppColors.white.withValues(alpha: 0.8)),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -241,7 +246,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textDark,
+                        color: AppColors.white,
                         letterSpacing: -0.3,
                       ),
                     ),
@@ -253,30 +258,30 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryLight,
+                            color: AppColors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(AppRadius.chip),
                           ),
                           child: Text(
                             user?.positionLabel ?? user?.position ?? '',
                             style: const TextStyle(
                               fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.primary,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.white,
                             ),
                           ),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AppColors.surfaceVariant,
+                            color: AppColors.white.withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(AppRadius.chip),
                           ),
                           child: Text(
                             user?.employeeCode ?? '',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.textGrey,
+                              color: AppColors.white.withValues(alpha: 0.85),
                             ),
                           ),
                         ),
@@ -286,14 +291,14 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                       const SizedBox(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.store_rounded, size: 14, color: AppColors.textGrey),
+                          Icon(Icons.store_rounded, size: 14, color: AppColors.white.withValues(alpha: 0.8)),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               storeLabel,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                              style: TextStyle(fontSize: 12.5, color: AppColors.white.withValues(alpha: 0.85)),
                             ),
                           ),
                         ],
@@ -308,10 +313,10 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.surfaceVariant,
+                    color: AppColors.white.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(AppRadius.row - 2),
                   ),
-                  child: const Icon(Icons.edit_rounded, color: AppColors.primary, size: 18),
+                  child: const Icon(Icons.edit_rounded, color: AppColors.white, size: 18),
                 ),
               ),
             ],
@@ -320,13 +325,13 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
             const SizedBox(height: 14),
             OutlinedButton.icon(
               onPressed: () => _showTransferStoreDialog(context, user),
-              icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: AppColors.primary),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: AppColors.white),
               label: const Text(
                 'Chuyển cửa hàng',
-                style: TextStyle(color: AppColors.primary, fontSize: 13),
+                style: TextStyle(color: AppColors.white, fontSize: 13),
               ),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.border),
+                side: BorderSide(color: AppColors.white.withValues(alpha: 0.5)),
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.row)),
               ),
@@ -337,7 +342,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     );
   }
 
-  Widget _buildStatsRow(dynamic user) {
+  Widget _buildStatsCard(dynamic user) {
     final empProvider = context.watch<EmployeeProvider>();
     final employees = empProvider.employees;
     // Find the current user in the employee list by matching ID
@@ -348,48 +353,87 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
           )
         : null;
 
-    final stats = [
-      _StatItem(Icons.people_rounded, 'Nhân viên', '${employees.length}', AppColors.info, AppColors.infoLight),
-      _StatItem(Icons.star_rounded, 'Điểm KPI', '${currentEmp?.score ?? user?.score ?? 0}', AppColors.warning, AppColors.warningLight),
-      _StatItem(Icons.trending_up_rounded, 'Xếp hạng', '#${currentEmp?.rank ?? '-'}', AppColors.success, AppColors.successLight),
-    ];
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      decoration: AppDecorations.card,
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildStatItem(
+              icon: Icons.people_rounded,
+              value: '${employees.length}',
+              label: 'Nhân viên',
+              color: AppColors.info,
+              onTap: () => Navigator.pushNamed(context, AppRoutes.employeeList),
+            ),
+          ),
+          const SizedBox(
+            height: 40,
+            child: VerticalDivider(width: 20, thickness: 1, color: AppColors.divider),
+          ),
+          Expanded(
+            child: _buildStatItem(
+              icon: Icons.star_rounded,
+              value: '${currentEmp?.score ?? user?.score ?? 0}',
+              label: 'Điểm KPI',
+              color: AppColors.warning,
+            ),
+          ),
+          const SizedBox(
+            height: 40,
+            child: VerticalDivider(width: 20, thickness: 1, color: AppColors.divider),
+          ),
+          Expanded(
+            child: _buildStatItem(
+              icon: Icons.trending_up_rounded,
+              value: '#${currentEmp?.rank ?? '-'}',
+              label: 'Xếp hạng',
+              color: AppColors.success,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return Row(
-      children: stats
-          .map((s) => Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: s == stats.last ? 0 : 10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                    decoration: AppDecorations.card,
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: s.bgColor,
-                            borderRadius: BorderRadius.circular(AppRadius.row - 2),
-                          ),
-                          child: Icon(s.icon, color: s.color, size: 20),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          s.value,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(s.label, style: AppTextStyles.caption),
-                      ],
-                    ),
-                  ),
-                ),
-              ))
-          .toList(),
+  Widget _buildStatItem({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.row),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+              child: Icon(icon, size: 17, color: color),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: AppTextStyles.caption.copyWith(fontSize: 11),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1013,16 +1057,6 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
       ),
     );
   }
-}
-
-class _StatItem {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-  final Color bgColor;
-
-  const _StatItem(this.icon, this.label, this.value, this.color, this.bgColor);
 }
 
 class _MenuItem {

@@ -5,6 +5,7 @@ import '../../core/constants/app_strings.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/currency_formatter.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../widgets/common/filter_dropdown.dart';
 import '../../widgets/charts/revenue_bar_chart.dart';
@@ -161,44 +162,94 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  // Hero-style header — same gradient card language as Nhân sự/Đào tạo,
+  // featuring the headline revenue figure the way a banking app leads with
+  // an account balance, instead of a plain white title bar.
   Widget _buildHeader(DashboardProvider provider, dynamic data) {
-    final isCompactMobile = MediaQuery.of(context).size.width < 430;
+    final emphasize = MediaQuery.of(context).size.width >= 900;
+    final currentUser = context.read<AuthProvider>().currentUser;
     final trailing = FilterDropdown(
       value: provider.filterType,
       onChanged: provider.setFilter,
     );
 
-    // Phones keep just the title + trailing actions, matching Nhân
-    // sự/Kinh doanh/Đào tạo's headerless mobile layout — no icon avatar,
-    // no bordered card, so there's room for the filter dropdown + menu.
-    if (isCompactMobile) {
-      return Row(
-        children: [
-          Expanded(
-            child: Text(AppStrings.dashboard, style: AppTextStyles.appTitle),
-          ),
-          trailing,
-        ],
-      );
-    }
-
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: AppDecorations.card,
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(AppStrings.dashboard, style: AppTextStyles.appTitle),
-                const SizedBox(height: 2),
-                Text(DateFormatter.formatDate(data.date), style: AppTextStyles.caption),
-              ],
-            ),
+      padding: EdgeInsets.all(emphasize ? 24 : 18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.panel),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.28),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-          trailing,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(AppStrings.dashboard,
+                    style: AppTextStyles.appTitle.copyWith(color: AppColors.white)),
+              ),
+              trailing,
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.18),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.insights_rounded, color: AppColors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Chào mừng trở lại, ${currentUser?.fullName ?? ''}',
+                      style: const TextStyle(color: AppColors.white, fontSize: 17, fontWeight: FontWeight.w700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      DateFormatter.formatDate(data.date),
+                      style: TextStyle(color: AppColors.white.withValues(alpha: 0.8), fontSize: 12.5),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            AppStrings.tongDoanhThu,
+            style: TextStyle(color: AppColors.white.withValues(alpha: 0.8), fontSize: 12.5, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            CurrencyFormatter.formatVND(data.totalRevenue),
+            style: const TextStyle(color: AppColors.white, fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );

@@ -177,29 +177,25 @@ class AppRadius {
 class AppDecorations {
   AppDecorations._();
 
-  // Simple, flat surface: white background + one thin border, no shadow.
-  // Every "card" in the app shares this single, plain look instead of each
-  // screen picking its own gradient/shadow/radius combination.
-  static final _cardBorder = Border.all(color: AppColors.border);
-
+  // Material 3-style tonal surface: a subtle primary-tinted fill shows
+  // elevation through color instead of a shadow or a hard border. Every
+  // "card" in the app shares this single look instead of each screen
+  // picking its own gradient/shadow/radius combination.
   static BoxDecoration get card => BoxDecoration(
-    color: AppColors.cardBg,
+    color: AppColors.surfaceTint1,
     borderRadius: BorderRadius.circular(AppRadius.panel),
-    border: _cardBorder,
   );
 
   static BoxDecoration get cardSubtle => BoxDecoration(
-    color: AppColors.cardBg,
+    color: AppColors.surfaceTint1,
     borderRadius: BorderRadius.circular(AppRadius.row + 2),
-    border: _cardBorder,
   );
 
-  /// Same flat border language as [card]/[cardSubtle] but sized for a
+  /// Same tonal-surface language as [card]/[cardSubtle] but sized for a
   /// single list row (product/store/employee rows, etc.).
   static BoxDecoration get row => BoxDecoration(
-    color: AppColors.cardBg,
+    color: AppColors.surfaceTint1,
     borderRadius: BorderRadius.circular(AppRadius.row),
-    border: _cardBorder,
   );
 
   static BoxDecoration get cardFlat => BoxDecoration(

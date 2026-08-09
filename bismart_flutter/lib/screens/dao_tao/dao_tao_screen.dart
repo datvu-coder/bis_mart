@@ -513,19 +513,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             constraints: const BoxConstraints(maxWidth: 680),
             child: Container(
               margin: EdgeInsets.fromLTRB(hMargin, 12, hMargin, 12),
-              decoration: BoxDecoration(
-                color: AppColors.white,
-                borderRadius: BorderRadius.circular(AppRadius.row),
-                border: Border.all(
-                    color: AppColors.border.withValues(alpha: 0.6)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 14,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
+              decoration: AppDecorations.row,
               padding: const EdgeInsets.all(14),
               child: Column(
                 children: [

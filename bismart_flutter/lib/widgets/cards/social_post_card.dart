@@ -33,22 +33,11 @@ class SocialPostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final card = Container(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      decoration: AppDecorations.row,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(AppRadius.row),
         child: Material(
-          color: AppColors.white,
+          color: AppColors.surfaceTint1,
           child: InkWell(
             onTap: onTap,
             child: Column(
@@ -308,9 +297,9 @@ class _PostMedia extends StatelessWidget {
             decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Color(0xFF111827),
-                  Color(0xFF1F2937),
-                  Color(0xFF374151)
+                  AppColors.textDark,
+                  AppColors.textPrimary,
+                  AppColors.textSecondary,
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
