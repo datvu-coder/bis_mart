@@ -107,20 +107,12 @@ class LessonCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (onEdit != null)
-              IconButton(
-                icon: const Icon(Icons.edit_rounded, size: 18),
-                tooltip: 'Sửa',
-                visualDensity: VisualDensity.compact,
-                onPressed: onEdit,
-              ),
+            if (onEdit != null) ...[
+              _pillIcon(Icons.edit_outlined, AppColors.info, onEdit!),
+              const SizedBox(width: 6),
+            ],
             if (onDelete != null)
-              IconButton(
-                icon: const Icon(Icons.delete_rounded, size: 18, color: AppColors.error),
-                tooltip: 'Xoá',
-                visualDensity: VisualDensity.compact,
-                onPressed: onDelete,
-              ),
+              _pillIcon(Icons.delete_outline_rounded, AppColors.error, onDelete!),
           ],
         ),
         const SizedBox(height: 4),
@@ -202,6 +194,22 @@ class LessonCard extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+
+  // Filled colored circle instead of a bare icon — matches the pill-button
+  // treatment used for row actions elsewhere in the app (e.g. Nhân sự's
+  // attendance edit/delete buttons).
+  Widget _pillIcon(IconData icon, Color color, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+        child: Icon(icon, size: 14, color: color),
+      ),
     );
   }
 
