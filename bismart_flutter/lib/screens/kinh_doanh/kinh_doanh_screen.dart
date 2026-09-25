@@ -163,7 +163,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
-              child: _buildScreenHeader(provider, isWide),
+              child: _buildScreenHeader(provider),
             ),
             const Expanded(child: SalesPosScreen()),
           ],
@@ -269,10 +269,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
 
   // ── Header ────────────────────────────────────────────────────────────────
 
-  // Hero-style header — same gradient card language as Nhân sự/Đào tạo,
-  // leading with the "Tạo đơn hàng" CTA (Kinh doanh's one daily action)
-  // instead of a small icon buried next to "...".
-  Widget _buildScreenHeader(SalesProvider provider, bool emphasize) {
+  Widget _buildScreenHeader(SalesProvider provider) {
     final totalRev = provider.totalRevenue;
     final reportCount = provider.salesReportCount;
     final pgCount = provider.filteredReports.map((r) => r.pgName).toSet().length;
@@ -296,93 +293,44 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
       ],
     );
 
-    final hero = Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 24 : 18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    // Compact pill instead of a full-width button inside a hero card — the
+    // one daily action stays visible right next to the title, no colored
+    // block needed to carry it.
+    final createOrderPill = InkWell(
+      onTap: _openCreateOrder,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: AppColors.primary,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
-        borderRadius: BorderRadius.circular(AppRadius.panel),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(AppStrings.kinhDoanh,
-                    style: AppTextStyles.appTitle.copyWith(color: AppColors.white)),
-              ),
-              moreActions,
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.storefront_rounded, color: AppColors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Quản lý bán hàng thông minh',
-                      style: TextStyle(color: AppColors.white, fontSize: 17, fontWeight: FontWeight.w700),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$reportCount báo cáo · ${CurrencyFormatter.formatVND(totalRev)}',
-                      style: TextStyle(color: AppColors.white.withValues(alpha: 0.8), fontSize: 12.5),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _openCreateOrder,
-              icon: const Icon(Icons.add_shopping_cart_rounded, size: 20),
-              label: const Text('Tạo đơn hàng', style: TextStyle(fontWeight: FontWeight.w700)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.white,
-                foregroundColor: AppColors.primary,
-                padding: EdgeInsets.symmetric(vertical: emphasize ? 16 : 14),
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
-              ),
-            ),
-          ),
-        ],
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add_shopping_cart_rounded, size: 15, color: AppColors.white),
+            SizedBox(width: 6),
+            Text('Tạo đơn', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.white)),
+          ],
+        ),
       ),
     );
 
+    // Minimal top bar — title + the one daily action + "..." menu, all
+    // sitting directly on the page background. No colored hero block.
+    final topBar = Row(
+      children: [
+        Expanded(
+          child: Text(AppStrings.kinhDoanh, style: AppTextStyles.appTitle),
+        ),
+        createOrderPill,
+        const SizedBox(width: 8),
+        moreActions,
+      ],
+    );
+
     final statCard = Container(
-      margin: const EdgeInsets.only(top: 12),
+      margin: const EdgeInsets.only(top: 14),
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: AppDecorations.card,
       child: Row(
@@ -425,7 +373,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
     );
 
     return Column(
-      children: [hero, statCard],
+      children: [topBar, statCard],
     );
   }
 
