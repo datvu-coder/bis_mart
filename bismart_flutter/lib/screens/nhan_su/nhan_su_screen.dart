@@ -492,6 +492,16 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       }
     }
 
+    // Every row below is conditional on the day's actual attendance state —
+    // with no assigned store, no check-in yet, and nothing else to report,
+    // none of them render, leaving an empty colored box with just padding.
+    final hasAnyContent = missedCheckoutMinutes != null ||
+        myStore != null ||
+        (hasCheckedIn && todayAtt.isNotEmpty) ||
+        _locationError != null ||
+        _lastDistance != null ||
+        hasCheckedOut;
+
     return Container(
       padding: EdgeInsets.all(isMobile ? 10 : 16),
       decoration: BoxDecoration(
@@ -508,6 +518,19 @@ class _NhanSuScreenState extends State<NhanSuScreen>
       ),
       child: Column(
         children: [
+          if (!hasAnyContent)
+            Row(
+              children: [
+                Icon(Icons.fingerprint_rounded, size: 18, color: AppColors.primary.withValues(alpha: 0.7)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Nhấn "Chấm công vào" ở trên để bắt đầu ca làm hôm nay',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                  ),
+                ),
+              ],
+            ),
           if (missedCheckoutMinutes != null) ...[
             Container(
               width: double.infinity,

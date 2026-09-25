@@ -10,8 +10,22 @@ class RevenueBarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (data.isEmpty) {
-      return const Center(child: Text('Không có dữ liệu'));
+    // All-zero data still passes `isEmpty`, but a maxY of 0 gives fl_chart
+    // a zero-height axis range — it renders nothing at all (no bars, no
+    // gridlines, no labels), which reads as a broken blank card instead of
+    // "no data yet".
+    if (data.isEmpty || _maxY == 0) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.bar_chart_rounded, size: 32, color: AppColors.textHint),
+            const SizedBox(height: 8),
+            Text('Chưa có dữ liệu doanh số', style: TextStyle(color: AppColors.textHint, fontSize: 13)),
+          ],
+        ),
+      );
     }
 
     return AspectRatio(
