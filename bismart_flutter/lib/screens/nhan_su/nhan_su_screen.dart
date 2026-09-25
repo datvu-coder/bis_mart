@@ -20,6 +20,7 @@ import '../../widgets/common/desktop_layout.dart';
 import '../../widgets/common/responsive_form.dart';
 import '../../widgets/common/header_action_cluster.dart';
 import '../../widgets/common/initials_avatar.dart';
+import '../../widgets/common/status_pill.dart';
 import '../../widgets/cards/rank_list_tile.dart';
 import 'leave_requests_screen.dart';
 
@@ -1275,17 +1276,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-              ),
-              child: const Text(
-                'Chưa chấm công',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.error),
-              ),
-            ),
+            const StatusPill(label: 'Chưa chấm công', color: AppColors.error),
           ],
         ),
       ),
@@ -1293,25 +1284,29 @@ class _NhanSuScreenState extends State<NhanSuScreen>
   }
 
   Widget _buildAttendanceActions(Attendance att, EmployeeProvider provider, {DateTime? historyDate}) {
+    // Filled colored circles instead of bare icons — a small, tappable
+    // "pill" treatment matching the app's other action-button styling.
+    Widget pillIcon(IconData icon, Color color, VoidCallback onTap) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), shape: BoxShape.circle),
+          child: Icon(icon, size: 16, color: color),
+        ),
+      );
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        InkWell(
-          onTap: () => _showEditAttendanceDialog(att, provider, historyDate: historyDate),
-          borderRadius: BorderRadius.circular(20),
-          child: const Padding(
-            padding: EdgeInsets.all(6),
-            child: Icon(Icons.edit_outlined, size: 18, color: AppColors.info),
-          ),
-        ),
-        InkWell(
-          onTap: () => _confirmDeleteAttendance(att, provider, historyDate: historyDate),
-          borderRadius: BorderRadius.circular(20),
-          child: const Padding(
-            padding: EdgeInsets.all(6),
-            child: Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
-          ),
-        ),
+        pillIcon(Icons.edit_outlined, AppColors.info,
+            () => _showEditAttendanceDialog(att, provider, historyDate: historyDate)),
+        const SizedBox(width: 6),
+        pillIcon(Icons.delete_outline_rounded, AppColors.error,
+            () => _confirmDeleteAttendance(att, provider, historyDate: historyDate)),
       ],
     );
   }
