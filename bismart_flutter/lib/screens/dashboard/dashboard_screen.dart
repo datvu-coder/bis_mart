@@ -162,96 +162,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Hero-style header — same gradient card language as Nhân sự/Đào tạo,
-  // featuring the headline revenue figure the way a banking app leads with
-  // an account balance, instead of a plain white title bar.
+  // Minimal top bar + plain-text revenue headline, sitting directly on the
+  // page background. No colored hero block.
   Widget _buildHeader(DashboardProvider provider, dynamic data) {
-    final emphasize = MediaQuery.of(context).size.width >= 900;
     final currentUser = context.read<AuthProvider>().currentUser;
     final trailing = FilterDropdown(
       value: provider.filterType,
       onChanged: provider.setFilter,
     );
 
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 24 : 18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(AppStrings.dashboard, style: AppTextStyles.appTitle),
+            ),
+            trailing,
+          ],
         ),
-        borderRadius: BorderRadius.circular(AppRadius.panel),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(AppStrings.dashboard,
-                    style: AppTextStyles.appTitle.copyWith(color: AppColors.white)),
-              ),
-              trailing,
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.insights_rounded, color: AppColors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Chào mừng trở lại, ${currentUser?.fullName ?? ''}',
-                      style: const TextStyle(color: AppColors.white, fontSize: 17, fontWeight: FontWeight.w700),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      DateFormatter.formatDate(data.date),
-                      style: TextStyle(color: AppColors.white.withValues(alpha: 0.8), fontSize: 12.5),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            AppStrings.tongDoanhThu,
-            style: TextStyle(color: AppColors.white.withValues(alpha: 0.8), fontSize: 12.5, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            CurrencyFormatter.formatVND(data.totalRevenue),
-            style: const TextStyle(color: AppColors.white, fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.5),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
+        const SizedBox(height: 6),
+        Text(
+          'Chào mừng trở lại, ${currentUser?.fullName ?? ''} · ${DateFormatter.formatDate(data.date)}',
+          style: AppTextStyles.bodyText.copyWith(color: AppColors.textSecondary),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 18),
+        Text(
+          AppStrings.tongDoanhThu,
+          style: const TextStyle(color: AppColors.textGrey, fontSize: 12.5, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          CurrencyFormatter.formatVND(data.totalRevenue),
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
     );
   }
 

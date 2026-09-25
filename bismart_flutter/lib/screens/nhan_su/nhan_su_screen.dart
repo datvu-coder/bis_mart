@@ -99,7 +99,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
           children: [
             Padding(
               padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
-              child: _buildScreenHeader(provider, canManage, isWide),
+              child: _buildScreenHeader(provider, canManage),
             ),
             Expanded(
               child: SingleChildScrollView(
@@ -219,14 +219,11 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     );
   }
 
-  static const _weekdayNames = [
-    'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'
-  ];
-
-  // Hero-style header — a gradient "clock-in" card up top instead of the
-  // previous plain white info card, so the one action people open this tab
-  // for every day (chấm công) reads as the headline, not a small icon.
-  Widget _buildScreenHeader(EmployeeProvider provider, bool canManage, bool emphasize) {
+  // Minimal top-bar header — title + the one daily chấm-công action + "..."
+  // menu, sitting directly on the page background. No colored hero block
+  // (a colored block dominating the top of the screen read as generic/
+  // outdated and was explicitly called out for removal).
+  Widget _buildScreenHeader(EmployeeProvider provider, bool canManage) {
     final myStoreCode = context.read<AuthProvider>().currentUser?.storeCode;
     final scopedEmployees = (myStoreCode == null || myStoreCode.isEmpty)
         ? provider.employees
@@ -241,13 +238,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     final memberCount = scopedEmployees.length;
 
     final currentUser = context.read<AuthProvider>().currentUser;
-    final stores = context.watch<StoreProvider>().stores;
-    final myStore = (currentUser?.storeCode != null && stores.isNotEmpty)
-        ? stores.cast<dynamic>().firstWhere(
-            (s) => s.storeCode == currentUser!.storeCode,
-            orElse: () => null,
-          )
-        : null;
 
     final todayAtt = provider.attendances.where((a) =>
         a.employeeId == currentUser?.id &&
@@ -256,10 +246,6 @@ class _NhanSuScreenState extends State<NhanSuScreen>
         a.date.day == DateTime.now().day).toList();
     final hasCheckedIn = todayAtt.isNotEmpty && todayAtt.first.isCheckedIn;
     final hasCheckedOut = todayAtt.isNotEmpty && todayAtt.first.checkOutTime != null;
-
-    final now = DateTime.now();
-    final dateLabel = '${_weekdayNames[now.weekday - 1]}, '
-        '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}';
 
     final moreActions = HeaderActionCluster(
       actions: [
@@ -292,10 +278,10 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     );
 
     final ctaLabel = hasCheckedOut
-        ? 'Đã hoàn thành chấm công hôm nay'
+        ? 'Đã chấm công'
         : hasCheckedIn
-            ? 'Chấm công ra ca'
-            : 'Chấm công vào ca';
+            ? 'Chấm công ra'
+            : 'Chấm công vào';
     final ctaIcon = hasCheckedOut
         ? Icons.check_circle_rounded
         : hasCheckedIn
@@ -307,109 +293,57 @@ class _NhanSuScreenState extends State<NhanSuScreen>
             ? () => _handleGpsCheckOut(provider)
             : () => _handleGpsCheckIn(provider);
 
-    final hero = Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 24 : 18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    // Compact pill instead of a full-width button inside a hero card — the
+    // one daily action stays visible right next to the title, no colored
+    // block needed to carry it.
+    final checkInPill = InkWell(
+      onTap: ctaOnTap,
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+        decoration: BoxDecoration(
+          color: hasCheckedOut ? AppColors.successLight : AppColors.primary,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
         ),
-        borderRadius: BorderRadius.circular(AppRadius.panel),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(AppStrings.nhanSu,
-                    style: AppTextStyles.appTitle.copyWith(color: AppColors.white)),
-              ),
-              moreActions,
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.waving_hand_rounded, color: AppColors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Xin chào, ${currentUser?.fullName ?? ''}',
-                      style: const TextStyle(
-                          color: AppColors.white, fontSize: 17, fontWeight: FontWeight.w700),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      myStore != null ? '$dateLabel · ${myStore.name}' : dateLabel,
-                      style: TextStyle(color: AppColors.white.withValues(alpha: 0.8), fontSize: 12.5),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: ctaOnTap,
-              icon: _isCheckingIn
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-                    )
-                  : Icon(ctaIcon, size: 20),
-              label: Text(
-                _isCheckingIn ? 'Đang xác định vị trí...' : ctaLabel,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    hasCheckedOut ? AppColors.white.withValues(alpha: 0.16) : AppColors.white,
-                foregroundColor: hasCheckedOut
-                    ? AppColors.white
-                    : (hasCheckedIn ? AppColors.primaryDark : AppColors.primary),
-                disabledBackgroundColor: AppColors.white.withValues(alpha: 0.16),
-                disabledForegroundColor: AppColors.white,
-                padding: EdgeInsets.symmetric(vertical: emphasize ? 16 : 14),
-                elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _isCheckingIn
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white),
+                  )
+                : Icon(ctaIcon, size: 15, color: hasCheckedOut ? AppColors.success : AppColors.white),
+            const SizedBox(width: 6),
+            Text(
+              _isCheckingIn ? 'Đang xác định...' : ctaLabel,
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: hasCheckedOut ? AppColors.success : AppColors.white,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
 
+    // Minimal top bar — title + the one daily action + "..." menu, all
+    // sitting directly on the page background. No colored hero block.
+    final topBar = Row(
+      children: [
+        Expanded(
+          child: Text(AppStrings.nhanSu, style: AppTextStyles.appTitle),
+        ),
+        checkInPill,
+        const SizedBox(width: 8),
+        moreActions,
+      ],
+    );
+
     final statCard = Container(
-      margin: const EdgeInsets.only(top: 12),
+      margin: const EdgeInsets.only(top: 14),
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: AppDecorations.card,
       child: Row(
@@ -454,7 +388,7 @@ class _NhanSuScreenState extends State<NhanSuScreen>
     );
 
     return Column(
-      children: [hero, statCard],
+      children: [topBar, statCard],
     );
   }
 

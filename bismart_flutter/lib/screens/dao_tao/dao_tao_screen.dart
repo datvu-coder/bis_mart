@@ -95,7 +95,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
             children: [
               Padding(
                 padding: EdgeInsets.fromLTRB(contentPad, isWide ? 20 : 14, contentPad, 10),
-                child: _buildScreenHeader(provider, isWide),
+                child: _buildScreenHeader(provider),
               ),
               Expanded(
                 child: SingleChildScrollView(
@@ -170,23 +170,19 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
 
   // ── Header ────────────────────────────────────────────────────────────────
 
-  // Hero-style header — mirrors Nhân sự's gradient "primary action" card:
-  // a "Tiếp tục học" shortcut to whatever lesson is in progress (or next
-  // unstarted one) up front, instead of a plain info card with no CTA.
-  Widget _buildScreenHeader(TrainingProvider provider, bool emphasize) {
+  Widget _buildScreenHeader(TrainingProvider provider) {
     final lessonCount = provider.lessons.length;
     final todayEvents = provider.getEventsForDay(DateTime.now()).length;
     final postCount = provider.posts.length;
 
-    final addLessonAction = _isAdmin()
-        ? IconButton(
-            onPressed: () => _showCreateLessonDialog(provider),
-            icon: const Icon(Icons.add_rounded, color: AppColors.white),
-            tooltip: 'Thêm bài giảng',
-          )
-        : null;
-    final communityAction = HeaderActionCluster(
+    final moreActions = HeaderActionCluster(
       actions: [
+        if (_isAdmin())
+          HeaderAction(
+            icon: Icons.add_rounded,
+            label: 'Thêm bài giảng',
+            onPressed: () => _showCreateLessonDialog(provider),
+          ),
         HeaderAction(
           icon: Icons.forum_rounded,
           label: 'Cộng đồng',
@@ -222,109 +218,59 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     }();
     final allDone = provider.lessons.isNotEmpty && resumeLesson == null;
 
-    final hero = Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(emphasize ? 24 : 18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.panel),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(AppStrings.daoTao,
-                    style: AppTextStyles.appTitle.copyWith(color: AppColors.white)),
+    // Compact pill instead of a full-width button inside a hero card — the
+    // one daily action stays visible right next to the title, no colored
+    // block needed to carry it.
+    final continueLessonPill = (resumeLesson != null || allDone)
+        ? InkWell(
+            onTap: resumeLesson != null ? () => _showLessonDetail(resumeLesson) : null,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: allDone ? AppColors.successLight : AppColors.primary,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
               ),
-              if (addLessonAction != null) addLessonAction,
-              communityAction,
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.school_rounded, color: AppColors.white, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Nâng cao kỹ năng mỗi ngày',
-                      style: TextStyle(color: AppColors.white, fontSize: 17, fontWeight: FontWeight.w700),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    allDone ? Icons.check_circle_rounded : Icons.play_circle_rounded,
+                    size: 15,
+                    color: allDone ? AppColors.success : AppColors.white,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    allDone ? 'Đã hoàn thành' : 'Tiếp tục học',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: allDone ? AppColors.success : AppColors.white,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$lessonCount bài giảng · $todayEvents sự kiện hôm nay',
-                      style: TextStyle(color: AppColors.white.withValues(alpha: 0.8), fontSize: 12.5),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          if (resumeLesson != null || allDone) ...[
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: resumeLesson != null ? () => _showLessonDetail(resumeLesson) : null,
-                icon: Icon(
-                  resumeLesson != null ? Icons.play_circle_rounded : Icons.check_circle_rounded,
-                  size: 20,
-                ),
-                label: Text(
-                  resumeLesson != null
-                      ? 'Tiếp tục: ${resumeLesson.title}'
-                      : 'Đã hoàn thành tất cả bài giảng!',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      allDone ? AppColors.white.withValues(alpha: 0.16) : AppColors.white,
-                  foregroundColor: allDone ? AppColors.white : AppColors.primary,
-                  disabledBackgroundColor: AppColors.white.withValues(alpha: 0.16),
-                  disabledForegroundColor: AppColors.white,
-                  padding: EdgeInsets.symmetric(vertical: emphasize ? 16 : 14),
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.pill)),
-                ),
+                  ),
+                ],
               ),
             ),
-          ],
+          )
+        : null;
+
+    // Minimal top bar — title + the one daily action + "..." menu, all
+    // sitting directly on the page background. No colored hero block.
+    final topBar = Row(
+      children: [
+        Expanded(
+          child: Text(AppStrings.daoTao, style: AppTextStyles.appTitle),
+        ),
+        if (continueLessonPill != null) ...[
+          continueLessonPill,
+          const SizedBox(width: 8),
         ],
-      ),
+        moreActions,
+      ],
     );
 
     final statCard = Container(
-      margin: const EdgeInsets.only(top: 12),
+      margin: const EdgeInsets.only(top: 14),
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: AppDecorations.card,
       child: Row(
@@ -368,7 +314,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
     );
 
     return Column(
-      children: [hero, statCard],
+      children: [topBar, statCard],
     );
   }
 

@@ -16,6 +16,7 @@ import '../../models/employee.dart';
 import '../../models/store.dart';
 import '../../services/api_service.dart';
 import '../../widgets/common/responsive_form.dart';
+import '../../widgets/common/status_pill.dart';
 
 String _avatarMimeType(String? ext) {
   switch ((ext ?? '').toLowerCase()) {
@@ -83,6 +84,8 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                _buildTopBar(context, user),
+                const SizedBox(height: 14),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -91,7 +94,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildProfileHero(context, user),
+                          _buildProfileCard(context, user),
                           const SizedBox(height: 12),
                           _buildStatsCard(user),
                         ],
@@ -125,8 +128,11 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Profile hero card (title, avatar, greeting all in one)
-              _buildProfileHero(context, user),
+              _buildTopBar(context, user),
+              const SizedBox(height: 14),
+
+              // Profile card (avatar, greeting, role/store info)
+              _buildProfileCard(context, user),
               const SizedBox(height: 12),
 
               // Quick stats card
@@ -169,10 +175,41 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
     }
   }
 
-  // Hero-style profile card — same gradient card language as the other 4
-  // tabs (title folded in, white-on-gradient text/chips) instead of a bare
-  // title above a plain white-bordered card.
-  Widget _buildProfileHero(BuildContext context, Employee? user) {
+  // Minimal top bar — title + edit-profile action, sitting directly on the
+  // page background. No colored hero block.
+  Widget _buildTopBar(BuildContext context, Employee? user) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(AppStrings.caNhan, style: AppTextStyles.appTitle),
+        ),
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IconButton(
+            onPressed: () => _showEditProfileDialog(context, user),
+            icon: const Icon(Icons.edit_rounded, size: 18, color: AppColors.textPrimary),
+            tooltip: 'Chỉnh sửa hồ sơ',
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Profile card — same white+shadow card weight as everything else on the
+  // page, no gradient block singling it out.
+  Widget _buildProfileCard(BuildContext context, Employee? user) {
     final stores = context.watch<StoreProvider>().stores;
     final myStore = (user?.storeCode != null && user!.storeCode!.isNotEmpty && stores.isNotEmpty)
         ? stores.cast<dynamic>().firstWhere(
@@ -187,36 +224,19 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.panel),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.28),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      padding: const EdgeInsets.all(18),
+      decoration: AppDecorations.card,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(AppStrings.caNhan, style: AppTextStyles.appTitle.copyWith(color: AppColors.white)),
-          const SizedBox(height: 16),
           Row(
             children: [
               Container(
-                width: 68,
-                height: 68,
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
-                  color: AppColors.white,
+                  color: AppColors.primaryLight,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.white, width: 3),
                   image: hasAvatar
                       ? DecorationImage(
                           image: MemoryImage(_decodeAvatarDataUrl(user!.avatarUrl!)),
@@ -232,29 +252,29 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                               ? user!.fullName[0].toUpperCase()
                               : '?',
                           style: const TextStyle(
-                            fontSize: 28,
+                            fontSize: 24,
                             fontWeight: FontWeight.w800,
                             color: AppColors.primary,
                           ),
                         ),
                       ),
               ),
-              const SizedBox(width: 18),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       '${AppStrings.xinChao},',
-                      style: TextStyle(fontSize: 13, color: AppColors.white.withValues(alpha: 0.8)),
+                      style: AppTextStyles.caption,
                     ),
                     const SizedBox(height: 2),
                     Text(
                       user?.fullName ?? 'Người dùng',
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.white,
+                        color: AppColors.textPrimary,
                         letterSpacing: -0.3,
                       ),
                     ),
@@ -263,83 +283,43 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                       spacing: 8,
                       runSpacing: 6,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(AppRadius.chip),
-                          ),
-                          child: Text(
-                            user?.positionLabel ?? user?.position ?? '',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.white,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.white.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(AppRadius.chip),
-                          ),
-                          child: Text(
-                            user?.employeeCode ?? '',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.white.withValues(alpha: 0.85),
-                            ),
-                          ),
-                        ),
+                        StatusPill(label: user?.positionLabel ?? user?.position ?? '', color: AppColors.primary),
+                        StatusPill(label: user?.employeeCode ?? '', color: AppColors.textGrey),
                       ],
                     ),
-                    if (storeLabel != null) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(Icons.store_rounded, size: 14, color: AppColors.white.withValues(alpha: 0.8)),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              storeLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(fontSize: 12.5, color: AppColors.white.withValues(alpha: 0.85)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
-                ),
-              ),
-              GestureDetector(
-                onTap: () => _showEditProfileDialog(context, user),
-                child: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.white.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(AppRadius.row - 2),
-                  ),
-                  child: const Icon(Icons.edit_rounded, color: AppColors.white, size: 18),
                 ),
               ),
             ],
           ),
+          if (storeLabel != null) ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Icon(Icons.store_rounded, size: 15, color: AppColors.textSecondary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    storeLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.bodyText,
+                  ),
+                ),
+              ],
+            ),
+          ],
           if (user != null && context.watch<PermissionProvider>().managedStoreIds.length >= 2) ...[
             const SizedBox(height: 14),
             OutlinedButton.icon(
               onPressed: () => _showTransferStoreDialog(context, user),
-              icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: AppColors.white),
+              icon: const Icon(Icons.swap_horiz_rounded, size: 16, color: AppColors.primary),
               label: const Text(
                 'Chuyển cửa hàng',
-                style: TextStyle(color: AppColors.white, fontSize: 13),
+                style: TextStyle(color: AppColors.primary, fontSize: 13),
               ),
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: AppColors.white.withValues(alpha: 0.5)),
+                side: const BorderSide(color: AppColors.border),
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.row)),
               ),
