@@ -55,6 +55,14 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
       if (currentUser != null) {
         context.read<PermissionProvider>().resolveForUser(currentUser);
       }
+      // The stats card below shows employee count + this user's rank —
+      // both come from EmployeeProvider, which this screen never loaded
+      // on its own before. Opening Cá nhân without visiting Nhân sự first
+      // in the same session left it empty, showing "0 nhân viên" / "#-".
+      final empProvider = context.read<EmployeeProvider>();
+      if (empProvider.employees.isEmpty) {
+        empProvider.loadEmployees();
+      }
     });
   }
 
