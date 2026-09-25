@@ -178,19 +178,29 @@ class _FloatingNavItem extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Center(
-        // No tinted pill behind the active item — the whole bar keeps one
-        // flat background, selection reads purely through icon/label color.
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                // Always the bold/filled glyph — inactive tabs differ only
-                // by color, not by a thinner outline icon.
-                item.selectedIcon,
-                size: 25,
-                color: isSelected ? AppColors.primary : AppColors.textDark,
+              // Selected tab gets a solid colored circle behind its icon
+              // instead of only a color change — a clearer, more premium
+              // "you are here" cue than color alone.
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  // Always the bold/filled glyph — inactive tabs differ only
+                  // by color, not by a thinner outline icon.
+                  item.selectedIcon,
+                  size: 20,
+                  color: isSelected ? AppColors.white : AppColors.textDark,
+                ),
               ),
               const SizedBox(height: 1),
               Text(

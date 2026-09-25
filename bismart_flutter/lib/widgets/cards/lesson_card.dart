@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/lesson.dart';
+import '../common/status_pill.dart';
 
 /// Compact, mobile-first lesson card with progress bar.
 /// - Whole card is tappable (Tham gia học).
@@ -131,11 +132,9 @@ class LessonCard extends StatelessWidget {
             _chip(Icons.list_alt_rounded, '${lesson.partCount} phần'),
             _chip(Icons.group_outlined, lesson.targetRole),
             if (isDone)
-              _chip(Icons.verified_rounded, 'Hoàn thành',
-                  color: AppColors.success)
+              const StatusPill(label: 'Hoàn thành', color: AppColors.success)
             else if (isNew)
-              _chip(Icons.fiber_new_rounded, 'Mới',
-                  color: AppColors.warning),
+              const StatusPill(label: 'Mới', color: AppColors.warning),
           ],
         ),
         const SizedBox(height: 8),
