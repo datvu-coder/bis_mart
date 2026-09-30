@@ -251,9 +251,8 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
                           user?.fullName.isNotEmpty == true
                               ? user!.fullName[0].toUpperCase()
                               : '?',
-                          style: const TextStyle(
+                          style: AppTextStyles.statValue.copyWith(
                             fontSize: 24,
-                            fontWeight: FontWeight.w800,
                             color: AppColors.primary,
                           ),
                         ),
@@ -408,7 +407,7 @@ class _CaNhanScreenState extends State<CaNhanScreen> {
             const SizedBox(height: 6),
             Text(
               value,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color),
+              style: AppTextStyles.statValue.copyWith(color: color),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

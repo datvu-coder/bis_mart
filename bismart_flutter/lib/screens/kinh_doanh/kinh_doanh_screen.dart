@@ -401,7 +401,7 @@ class _KinhDoanhScreenState extends State<KinhDoanhScreen>
             const SizedBox(height: 6),
             Text(
               value,
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color),
+              style: AppTextStyles.statValue.copyWith(color: color),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

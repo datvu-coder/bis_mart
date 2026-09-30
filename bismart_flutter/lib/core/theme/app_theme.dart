@@ -6,11 +6,11 @@ class AppTheme {
   AppTheme._();
 
   static ThemeData get lightTheme {
-    final interFamily = GoogleFonts.inter().fontFamily;
+    final bodyFamily = GoogleFonts.beVietnamPro().fontFamily;
     return ThemeData(
       useMaterial3: true,
-      fontFamily: interFamily,
-      textTheme: GoogleFonts.interTextTheme(),
+      fontFamily: bodyFamily,
+      textTheme: GoogleFonts.beVietnamProTextTheme(),
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
         primary: AppColors.primary,
@@ -24,7 +24,7 @@ class AppTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
-          fontFamily: interFamily,
+          fontFamily: bodyFamily,
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: AppColors.textDark,
@@ -50,8 +50,8 @@ class AppTheme {
             borderRadius: BorderRadius.circular(14),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter',
+          textStyle: TextStyle(
+            fontFamily: bodyFamily,
             fontSize: 14,
             fontWeight: FontWeight.w600,
             letterSpacing: 0,
@@ -74,8 +74,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter',
+          textStyle: TextStyle(
+            fontFamily: bodyFamily,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -119,8 +119,8 @@ class AppTheme {
         backgroundColor: AppColors.white,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        titleTextStyle: const TextStyle(
-          fontFamily: 'Inter',
+        titleTextStyle: TextStyle(
+          fontFamily: bodyFamily,
           fontSize: 18,
           fontWeight: FontWeight.w700,
           color: AppColors.textDark,
@@ -130,8 +130,8 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.textDark,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        contentTextStyle: const TextStyle(
-          fontFamily: 'Inter',
+        contentTextStyle: TextStyle(
+          fontFamily: bodyFamily,
           fontSize: 14,
           color: AppColors.white,
         ),
@@ -141,15 +141,15 @@ class AppTheme {
         indicatorColor: AppColors.primaryLight,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return const TextStyle(
-              fontFamily: 'Inter',
+            return TextStyle(
+              fontFamily: bodyFamily,
               fontSize: 11,
               fontWeight: FontWeight.w600,
               color: AppColors.primary,
             );
           }
-          return const TextStyle(
-            fontFamily: 'Inter',
+          return TextStyle(
+            fontFamily: bodyFamily,
             fontSize: 11,
             color: AppColors.textGrey,
           );
@@ -178,7 +178,7 @@ class AppDecorations {
   AppDecorations._();
 
   // Clean white surface + soft shadow + hairline border. A pure-white
-  // fill guarantees visible contrast against the app's light-gray page
+  // fill guarantees visible contrast against the app's warm-ivory page
   // background and against warm-tinted banners/chips no matter how
   // subtle any of those tints are — a tonal (colored-fill) card was tried
   // here and looked washed-out/undifferentiated against those neutrals,
@@ -187,7 +187,7 @@ class AppDecorations {
   static final _cardBorder = Border.all(color: AppColors.border.withValues(alpha: 0.6));
   static final _cardShadow = <BoxShadow>[
     BoxShadow(
-      color: Colors.black.withValues(alpha: 0.05),
+      color: AppColors.textDark.withValues(alpha: 0.05),
       blurRadius: 16,
       offset: const Offset(0, 4),
     ),
@@ -248,19 +248,23 @@ class AppDecorations {
 class AppTextStyles {
   AppTextStyles._();
 
-  static const appTitle = TextStyle(
-    fontSize: 24,
-    fontWeight: FontWeight.w800,
+  // Display type — Fraunces, the serif used for headline titles and
+  // numbers in the "Bi'S MART — Thiết kế mới" design (everything else
+  // stays the app's default body sans, Be Vietnam Pro, inherited from
+  // ThemeData.fontFamily).
+  static final appTitle = GoogleFonts.fraunces(
+    fontSize: 22,
+    fontWeight: FontWeight.w600,
     color: AppColors.textDark,
-    letterSpacing: -0.8,
+    letterSpacing: -0.3,
     height: 1.2,
   );
 
-  static const sectionHeader = TextStyle(
+  static final sectionHeader = GoogleFonts.fraunces(
     fontSize: 16,
-    fontWeight: FontWeight.w700,
+    fontWeight: FontWeight.w600,
     color: AppColors.textDark,
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
   );
 
   static const bodyText = TextStyle(
@@ -301,11 +305,20 @@ class AppTextStyles {
     color: AppColors.primary,
   );
 
-  static const metric = TextStyle(
-    fontSize: 28,
-    fontWeight: FontWeight.w800,
+  /// Small headline figure used in stat-row tiles (member counts, KPI
+  /// scores, revenue) — same Fraunces display type as [appTitle]/[metric]
+  /// but sized for a compact 3-up row instead of a full metric card.
+  static final statValue = GoogleFonts.fraunces(
+    fontSize: 17,
+    fontWeight: FontWeight.w600,
     color: AppColors.textDark,
-    letterSpacing: -0.5,
+  );
+
+  static final metric = GoogleFonts.fraunces(
+    fontSize: 26,
+    fontWeight: FontWeight.w600,
+    color: AppColors.textDark,
+    letterSpacing: -0.3,
     height: 1.1,
   );
 
