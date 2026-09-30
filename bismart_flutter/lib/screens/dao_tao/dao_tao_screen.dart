@@ -340,7 +340,7 @@ class _DaoTaoScreenState extends State<DaoTaoScreen>
               child: Icon(icon, size: 17, color: color),
             ),
             const SizedBox(height: 6),
-            Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color)),
+            Text(value, style: AppTextStyles.statValue.copyWith(color: color)),
             const SizedBox(height: 2),
             Text(
               label,

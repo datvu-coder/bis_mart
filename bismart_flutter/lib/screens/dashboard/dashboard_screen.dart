@@ -197,7 +197,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 4),
         Text(
           CurrencyFormatter.formatVND(data.totalRevenue),
-          style: const TextStyle(color: AppColors.textPrimary, fontSize: 30, fontWeight: FontWeight.w800, letterSpacing: -0.5),
+          style: AppTextStyles.metric.copyWith(fontSize: 30),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
