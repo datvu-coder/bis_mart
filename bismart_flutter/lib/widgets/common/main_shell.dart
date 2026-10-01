@@ -117,8 +117,8 @@ class _MainShellState extends State<MainShell> {
 }
 
 /// Bottom nav as a floating rounded card with a gap from the screen edges,
-/// the active item's icon+label wrapped in one tinted pill — instead of a
-/// full-width bar flush with the edges.
+/// icon-only (the active tab's icon sits in a solid colored circle) instead
+/// of a full-width bar with icon+label flush to the edges.
 class _FloatingNavBar extends StatelessWidget {
   final List<_NavItem> items;
   final int selectedIndex;
@@ -133,7 +133,7 @@ class _FloatingNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 58,
+      height: 64,
       decoration: BoxDecoration(
         color: AppColors.white,
         borderRadius: BorderRadius.circular(28),
@@ -174,47 +174,36 @@ class _FloatingNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Selected tab gets a solid colored circle behind its icon
-              // instead of only a color change — a clearer, more premium
-              // "you are here" cue than color alone.
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  // Always the bold/filled glyph — inactive tabs differ only
-                  // by color, not by a thinner outline icon.
-                  item.selectedIcon,
-                  size: 20,
-                  color: isSelected ? AppColors.white : AppColors.textDark,
-                ),
+    // Icon-only row (no label underneath) — the label still reaches
+    // screen readers and desktop/web hover via Tooltip/Semantics.
+    return Tooltip(
+      message: item.label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            // Selected tab gets a solid colored circle behind its icon
+            // instead of only a color change — a clearer, more premium
+            // "you are here" cue than color alone.
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.primary : Colors.transparent,
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 1),
-              Text(
-                item.label,
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.clip,
-                style: TextStyle(
-                  fontSize: 9.5,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? AppColors.primary : AppColors.textGrey,
-                ),
+              child: Icon(
+                // Always the bold/filled glyph — inactive tabs differ only
+                // by color, not by a thinner outline icon.
+                item.selectedIcon,
+                size: 24,
+                color: isSelected ? AppColors.white : AppColors.textDark,
+                semanticLabel: item.label,
               ),
-            ],
+            ),
           ),
         ),
       ),
