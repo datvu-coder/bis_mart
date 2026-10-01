@@ -4973,6 +4973,552 @@ def api_delete_event():
     return jsonify({"ok": True})
 
 
+# ---------------------------------------------------------------------------
+# Zalo Mini App: Zalo account linking + task assignment / store work tracking
+# ---------------------------------------------------------------------------
+
+ZALO_GRAPH_ME_URL = "https://graph.zalo.me/v2.0/me?fields=id,name,picture"
+ZALO_OA_SEND_URL = "https://openapi.zalo.me/v3.0/oa/message/cs"
+ZALO_OA_ACCESS_TOKEN = os.getenv("ZALO_OA_ACCESS_TOKEN", "")
+TASK_PHOTO_DIR = Path(os.getenv("TASK_PHOTO_DIR", "/data/task_photos"))
+try:
+    TASK_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    TASK_PHOTO_DIR = Path(os.getenv("BASE_DIR", ".")) / "task_photos"
+    TASK_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
+ALLOWED_PHOTO_EXT = {".jpg", ".jpeg", ".png", ".webp", ".heic"}
+MAX_PHOTO_BYTES = 10 * 1024 * 1024
+TASK_STATUSES = ("todo", "doing", "done", "cancelled")
+TASK_PRIORITIES = ("low", "normal", "high", "urgent")
+TASK_RECURRENCES = ("none", "daily", "weekly")
+
+
+def _now_iso() -> str:
+    return datetime.now(tz=VN_TZ).strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _verify_zalo_access_token(access_token: str) -> dict | None:
+    """Resolve a Mini App access token to the Zalo user via the Graph API, so
+    the Zalo ID is never taken on the client's word."""
+    if not access_token:
+        return None
+    req = urllib.request.Request(ZALO_GRAPH_ME_URL, headers={"access_token": access_token})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+    if not isinstance(body, dict) or body.get("error") or not body.get("id"):
+        return None
+    return body
+
+
+def _notify_zalo(employee_id: int | None, text: str) -> None:
+    """Best-effort OA push to an employee's linked Zalo account. Never raises:
+    a notification failure must not fail the task write that triggered it."""
+    if not employee_id or not ZALO_OA_ACCESS_TOKEN:
+        return
+    try:
+        db = get_db()
+        with db.cursor() as cur:
+            cur.execute("SELECT zalo_id FROM employees WHERE id = %s", (employee_id,))
+            row = cur.fetchone() or {}
+        zalo_id = row.get("zalo_id")
+        if not zalo_id:
+            return
+        payload = json.dumps({
+            "recipient": {"user_id": zalo_id},
+            "message": {"text": text[:1900]},
+        }).encode("utf-8")
+        req = urllib.request.Request(
+            ZALO_OA_SEND_URL,
+            data=payload,
+            headers={"Content-Type": "application/json", "access_token": ZALO_OA_ACCESS_TOKEN},
+        )
+        urllib.request.urlopen(req, timeout=8).read()
+    except Exception:
+        pass
+
+
+@app.post("/api/auth/zalo-link")
+@login_required
+def api_zalo_link():
+    """Bind the Zalo account of a Mini App session to the logged-in employee."""
+    data = request.get_json(silent=True) or {}
+    zalo = _verify_zalo_access_token((data.get("accessToken") or "").strip())
+    if not zalo:
+        return jsonify({"error": "Invalid Zalo access token"}), 400
+    employee_id = (g.current_user or {}).get("employee_id")
+    if not employee_id:
+        return jsonify({"error": "Account has no employee profile"}), 400
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM employees WHERE zalo_id = %s AND id <> %s",
+            (str(zalo["id"]), employee_id),
+        )
+        if cur.fetchone():
+            return jsonify({"error": "Zalo account already linked to another employee"}), 409
+        cur.execute("UPDATE employees SET zalo_id = %s WHERE id = %s", (str(zalo["id"]), employee_id))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/auth/zalo-login")
+def api_zalo_login():
+    """One-tap login for an employee whose Zalo account was linked earlier."""
+    data = request.get_json(silent=True) or {}
+    zalo = _verify_zalo_access_token((data.get("accessToken") or "").strip())
+    if not zalo:
+        return jsonify({"error": "Invalid Zalo access token"}), 401
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT u.id as user_id, u.username, u.employee_id as auth_employee_id, e.* FROM employees e "
+            "JOIN users u ON u.employee_id = e.id "
+            "WHERE e.zalo_id = %s AND e.is_active = 1 LIMIT 1",
+            (str(zalo["id"]),),
+        )
+        user_row = cur.fetchone()
+    if not user_row:
+        return jsonify({"error": "Zalo account not linked", "code": "NOT_LINKED"}), 404
+    token = create_token(user_row["user_id"], user_row.get("auth_employee_id"))
+    return jsonify({"token": token, "user": _user_to_api_json(user_row)})
+
+
+def _task_viewer() -> dict:
+    """Caller's employee id, store scope and whether they can assign/manage tasks."""
+    user_id = (g.current_user or {}).get("user_id")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT e.id, e.full_name, e.store_code, p.can_employees, p.can_crud "
+            "FROM users u LEFT JOIN employees e ON e.id = u.employee_id "
+            "LEFT JOIN permissions p ON UPPER(p.position) = UPPER(e.position) "
+            "WHERE u.id = %s",
+            (user_id,),
+        )
+        row = cur.fetchone() or {}
+    is_admin = _is_admin_user()
+    return {
+        "employee_id": row.get("id"),
+        "name": row.get("full_name") or "",
+        "store_code": (row.get("store_code") or "").upper(),
+        "scope": _allowed_store_codes_for_current_user(),  # None = all stores
+        "can_manage": bool(is_admin or row.get("can_crud") or row.get("can_employees")),
+    }
+
+
+def _task_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
+    try:
+        photos = json.loads(row.get("photo_urls") or "[]")
+    except Exception:
+        photos = []
+    due_at = row.get("due_at")
+    status = row.get("status") or "todo"
+    overdue = bool(due_at) and status in ("todo", "doing") and due_at < _now_iso()
+    return {
+        "id": row["id"],
+        "title": row.get("title") or "",
+        "description": row.get("description") or "",
+        "storeCode": row.get("store_code") or "",
+        "storeName": row.get("store_name") or "",
+        "assigneeId": row.get("assignee_id"),
+        "assigneeName": row.get("assignee_name") or "",
+        "assignedById": row.get("assigned_by"),
+        "assignedByName": row.get("assigner_name") or "",
+        "priority": row.get("priority") or "normal",
+        "status": status,
+        "dueAt": due_at,
+        "overdue": overdue,
+        "recurrence": row.get("recurrence") or "none",
+        "requirePhoto": bool(row.get("require_photo")),
+        "photoUrls": photos,
+        "completedAt": row.get("completed_at"),
+        "completionNote": row.get("completion_note") or "",
+        "createdAt": row.get("created_at"),
+        "updatedAt": row.get("updated_at"),
+    }
+
+
+_TASK_SELECT = (
+    "SELECT t.*, a.full_name AS assignee_name, b.full_name AS assigner_name, s.name AS store_name "
+    "FROM tasks t "
+    "LEFT JOIN employees a ON a.id = t.assignee_id "
+    "LEFT JOIN employees b ON b.id = t.assigned_by "
+    "LEFT JOIN stores s ON UPPER(s.store_code) = UPPER(t.store_code) "
+)
+
+
+def _fetch_task(task_id: int) -> dict | None:
+    with get_db().cursor() as cur:
+        cur.execute(_TASK_SELECT + "WHERE t.id = %s", (task_id,))
+        return cur.fetchone()
+
+
+def _can_view_task(task: dict, viewer: dict) -> bool:
+    if task.get("assignee_id") == viewer["employee_id"] or task.get("assigned_by") == viewer["employee_id"]:
+        return True
+    if viewer["scope"] is None:
+        return True
+    return viewer["can_manage"] and (task.get("store_code") or "").upper() in viewer["scope"]
+
+
+def _can_manage_task(task: dict, viewer: dict) -> bool:
+    if not viewer["can_manage"]:
+        return False
+    if task.get("assigned_by") == viewer["employee_id"] or viewer["scope"] is None:
+        return True
+    return (task.get("store_code") or "").upper() in viewer["scope"]
+
+
+def _next_due(due_at: str | None, recurrence: str) -> str:
+    base = datetime.now(tz=VN_TZ).replace(tzinfo=None)
+    if due_at:
+        try:
+            base = datetime.strptime(due_at[:19], "%Y-%m-%dT%H:%M:%S")
+        except ValueError:
+            pass
+    step = timedelta(days=7 if recurrence == "weekly" else 1)
+    nxt = base + step
+    now = datetime.now(tz=VN_TZ).replace(tzinfo=None)
+    while nxt < now:  # skip occurrences already missed
+        nxt += step
+    return nxt.strftime("%Y-%m-%dT%H:%M:%S")
+
+
+def _spawn_next_occurrence(task: dict) -> None:
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO tasks (title, description, store_code, assignee_id, assigned_by, priority, "
+            "due_at, recurrence, require_photo, created_at, updated_at) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            (
+                task["title"], task.get("description"), task.get("store_code") or "",
+                task.get("assignee_id"), task.get("assigned_by"), task.get("priority") or "normal",
+                _next_due(task.get("due_at"), task["recurrence"]), task["recurrence"],
+                task.get("require_photo") or 0, _now_iso(), _now_iso(),
+            ),
+        )
+
+
+def _clean_photo_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [secure_filename(str(v)) for v in value[:10] if v]
+
+
+@app.get("/api/tasks")
+@login_required
+def api_list_tasks():
+    viewer = _task_viewer()
+    where, params = [], []
+    status = request.args.get("status")
+    if status in TASK_STATUSES:
+        where.append("t.status = %s")
+        params.append(status)
+    store = (request.args.get("storeCode") or "").strip().upper()
+    if store:
+        where.append("UPPER(t.store_code) = %s")
+        params.append(store)
+    assignee = request.args.get("assigneeId")
+    if request.args.get("mine") == "1":
+        assignee = str(viewer["employee_id"])
+    if assignee and assignee.isdigit():
+        where.append("t.assignee_id = %s")
+        params.append(int(assignee))
+
+    # Visibility: own tasks always; managers also see their store scope.
+    if viewer["scope"] is not None:
+        vis, vparams = ["t.assignee_id = %s", "t.assigned_by = %s"], [viewer["employee_id"]] * 2
+        if viewer["can_manage"] and viewer["scope"]:
+            vis.append("UPPER(t.store_code) = ANY(%s)")
+            vparams.append(list(viewer["scope"]))
+        where.append("(" + " OR ".join(vis) + ")")
+        params.extend(vparams)
+
+    sql = _TASK_SELECT + ("WHERE " + " AND ".join(where) + " " if where else "")
+    sql += "ORDER BY (t.status IN ('done','cancelled')), t.due_at IS NULL, t.due_at ASC, t.id DESC LIMIT 300"
+    with get_db().cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    return jsonify({"tasks": [_task_to_api_json(r) for r in rows], "canManage": viewer["can_manage"]})
+
+
+@app.post("/api/tasks")
+@login_required
+def api_create_task():
+    viewer = _task_viewer()
+    if not viewer["can_manage"]:
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "Title is required"}), 400
+    priority = data.get("priority") or "normal"
+    recurrence = data.get("recurrence") or "none"
+    if priority not in TASK_PRIORITIES or recurrence not in TASK_RECURRENCES:
+        return jsonify({"error": "Invalid priority or recurrence"}), 400
+
+    assignee_id = data.get("assigneeId")
+    store_code = (data.get("storeCode") or "").strip().upper()
+    db = get_db()
+    if assignee_id:
+        with db.cursor() as cur:
+            cur.execute("SELECT id, store_code FROM employees WHERE id = %s AND is_active = 1", (assignee_id,))
+            assignee = cur.fetchone()
+        if not assignee:
+            return jsonify({"error": "Assignee not found"}), 404
+        store_code = store_code or (assignee.get("store_code") or "").upper()
+    if viewer["scope"] is not None and store_code not in viewer["scope"]:
+        return _forbidden()
+
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO tasks (title, description, store_code, assignee_id, assigned_by, priority, due_at, "
+            "recurrence, require_photo, created_at, updated_at) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (
+                title, (data.get("description") or "").strip(), store_code, assignee_id or None,
+                viewer["employee_id"], priority, data.get("dueAt") or None, recurrence,
+                1 if data.get("requirePhoto") else 0, _now_iso(), _now_iso(),
+            ),
+        )
+        task_id = cur.fetchone()["id"]
+    db.commit()
+    if assignee_id:
+        due = f" - hạn {data['dueAt'].replace('T', ' ')}" if data.get("dueAt") else ""
+        _notify_zalo(int(assignee_id), f"Bạn được giao việc mới: {title}{due}\nGiao bởi: {viewer['name']}")
+    return jsonify(_task_to_api_json(_fetch_task(task_id))), 201
+
+
+@app.get("/api/tasks/summary")
+@login_required
+def api_tasks_summary():
+    """Per-store counts for the manager dashboard (scoped like the list)."""
+    viewer = _task_viewer()
+    if not viewer["can_manage"]:
+        return _forbidden()
+    sql = (
+        "SELECT t.store_code, s.name AS store_name, "
+        "COUNT(*) FILTER (WHERE t.status = 'todo') AS todo, "
+        "COUNT(*) FILTER (WHERE t.status = 'doing') AS doing, "
+        "COUNT(*) FILTER (WHERE t.status = 'done') AS done, "
+        "COUNT(*) FILTER (WHERE t.status IN ('todo','doing') AND t.due_at < %s) AS overdue "
+        "FROM tasks t LEFT JOIN stores s ON UPPER(s.store_code) = UPPER(t.store_code) "
+        "WHERE t.status <> 'cancelled' "
+    )
+    params: list[Any] = [_now_iso()]
+    if viewer["scope"] is not None:
+        sql += "AND UPPER(t.store_code) = ANY(%s) "
+        params.append(list(viewer["scope"]))
+    sql += "GROUP BY t.store_code, s.name ORDER BY overdue DESC, t.store_code"
+    with get_db().cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    return jsonify({"stores": [
+        {"storeCode": r["store_code"], "storeName": r.get("store_name") or "", "todo": r["todo"],
+         "doing": r["doing"], "done": r["done"], "overdue": r["overdue"]} for r in rows
+    ]})
+
+
+@app.get("/api/tasks/assignees")
+@login_required
+def api_task_assignees():
+    viewer = _task_viewer()
+    if not viewer["can_manage"]:
+        return _forbidden()
+    sql = "SELECT id, full_name, employee_code, position, store_code FROM employees WHERE is_active = 1 "
+    params: list[Any] = []
+    if viewer["scope"] is not None:
+        sql += "AND UPPER(store_code) = ANY(%s) "
+        params.append(list(viewer["scope"]))
+    sql += "ORDER BY store_code, full_name"
+    with get_db().cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    return jsonify({"employees": [
+        {"id": r["id"], "fullName": r["full_name"], "employeeCode": r["employee_code"],
+         "position": r["position"], "storeCode": r.get("store_code") or ""} for r in rows
+    ]})
+
+
+@app.post("/api/tasks/upload-photo")
+@login_required
+def api_upload_task_photo():
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "no file"}), 400
+    ext = os.path.splitext(secure_filename(f.filename or "photo.jpg"))[1].lower() or ".jpg"
+    if ext not in ALLOWED_PHOTO_EXT:
+        return jsonify({"error": f"ext {ext} not allowed"}), 400
+    fname = f"{uuid.uuid4().hex}{ext}"
+    target = TASK_PHOTO_DIR / fname
+    f.save(target)
+    if target.stat().st_size > MAX_PHOTO_BYTES:
+        target.unlink(missing_ok=True)
+        return jsonify({"error": "file too large"}), 413
+    return jsonify({"photoUrl": fname})
+
+
+@app.get("/api/tasks/photo/<path:fname>")
+def api_task_photo(fname: str):
+    # Names are unguessable UUIDs and <img> cannot send an Authorization header.
+    full = TASK_PHOTO_DIR / secure_filename(fname)
+    if not full.is_file():
+        return jsonify({"error": "missing"}), 404
+    mime = mimetypes.guess_type(str(full))[0] or "application/octet-stream"
+    return Response(full.read_bytes(), mimetype=mime, headers={"Cache-Control": "private, max-age=86400"})
+
+
+@app.get("/api/tasks/<int:task_id>")
+@login_required
+def api_get_task(task_id: int):
+    viewer = _task_viewer()
+    task = _fetch_task(task_id)
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    if not _can_view_task(task, viewer):
+        return _forbidden()
+    with get_db().cursor() as cur:
+        cur.execute(
+            "SELECT c.id, c.body, c.created_at, c.author_id, e.full_name FROM task_comments c "
+            "LEFT JOIN employees e ON e.id = c.author_id WHERE c.task_id = %s ORDER BY c.id ASC",
+            (task_id,),
+        )
+        comments = cur.fetchall()
+    out = _task_to_api_json(task)
+    out["canManage"] = _can_manage_task(task, viewer)
+    out["comments"] = [
+        {"id": c["id"], "body": c["body"], "createdAt": c["created_at"],
+         "authorId": c["author_id"], "authorName": c.get("full_name") or ""} for c in comments
+    ]
+    return jsonify(out)
+
+
+@app.put("/api/tasks/<int:task_id>")
+@login_required
+def api_update_task(task_id: int):
+    viewer = _task_viewer()
+    task = _fetch_task(task_id)
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    if not _can_manage_task(task, viewer):
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    priority = data.get("priority", task["priority"])
+    recurrence = data.get("recurrence", task["recurrence"])
+    if priority not in TASK_PRIORITIES or recurrence not in TASK_RECURRENCES:
+        return jsonify({"error": "Invalid priority or recurrence"}), 400
+    title = (data.get("title", task["title"]) or "").strip()
+    if not title:
+        return jsonify({"error": "Title is required"}), 400
+    new_assignee = data.get("assigneeId", task["assignee_id"]) or None
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE tasks SET title=%s, description=%s, assignee_id=%s, priority=%s, due_at=%s, "
+            "recurrence=%s, require_photo=%s, updated_at=%s WHERE id=%s",
+            (
+                title, data.get("description", task["description"]), new_assignee, priority,
+                data.get("dueAt", task["due_at"]) or None, recurrence,
+                1 if data.get("requirePhoto", bool(task["require_photo"])) else 0, _now_iso(), task_id,
+            ),
+        )
+    db.commit()
+    if new_assignee and new_assignee != task["assignee_id"]:
+        _notify_zalo(int(new_assignee), f"Bạn được giao việc: {title}\nGiao bởi: {viewer['name']}")
+    return jsonify(_task_to_api_json(_fetch_task(task_id)))
+
+
+@app.post("/api/tasks/<int:task_id>/status")
+@login_required
+def api_set_task_status(task_id: int):
+    """Assignee or manager moves a task along; completing may require photo proof."""
+    viewer = _task_viewer()
+    task = _fetch_task(task_id)
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    is_assignee = task.get("assignee_id") == viewer["employee_id"]
+    is_manager = _can_manage_task(task, viewer)
+    if not (is_assignee or is_manager):
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    status = data.get("status")
+    if status not in TASK_STATUSES:
+        return jsonify({"error": "Invalid status"}), 400
+    if status == "cancelled" and not is_manager:
+        return _forbidden()
+
+    photos = _clean_photo_list(data.get("photoUrls")) or json.loads(task.get("photo_urls") or "[]")
+    if status == "done" and task.get("require_photo") and not photos:
+        return jsonify({"error": "Photo proof is required to complete this task"}), 400
+
+    done_now = status == "done" and task["status"] != "done"
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE tasks SET status=%s, photo_urls=%s, completion_note=%s, completed_at=%s, updated_at=%s "
+            "WHERE id=%s",
+            (
+                status, json.dumps(photos),
+                (data.get("note") if "note" in data else task.get("completion_note")),
+                _now_iso() if status == "done" else None, _now_iso(), task_id,
+            ),
+        )
+    db.commit()
+    if done_now:
+        if task.get("recurrence") in ("daily", "weekly"):
+            _spawn_next_occurrence(task)
+            db.commit()
+        if task.get("assigned_by") and task["assigned_by"] != viewer["employee_id"]:
+            _notify_zalo(task["assigned_by"], f"{viewer['name']} đã hoàn thành: {task['title']}")
+    return jsonify(_task_to_api_json(_fetch_task(task_id)))
+
+
+@app.post("/api/tasks/<int:task_id>/comments")
+@login_required
+def api_add_task_comment(task_id: int):
+    viewer = _task_viewer()
+    task = _fetch_task(task_id)
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    if not _can_view_task(task, viewer):
+        return _forbidden()
+    body = ((request.get_json(silent=True) or {}).get("body") or "").strip()
+    if not body:
+        return jsonify({"error": "Empty comment"}), 400
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO task_comments (task_id, author_id, body, created_at) VALUES (%s,%s,%s,%s) RETURNING id",
+            (task_id, viewer["employee_id"], body, _now_iso()),
+        )
+        cid = cur.fetchone()["id"]
+    db.commit()
+    for target in {task.get("assignee_id"), task.get("assigned_by")} - {viewer["employee_id"], None}:
+        _notify_zalo(target, f"{viewer['name']} bình luận về \"{task['title']}\": {body[:200]}")
+    return jsonify({"id": cid, "body": body, "authorId": viewer["employee_id"],
+                    "authorName": viewer["name"], "createdAt": _now_iso()}), 201
+
+
+@app.delete("/api/tasks/<int:task_id>")
+@login_required
+def api_delete_task(task_id: int):
+    viewer = _task_viewer()
+    task = _fetch_task(task_id)
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    if not _can_manage_task(task, viewer):
+        return _forbidden()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
 @app.get("/healthz")
 def healthz():
     db = get_db()

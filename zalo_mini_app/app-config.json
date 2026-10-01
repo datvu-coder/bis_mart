@@ -1,0 +1,13 @@
+{
+  "app": {
+    "title": "Bi'S MART Công việc",
+    "headerTitle": "Bi'S MART Công việc",
+    "headerColor": "#C1622B",
+    "textColor": "white",
+    "statusBar": "normal",
+    "leftButton": "back"
+  },
+  "listCSS": [],
+  "listSyncJS": [],
+  "listAsyncJS": []
+}

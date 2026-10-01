@@ -1274,3 +1274,38 @@ CREATE TABLE IF NOT EXISTS report_returns (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_report_returns_report ON report_returns(report_id);
+
+-- Zalo Mini App: link an employee to their Zalo account (one-tap login)
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS zalo_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_zalo_id ON employees(zalo_id) WHERE zalo_id IS NOT NULL;
+
+-- Task assignment & store work tracking
+CREATE TABLE IF NOT EXISTS tasks (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    store_code TEXT NOT NULL DEFAULT '',
+    assignee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    assigned_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    priority TEXT NOT NULL DEFAULT 'normal',      -- low | normal | high | urgent
+    status TEXT NOT NULL DEFAULT 'todo',          -- todo | doing | done | cancelled
+    due_at TEXT,
+    recurrence TEXT NOT NULL DEFAULT 'none',      -- none | daily | weekly
+    require_photo INTEGER NOT NULL DEFAULT 0,
+    photo_urls TEXT NOT NULL DEFAULT '[]',        -- JSON array of uploaded file names (completion proof)
+    completed_at TEXT,
+    completion_note TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_store ON tasks(store_code, status);
+
+CREATE TABLE IF NOT EXISTS task_comments (
+    id SERIAL PRIMARY KEY,
+    task_id INTEGER NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    author_id INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id);
