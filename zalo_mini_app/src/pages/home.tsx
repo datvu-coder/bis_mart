@@ -5,10 +5,11 @@ import BottomNav, { TabKey } from "../components/BottomNav";
 import Icon from "../components/Icon";
 import { uiState, useTaskData } from "../data";
 import MeTab from "./tabs/me-tab";
+import OverviewTab from "./tabs/overview-tab";
 import SummaryTab from "./tabs/summary-tab";
 import TasksTab from "./tabs/tasks-tab";
 
-const ORDER: TabKey[] = ["tasks", "summary", "me"];
+const ORDER: TabKey[] = ["overview", "tasks", "summary", "me"];
 
 /**
  * One shell for the three main tabs: the bottom bar stays put and only the panel content cross-fades,
@@ -36,6 +37,7 @@ export default function HomePage() {
 
   return (
     <Page className="shell-page disable-scrolling">
+      {panel("overview", <OverviewTab active={current === "overview"} />)}
       {panel("tasks", <TasksTab {...data} jump={jump} />)}
       {data.canManage && panel("summary", (
         <SummaryTab

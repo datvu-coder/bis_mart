@@ -1,4 +1,4 @@
-import type { Assignee, StoreSummary, Task, TaskDetail, User } from "./types";
+import type { Analytics, Assignee, StoreSummary, Task, TaskDetail, User } from "./types";
 
 const BASE_URL: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "https://api.bismart.id.vn";
 const TOKEN_KEY = "bismart_token";
@@ -101,6 +101,8 @@ export const api = {
   addComment: (id: number, body: string) =>
     request<{ id: number }>("POST", `/api/tasks/${id}/comments`, { body }),
   summary: () => request<{ stores: StoreSummary[] }>("GET", "/api/tasks/summary"),
+  analytics: (days: number, storeCode: string) =>
+    request<Analytics>("GET", `/api/tasks/analytics?${new URLSearchParams({ days: String(days), storeCode })}`),
   assignees: () => request<{ employees: Assignee[] }>("GET", "/api/tasks/assignees"),
   uploadPhoto: (file: File) => {
     const form = new FormData();

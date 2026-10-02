@@ -5325,6 +5325,125 @@ def api_tasks_summary():
     ]})
 
 
+def _compute_task_analytics(rows: list[dict], days: int, now_iso: str, today: str) -> dict:
+    """Completion analytics over task rows (cancelled already excluded). `days` = 0 means all time.
+    The cohort is the tasks created in the period; the daily series covers the last 7/30 days."""
+    from datetime import date as _date
+
+    def _is_open(r):
+        return r["status"] in ("todo", "doing")
+
+    def _overdue(r):
+        return _is_open(r) and bool(r.get("due_at")) and r["due_at"] < now_iso
+
+    def _on_time(r):
+        return r["status"] == "done" and (not r.get("due_at") or (bool(r.get("completed_at")) and r["completed_at"] <= r["due_at"]))
+
+    today_d = _date.fromisoformat(today)
+    from_date = (today_d - timedelta(days=days - 1)).isoformat() if days else ""
+    cohort = [r for r in rows if not days or (r.get("created_at") or "")[:10] >= from_date]
+
+    def _tally(items):
+        total = len(items)
+        done = sum(1 for r in items if r["status"] == "done")
+        overdue = sum(1 for r in items if _overdue(r))
+        on_time = sum(1 for r in items if _on_time(r))
+        doing = sum(1 for r in items if r["status"] == "doing" and not _overdue(r))
+        todo = sum(1 for r in items if r["status"] == "todo" and not _overdue(r))
+        return {
+            "total": total, "done": done, "overdue": overdue, "doing": doing, "todo": todo,
+            "onTime": on_time, "late": done - on_time,
+            "completionRate": round(done * 100 / total) if total else 0,
+            "onTimeRate": round(on_time * 100 / done) if done else None,
+        }
+
+    by_store: dict[str, dict] = {}
+    by_person: dict[int, dict] = {}
+    for r in cohort:
+        sc = (r.get("store_code") or "").upper()
+        by_store.setdefault(sc, {"name": r.get("store_name") or "", "items": []})["items"].append(r)
+        if r.get("assignee_id"):
+            by_person.setdefault(r["assignee_id"], {"name": r.get("assignee_name") or "", "store": sc, "items": []})["items"].append(r)
+
+    span = days if days in (7, 30) else 30
+    day_list = [(today_d - timedelta(days=i)).isoformat() for i in range(span - 1, -1, -1)]
+    created_by_day: dict[str, int] = {}
+    done_by_day: dict[str, int] = {}
+    for r in rows:
+        c = (r.get("created_at") or "")[:10]
+        if c:
+            created_by_day[c] = created_by_day.get(c, 0) + 1
+        if r["status"] == "done" and r.get("completed_at"):
+            d = r["completed_at"][:10]
+            done_by_day[d] = done_by_day.get(d, 0) + 1
+
+    return {
+        "days": days,
+        "totals": _tally(cohort),
+        "byStore": sorted(
+            ({"storeCode": k, "storeName": v["name"], **_tally(v["items"])} for k, v in by_store.items()),
+            key=lambda x: (-x["total"], x["storeCode"]),
+        ),
+        "byAssignee": sorted(
+            ({"id": k, "name": v["name"], "storeCode": v["store"], **_tally(v["items"])} for k, v in by_person.items()),
+            key=lambda x: (-x["total"], x["name"]),
+        )[:30],
+        "daily": [{"date": d, "created": created_by_day.get(d, 0), "done": done_by_day.get(d, 0)} for d in day_list],
+    }
+
+
+@app.get("/api/tasks/analytics")
+@login_required
+def api_tasks_analytics():
+    """Completion-rate overview. Managers see their store scope (optionally one store); everyone else sees
+    only their own tasks."""
+    viewer = _task_viewer()
+    try:
+        days = int(request.args.get("days", 30))
+    except ValueError:
+        days = 30
+    if days not in (0, 7, 30, 90):
+        days = 30
+    store = (request.args.get("storeCode") or "").strip().upper()
+
+    where = ["t.status <> 'cancelled'"]
+    params: list[Any] = []
+    if viewer["can_manage"]:
+        if viewer["scope"] is not None:
+            if not viewer["scope"]:
+                where.append("FALSE")
+            else:
+                where.append("UPPER(t.store_code) = ANY(%s)")
+                params.append(list(viewer["scope"]))
+    else:
+        where.append("t.assignee_id = %s")
+        params.append(viewer["employee_id"])
+
+    select = (
+        "SELECT t.id, t.store_code, s.name AS store_name, t.assignee_id, a.full_name AS assignee_name, "
+        "t.status, t.due_at, t.completed_at, t.created_at FROM tasks t "
+        "LEFT JOIN employees a ON a.id = t.assignee_id "
+        "LEFT JOIN stores s ON UPPER(s.store_code) = UPPER(t.store_code) WHERE "
+    )
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(select + " AND ".join(where), params)
+        all_rows = cur.fetchall()
+
+    stores = {}
+    for r in all_rows:
+        sc = (r.get("store_code") or "").upper()
+        if sc and sc not in stores:
+            stores[sc] = r.get("store_name") or ""
+    rows = [r for r in all_rows if not store or (r.get("store_code") or "").upper() == store]
+
+    out = _compute_task_analytics(rows, days, _now_iso(), _now_iso()[:10])
+    out["scope"] = "team" if viewer["can_manage"] else "mine"
+    out["storeCode"] = store
+    out["stores"] = [{"storeCode": k, "storeName": v} for k, v in sorted(stores.items())]
+    return jsonify(out)
+
+
 @app.get("/api/tasks/assignees")
 @login_required
 def api_task_assignees():

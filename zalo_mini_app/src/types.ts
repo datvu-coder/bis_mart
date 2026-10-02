@@ -82,3 +82,26 @@ export const RECURRENCE_LABEL: Record<Recurrence, string> = {
   daily: "Hằng ngày",
   weekly: "Hằng tuần",
 };
+
+export interface Tally {
+  total: number;
+  done: number;
+  overdue: number;
+  doing: number;
+  todo: number;
+  onTime: number;
+  late: number;
+  completionRate: number;
+  onTimeRate: number | null;
+}
+
+export interface Analytics {
+  days: number;
+  scope: "team" | "mine";
+  storeCode: string;
+  stores: { storeCode: string; storeName: string }[];
+  totals: Tally;
+  byStore: (Tally & { storeCode: string; storeName: string })[];
+  byAssignee: (Tally & { id: number; name: string; storeCode: string })[];
+  daily: { date: string; created: number; done: number }[];
+}

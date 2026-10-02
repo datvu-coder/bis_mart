@@ -274,3 +274,51 @@ h1, h2, h3 { margin: 0; }
 .sheet .field:first-of-type { margin-top: 4px; }
 .sheet .sheet-actions { margin-top: 16px; }
 @media (prefers-reduced-motion: reduce) { .tab-panel { transition: none; } }
+
+/* ---------- Overview ---------- */
+.hero-filters { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; padding-bottom: 6px; }
+.range-chips { display: flex; gap: 6px; }
+.range-chips button { flex: 1; padding: 8px 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); color: #fff; font-size: 13px; font-weight: 600; }
+.range-chips button.active { background: #fff; color: var(--primary-dark); }
+.hero-select { background: rgba(255, 255, 255, 0.18) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center; color: #fff; border: 0; border-radius: 12px; padding: 10px 34px 10px 12px; font-weight: 600; appearance: none; -webkit-appearance: none; }
+.hero-select option { color: var(--text); }
+.dim { opacity: 0.6; transition: opacity 0.15s; }
+.kpi-card { margin: -22px 14px 0; background: var(--surface); border-radius: var(--radius); padding: 16px; box-shadow: 0 4px 16px rgba(80, 50, 20, 0.12); position: relative; z-index: 2; }
+.kpi-hero { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.kpi-number { font-size: 56px; line-height: 1; font-weight: 800; color: var(--text); letter-spacing: -1px; }
+.kpi-number small { font-size: 24px; font-weight: 700; margin-left: 2px; color: var(--muted); }
+.kpi-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kpi-text span { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.status-bar { display: flex; gap: 2px; height: 14px; }
+.status-bar span { min-width: 4px; border-radius: 4px; }
+.status-legend { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.status-legend li { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+.status-legend li i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.status-legend li b { margin-left: auto; color: var(--text); }
+.kpi-row { display: flex; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--border); }
+.kpi-row > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; }
+.kpi-row b { font-size: 20px; }
+.kpi-row span { font-size: 11px; color: var(--muted); }
+.red { color: var(--error); }
+.filter-note { margin: 12px 18px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); }
+.rate-bars, .people-rank { display: flex; flex-direction: column; gap: 14px; }
+.rate-row { width: 100%; text-align: left; display: block; }
+.rate-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 14px; }
+.rate-label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rate-track { height: 8px; background: #efe6da; border-radius: 4px; overflow: hidden; margin-top: 6px; }
+.rate-track span { display: block; height: 100%; background: linear-gradient(90deg, #d9854f, var(--primary)); border-radius: 0 4px 4px 0; transition: width 0.4s ease; }
+.rate-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.rank-row { display: flex; gap: 10px; align-items: flex-start; }
+.rank-main { flex: 1; min-width: 0; }
+.daily-viz svg { width: 100%; height: auto; display: block; }
+.grid-line { stroke: #efe6da; stroke-width: 1; }
+.axis-text { font-size: 9px; fill: var(--muted); }
+.bar-created { fill: #e4d8c9; }
+.bar-created.on { fill: #d2c3b0; }
+.bar-done { fill: var(--primary); }
+.bar-done.on { fill: var(--primary-dark); }
+.day-col { cursor: pointer; }
+.chart-legend { display: flex; gap: 16px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.chart-readout { display: flex; gap: 14px; align-items: baseline; margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: var(--bg); font-size: 13px; color: var(--muted); }
+.chart-readout b { color: var(--text); }

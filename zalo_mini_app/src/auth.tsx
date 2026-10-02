@@ -31,7 +31,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     clearDataCache();
-    uiState.tab = "tasks";
+    uiState.tab = "overview";
+    uiState.overviewDays = 30;
+    uiState.overviewStore = "";
     uiState.scope = null;
     uiState.filter = "open";
     uiState.store = "";
