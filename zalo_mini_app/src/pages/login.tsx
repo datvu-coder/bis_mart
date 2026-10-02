@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { useAuth } from "../auth";
+import Icon from "../components/Icon";
 
 export default function LoginPage() {
   const { login } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -15,7 +17,8 @@ export default function LoginPage() {
     try {
       await login(username, password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Đăng nhập thất bại");
+      const msg = err instanceof Error ? err.message : "";
+      setError(msg === "Invalid credentials" ? "Sai mã nhân viên hoặc mật khẩu" : msg || "Đăng nhập thất bại");
     } finally {
       setBusy(false);
     }
@@ -23,18 +26,26 @@ export default function LoginPage() {
 
   return (
     <div className="login">
-      <div className="hero">
-        <h1>Bi'S MART</h1>
-        <p>Giao việc &amp; theo dõi công việc cửa hàng</p>
-      </div>
-      <form className="panel" onSubmit={submit}>
-        <p className="hint">Đăng nhập bằng tài khoản Bi'S MART lần đầu để liên kết với Zalo. Lần sau bạn vào thẳng, không cần nhập lại.</p>
-        <input placeholder="Mã nhân viên" value={username} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" />
-        <input type="password" placeholder="Mật khẩu" value={password} onChange={(e) => setPassword(e.target.value)} />
-        {error && <div className="error">{error}</div>}
-        <button className="btn primary" disabled={busy || !username || !password}>
-          {busy ? "Đang đăng nhập..." : "Đăng nhập"}
-        </button>
+      <header className="hero login-hero">
+        <div className="logo">Bi'S MART</div>
+        <h1>Giao việc &amp; theo dõi công việc cửa hàng</h1>
+        <div className="hero-note">Đăng nhập một lần, lần sau vào thẳng bằng Zalo</div>
+      </header>
+      <form className="panel login-card" onSubmit={submit}>
+        <label className="field">
+          <span>Mã nhân viên</span>
+          <input value={username} onChange={(e) => setUsername(e.target.value)} autoCapitalize="none" autoComplete="username" placeholder="Nhập mã nhân viên" />
+        </label>
+        <label className="field">
+          <span>Mật khẩu</span>
+          <div className="pw">
+            <input type={show ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" placeholder="Nhập mật khẩu" />
+            <button type="button" onClick={() => setShow((v) => !v)} aria-label="Hiện/ẩn mật khẩu"><Icon name={show ? "eyeOff" : "eye"} size={20} /></button>
+          </div>
+        </label>
+        {error && <div className="error inline">{error}</div>}
+        <button className="btn primary wide" disabled={busy || !username || !password}>{busy ? "Đang đăng nhập..." : "Đăng nhập"}</button>
+        <p className="hint center">Dùng chung tài khoản với ứng dụng Bi'S MART</p>
       </form>
     </div>
   );
