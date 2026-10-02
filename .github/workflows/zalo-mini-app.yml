@@ -1,0 +1,57 @@
+name: Zalo Mini App Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'zalo_mini_app/**'
+      - '.github/workflows/zalo-mini-app.yml'
+
+# Never run two deploys at once; a newer push supersedes a queued one.
+concurrency:
+  group: zalo-mini-app-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: zalo_mini_app
+    env:
+      APP_ID: '1392694436732932143'
+      ZMP_TOKEN: ${{ secrets.ZMP_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: zalo_mini_app/package-lock.json
+
+      - name: Check ZMP_TOKEN secret
+        run: |
+          if [ -z "$ZMP_TOKEN" ]; then
+            echo "::error::Missing repository secret ZMP_TOKEN. Run 'zmp login' once and add the token from .env as a secret."
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Install zmp-cli
+        run: npm install -g zmp-cli
+
+      # Uploads the Development version; the Zalo app picks it up on next open.
+      - name: Deploy to Zalo Mini App
+        run: zmp deploy -e -p -m "${GITHUB_SHA::7} ${{ github.event.head_commit.message || 'manual deploy' }}"

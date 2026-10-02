@@ -11,12 +11,11 @@ npm run build             # production bundle into www/
 npx zmp deploy            # upload to Zalo Mini App platform (set your App ID first)
 ```
 
-## One-step update (macOS/Linux)
-After `npm i -g zmp-cli` and a one-time `zmp login --app-id <id>`, paste this to pull the latest `main`, build and deploy:
-```bash
-curl -fsSL https://raw.githubusercontent.com/datvu-coder/bis_mart/main/zalo_mini_app/scripts/update-and-deploy.sh | bash
-```
-From a checkout you can also run `npm run release`.
+## Automatic deploy
+Every push to `main` that touches `zalo_mini_app/` runs `.github/workflows/zalo-mini-app.yml`, which
+type-checks, builds and uploads the Development version with `zmp deploy -e`.
+One-time setup: run `zmp login --app-id <id>` locally, then add the `ZMP_TOKEN` value from the generated
+`.env` as a GitHub Actions repository secret named `ZMP_TOKEN`. If the token expires, log in again and update the secret.
 
 ## Auth
 1. First open: employee logs in with their Bi'S MART code/password; the app then calls
