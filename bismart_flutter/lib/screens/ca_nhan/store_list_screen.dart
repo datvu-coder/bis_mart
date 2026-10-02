@@ -616,7 +616,7 @@ class _StoreListScreenState extends State<StoreListScreen> {
       actionsBuilder: (ctx, setLocal) => [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
         ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             if (nameCtrl.text.trim().isEmpty || codeCtrl.text.trim().isEmpty) {
               ScaffoldMessenger.of(ctx).showSnackBar(
                 const SnackBar(content: Text('Vui lòng nhập tên và mã cửa hàng')),
@@ -644,12 +644,26 @@ class _StoreListScreenState extends State<StoreListScreen> {
               taxCode: nz(taxCtrl.text),
             );
             final prov = context.read<StoreProvider>();
-            if (isEdit) {
-              prov.updateStore(updated);
+            final ok = isEdit ? await prov.updateStore(updated) : await prov.addStore(updated);
+            if (!ctx.mounted) return;
+            if (ok) {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text(isEdit ? 'Đã cập nhật cửa hàng' : 'Đã thêm cửa hàng "${updated.name}"'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.success,
+                ),
+              );
             } else {
-              prov.addStore(updated);
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                SnackBar(
+                  content: Text(prov.error ?? 'Không thể lưu cửa hàng.'),
+                  behavior: SnackBarBehavior.floating,
+                  backgroundColor: AppColors.error,
+                ),
+              );
             }
-            Navigator.pop(ctx);
           },
           child: Text(isEdit ? 'Lưu' : 'Thêm'),
         ),
@@ -666,9 +680,20 @@ class _StoreListScreenState extends State<StoreListScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
           ElevatedButton(
-            onPressed: () {
-              context.read<StoreProvider>().deleteStore(store.id);
+            onPressed: () async {
+              final prov = context.read<StoreProvider>();
+              final ok = await prov.deleteStore(store.id);
+              if (!ctx.mounted) return;
               Navigator.pop(ctx);
+              if (!ok && this.context.mounted) {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: Text(prov.error ?? 'Không thể xoá cửa hàng.'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Xóa'),

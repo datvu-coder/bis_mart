@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../models/store.dart';
 import '../services/api_service.dart';
@@ -73,28 +74,73 @@ class StoreProvider extends ChangeNotifier {
     }
   }
 
-  void addStore(Store store) async {
+  // A failed create/update/delete used to be swallowed silently and the
+  // local list patched anyway (a fabricated store on a failed create, a
+  // "saved" edit or a "deleted" store the server never touched) — the UI
+  // showed success while the real backend state hadn't changed. These now
+  // only mutate local state once the server call actually succeeds, and
+  // report the failure via [error] otherwise, matching
+  // EmployeeProvider's add/update/delete pattern.
+
+  Future<bool> addStore(Store store) async {
     try {
       final result = await _api.createStore(store.toJson());
       _stores.add(Store.fromJson(result));
-    } catch (_) {
-      _stores.add(store);
-    }
-    notifyListeners();
-  }
-
-  Future<void> updateStore(Store updated) async {
-    try { await _api.updateStore(int.parse(updated.id), updated.toJson()); } catch (_) {}
-    final index = _stores.indexWhere((s) => s.id == updated.id);
-    if (index != -1) {
-      _stores[index] = updated;
+      _error = null;
       notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _describeError(e);
+      notifyListeners();
+      return false;
     }
   }
 
-  Future<void> deleteStore(String id) async {
-    try { await _api.deleteStore(int.parse(id)); } catch (_) {}
-    _stores.removeWhere((s) => s.id == id);
-    notifyListeners();
+  Future<bool> updateStore(Store updated) async {
+    try {
+      await _api.updateStore(int.parse(updated.id), updated.toJson());
+      final index = _stores.indexWhere((s) => s.id == updated.id);
+      if (index != -1) _stores[index] = updated;
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _describeError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> deleteStore(String id) async {
+    try {
+      await _api.deleteStore(int.parse(id));
+      _stores.removeWhere((s) => s.id == id);
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _describeError(e);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  String _describeError(Object e) {
+    if (e is DioException) {
+      final status = e.response?.statusCode;
+      final data = e.response?.data;
+      final serverMessage = data is Map ? data['error']?.toString() : null;
+      if (status == 401 || status == 403) {
+        return 'Bạn không có quyền thực hiện thao tác này.';
+      }
+      if (serverMessage != null && serverMessage.isNotEmpty) {
+        return serverMessage;
+      }
+      if (status != null) {
+        return 'Lỗi máy chủ (mã $status).';
+      }
+      return 'Không thể kết nối đến máy chủ. Kiểm tra lại mạng.';
+    }
+    return e.toString();
   }
 }
