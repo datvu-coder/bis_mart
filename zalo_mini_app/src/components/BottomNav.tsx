@@ -1,7 +1,7 @@
 import React from "react";
 import Icon, { IconName } from "./Icon";
 
-export type TabKey = "tasks" | "summary" | "me";
+export type TabKey = "overview" | "tasks" | "summary" | "me";
 
 interface Props {
   tab: TabKey;
@@ -11,6 +11,7 @@ interface Props {
 
 export default function BottomNav({ tab, canManage, onChange }: Props) {
   const items: { key: TabKey; label: string; icon: IconName }[] = [
+    { key: "overview", label: "Tổng quan", icon: "chart" },
     { key: "tasks", label: "Công việc", icon: "tasks" },
     ...(canManage ? [{ key: "summary" as TabKey, label: "Cửa hàng", icon: "store" as IconName }] : []),
     { key: "me", label: "Cá nhân", icon: "user" },

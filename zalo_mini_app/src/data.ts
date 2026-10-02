@@ -52,7 +52,9 @@ export function useTaskData() {
 
 /** Remembers filters across navigation (the Home screen is remounted when returning from detail). */
 export const uiState = {
-  tab: "tasks" as "tasks" | "summary" | "me",
+  tab: "overview" as "overview" | "tasks" | "summary" | "me",
+  overviewDays: 30,
+  overviewStore: "",
   scope: null as "mine" | "store" | null,
   filter: "open" as "open" | "today" | "overdue" | "done",
   store: "",
