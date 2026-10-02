@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { createPortal } from "react-dom";
 import Icon from "./Icon";
 
 interface Props {
@@ -19,7 +20,9 @@ export default function Sheet({ open, title, onClose, children }: Props) {
     };
   }, [open]);
   if (!open) return null;
-  return (
+  // Rendered into <body>: inside a scrollable tab panel iOS creates a stacking context
+  // (-webkit-overflow-scrolling) that would trap the sheet underneath the fixed bottom bar.
+  return createPortal(
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="sheet-grip" />
@@ -29,7 +32,8 @@ export default function Sheet({ open, title, onClose, children }: Props) {
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
