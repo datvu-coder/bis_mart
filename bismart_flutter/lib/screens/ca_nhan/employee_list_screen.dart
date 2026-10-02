@@ -311,7 +311,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
             child: const Text('Hủy'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (nameCtrl.text.isEmpty || codeCtrl.text.isEmpty) {
                 ScaffoldMessenger.of(ctx).showSnackBar(
                   const SnackBar(
@@ -326,7 +326,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                 (s) => s.storeCode == selectedStoreCode,
                 orElse: () => null,
               );
-              provider.addEmployee(Employee(
+              final ok = await provider.addEmployee(Employee(
                 id: DateTime.now().millisecondsSinceEpoch.toString(),
                 fullName: nameCtrl.text,
                 employeeCode: codeCtrl.text,
@@ -335,15 +335,27 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                 storeCode: selectedStoreCode,
                 email: emailCtrl.text.isNotEmpty ? emailCtrl.text : null,
               ));
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(this.context).showSnackBar(
-                SnackBar(
-                  content: Text('Đã thêm nhân viên "${nameCtrl.text}"'),
-                  behavior: SnackBarBehavior.floating,
-                  backgroundColor: AppColors.success,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-              );
+              if (!ctx.mounted) return;
+              if (ok) {
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  SnackBar(
+                    content: Text('Đã thêm nhân viên "${nameCtrl.text}"'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.success,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(
+                    content: Text(provider.error ?? 'Không thể thêm nhân viên.'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.error,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              }
             },
             child: const Text('Thêm'),
           ),
