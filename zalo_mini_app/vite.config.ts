@@ -6,6 +6,7 @@ export default () => {
   return defineConfig({
     root: "./src",
     base: "",
+    build: { outDir: "../www", emptyOutDir: true },
     plugins: [zaloMiniApp(), react()],
   });
 };
