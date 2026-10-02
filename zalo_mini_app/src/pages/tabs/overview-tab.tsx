@@ -88,20 +88,21 @@ export default function OverviewTab({ active }: { active: boolean }) {
             <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
           </div>
         </div>
-        <div className="hero-filters">
-          <div className="range-chips">
-            {RANGES.map((r) => (
-              <button key={r.days} className={days === r.days ? "active" : ""} onClick={() => setDays(r.days)}>{r.label}</button>
-            ))}
-          </div>
-          {team && data && data.stores.length > 1 && (
-            <select className="hero-select" value={store} onChange={(e) => setStore(e.target.value)} aria-label="Lọc theo cửa hàng">
-              <option value="">Tất cả cửa hàng</option>
-              {data.stores.map((s) => <option key={s.storeCode} value={s.storeCode}>{s.storeName || s.storeCode}</option>)}
-            </select>
-          )}
-        </div>
       </header>
+
+      <div className="filter-bar">
+        <div className="range-seg">
+          {RANGES.map((r) => (
+            <button key={r.days} className={days === r.days ? "active" : ""} onClick={() => setDays(r.days)}>{r.label}</button>
+          ))}
+        </div>
+        {team && data && data.stores.length > 1 && (
+          <select className="filter-select" value={store} onChange={(e) => setStore(e.target.value)} aria-label="Lọc theo cửa hàng">
+            <option value="">Tất cả CH</option>
+            {data.stores.map((s) => <option key={s.storeCode} value={s.storeCode}>{s.storeName || s.storeCode}</option>)}
+          </select>
+        )}
+      </div>
 
       {error && <div className="error">{error} <button className="link" onClick={load}>Thử lại</button></div>}
       {!data && !error && <Skeleton count={3} />}

@@ -48,7 +48,7 @@ export default function SummaryTab({ active, onOpenStore }: Props) {
       <header className="hero">
         <div className="hero-row">
           <div>
-            <div className="hero-sub">Theo dõi công việc</div>
+            <div className="hero-sub">{stores ? `${stores.length} cửa hàng · ${pct}% công việc đã hoàn thành` : "Đang tải dữ liệu..."}</div>
             <h1>Tổng quan cửa hàng</h1>
           </div>
           <div className="hero-actions">
@@ -56,7 +56,6 @@ export default function SummaryTab({ active, onOpenStore }: Props) {
             <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
           </div>
         </div>
-        <div className="hero-note">{stores ? `${stores.length} cửa hàng · ${pct}% công việc đã hoàn thành` : "Đang tải dữ liệu..."}</div>
       </header>
 
       {stores && (
