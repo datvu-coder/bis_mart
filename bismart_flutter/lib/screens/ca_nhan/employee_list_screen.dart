@@ -300,6 +300,31 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
                   .toList(),
               onChanged: (v) => setDialogState(() => selectedPosition = v!),
             ),
+            const SizedBox(height: 12),
+            // There's no password field here on purpose — the backend's
+            // login auto-provision flow (employees.password, defaulted to
+            // '1111' in schema_postgres.sql) is what lets a newly created
+            // employee log in at all without an admin setting one by hand.
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.infoLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.info),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Mật khẩu đăng nhập lần đầu mặc định là 1111 (dùng Mã nhân viên làm tên đăng nhập). Nhân viên nên tự đổi mật khẩu sau trong mục Cá nhân.',
+                      style: AppTextStyles.caption.copyWith(color: AppColors.info),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         );
       },
