@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Page, useSnackbar } from "zmp-ui";
 import { api } from "../api";
+import { bumpData } from "../data";
 import Avatar from "../components/Avatar";
 import Icon from "../components/Icon";
 import { Assignee, PRIORITY_LABEL, RECURRENCE_LABEL } from "../types";
@@ -86,6 +87,7 @@ export default function TaskFormPage() {
     } catch (err) {
       openSnackbar({ text: err instanceof Error ? err.message : "Có lỗi xảy ra", type: "error" });
     } finally {
+      bumpData();
       setBusy(false);
     }
   };

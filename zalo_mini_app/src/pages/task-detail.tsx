@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Page, useSnackbar } from "zmp-ui";
 import { api, photoSrc } from "../api";
+import { bumpData } from "../data";
+import { compressImage, pickPhotos, PhotoSource } from "../photos";
 import { useAuth } from "../auth";
 import Avatar from "../components/Avatar";
 import Icon from "../components/Icon";
@@ -31,6 +33,7 @@ export default function TaskDetailPage() {
   const [busy, setBusy] = useState(false);
   const [viewer, setViewer] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
+  const [photoSheet, setPhotoSheet] = useState(false);
   const [confirm, setConfirm] = useState<Confirm>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -54,6 +57,7 @@ export default function TaskDetailPage() {
     try {
       await fn();
       if (okMsg) openSnackbar({ text: okMsg, type: "success" });
+      bumpData();
       await load();
       return true;
     } catch (e) {
@@ -64,16 +68,37 @@ export default function TaskDetailPage() {
     }
   };
 
-  const onPickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadFiles = async (files: File[]) => {
+    if (!files.length) return;
+    setBusy(true);
+    try {
+      let added = 0;
+      for (const f of files) {
+        const { photoUrl } = await api.uploadPhoto(await compressImage(f));
+        setPhotos((p) => [...p, photoUrl]);
+        added += 1;
+      }
+      openSnackbar({ text: `Đã thêm ${added} ảnh`, type: "success" });
+    } catch (e) {
+      openSnackbar({ text: e instanceof Error ? e.message : "Không tải được ảnh lên", type: "error" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addPhotos = async (source: PhotoSource) => {
+    setPhotoSheet(false);
+    try {
+      await uploadFiles(await pickPhotos(source));
+    } catch (e) {
+      openSnackbar({ text: e instanceof Error ? e.message : "Không lấy được ảnh", type: "error" });
+    }
+  };
+
+  const onFallbackPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!files.length) return;
-    await run(async () => {
-      for (const f of files) {
-        const { photoUrl } = await api.uploadPhoto(f);
-        setPhotos((p) => [...p, photoUrl]);
-      }
-    });
+    await uploadFiles(files);
   };
 
   if (error) return <Page className="page"><div className="error">{error}</div></Page>;
@@ -132,7 +157,7 @@ export default function TaskDetailPage() {
           <div><Icon name="user" size={18} /><dt>Người làm</dt><dd>{task.assigneeName ? <><Avatar name={task.assigneeName} size={20} /> {task.assigneeName}</> : "Chưa giao"}</dd></div>
           <div><Icon name="users" size={18} /><dt>Giao bởi</dt><dd>{task.assignedByName || "-"}</dd></div>
           <div><Icon name="pin" size={18} /><dt>Cửa hàng</dt><dd>{task.storeName || task.storeCode || "-"}</dd></div>
-          <div><Icon name="calendar" size={18} /><dt>Hạn chót</dt><dd className={due ? `tone-${due.tone}` : ""}>{task.dueAt ? `${formatDateTime(task.dueAt)}${due && due.tone !== "done" ? ` · ${due.text}` : ""}` : "Không có"}</dd></div>
+          <div><Icon name="calendar" size={18} /><dt>Hạn chót</dt><dd className={due ? `tone-${due.tone}` : ""}>{task.dueAt ? formatDateTime(task.dueAt) : "Không có"}{due && (due.tone === "overdue" || due.tone === "today") && <span className={`tag ${due.tone}`}>{due.tone === "overdue" ? "Quá hạn" : "Hôm nay"}</span>}</dd></div>
           {task.completedAt && <div><Icon name="checkCircle" size={18} /><dt>Hoàn thành lúc</dt><dd>{formatDateTime(task.completedAt)}</dd></div>}
         </dl>
       </div>
@@ -148,12 +173,12 @@ export default function TaskDetailPage() {
               <button key={p} className="photo" onClick={() => setViewer(p)}><img src={photoSrc(p)} alt="Ảnh minh chứng" /></button>
             ))}
             {canAct && !closed && (
-              <button className="photo-add" onClick={() => fileRef.current?.click()} disabled={busy}>
+              <button className="photo-add" onClick={() => setPhotoSheet(true)} disabled={busy}>
                 <Icon name="camera" size={22} /><span>Thêm ảnh</span>
               </button>
             )}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={onPickPhoto} />
+          <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onFallbackPick} />
           {canAct && !closed && (
             <textarea placeholder="Ghi chú kết quả (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />
           )}
@@ -211,6 +236,14 @@ export default function TaskDetailPage() {
       )}
 
       <PhotoViewer name={viewer} onClose={() => setViewer(null)} />
+
+      <Sheet open={photoSheet} title="Thêm ảnh minh chứng" onClose={() => setPhotoSheet(false)}>
+        <div className="menu">
+          <button onClick={() => addPhotos("camera")}><Icon name="camera" size={20} /> Chụp ảnh mới</button>
+          <button onClick={() => addPhotos("album")}><Icon name="inbox" size={20} /> Chọn từ thư viện</button>
+          <button className="muted-row" onClick={() => { setPhotoSheet(false); fileRef.current?.click(); }}>Không được? Dùng bộ chọn dự phòng</button>
+        </div>
+      </Sheet>
 
       <Sheet open={menu} title="Tuỳ chọn" onClose={() => setMenu(false)}>
         <div className="menu">

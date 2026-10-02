@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { getAccessToken } from "zmp-sdk/apis";
 import { api, ApiError, getToken, setToken, setUnauthorizedHandler } from "./api";
+import { clearDataCache, uiState } from "./data";
 import type { User } from "./types";
 
 interface AuthState {
@@ -29,6 +30,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const logout = useCallback(() => {
+    clearDataCache();
+    uiState.tab = "tasks";
+    uiState.scope = null;
+    uiState.filter = "open";
+    uiState.store = "";
+    uiState.assignee = "";
     setToken("");
     setUser(null);
   }, []);

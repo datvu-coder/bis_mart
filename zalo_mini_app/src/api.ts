@@ -19,6 +19,23 @@ export const setToken = (token: string) => {
   }
 };
 
+const ERROR_VI: Record<string, string> = {
+  "Photo proof is required to complete this task": "Việc này bắt buộc có ảnh minh chứng. Hãy thêm ảnh trước khi bấm Hoàn thành.",
+  "Forbidden": "Bạn không có quyền thực hiện thao tác này.",
+  "Unauthorized": "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.",
+  "Invalid credentials": "Sai mã nhân viên hoặc mật khẩu.",
+  "Task not found": "Không tìm thấy công việc (có thể đã bị xoá).",
+  "Title is required": "Vui lòng nhập tiêu đề công việc.",
+  "Assignee not found": "Không tìm thấy nhân viên được giao.",
+  "Invalid status": "Trạng thái không hợp lệ.",
+  "Invalid priority or recurrence": "Mức ưu tiên hoặc lịch lặp không hợp lệ.",
+  "Empty comment": "Nội dung trao đổi đang trống.",
+  "file too large": "Ảnh quá lớn (tối đa 10MB).",
+  "Zalo account already linked to another employee": "Tài khoản Zalo này đã liên kết với nhân viên khác.",
+};
+
+export const viError = (msg: string): string => ERROR_VI[msg] || msg;
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string) {
     super(message);
@@ -30,20 +47,26 @@ export const setUnauthorizedHandler = (fn: () => void) => {
   onUnauthorized = fn;
 };
 
-async function request<T>(method: string, path: string, body?: unknown, isForm = false): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, isForm = false, keepSession = false): Promise<T> {
   const headers: Record<string, string> = {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body && !isForm) headers["Content-Type"] = "application/json";
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body ? (isForm ? (body as FormData) : JSON.stringify(body)) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body ? (isForm ? (body as FormData) : JSON.stringify(body)) : undefined,
+    });
+  } catch {
+    throw new ApiError(0, "Không kết nối được máy chủ. Kiểm tra mạng và thử lại.");
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    if (res.status === 401 && token) onUnauthorized();
-    throw new ApiError(res.status, data.error || `Lỗi ${res.status}`, data.code);
+    // A wrong current password also returns 401; only treat it as an expired session otherwise.
+    if (res.status === 401 && token && !keepSession) onUnauthorized();
+    throw new ApiError(res.status, viError(data.error || `Lỗi ${res.status}`), data.code);
   }
   return data as T;
 }
@@ -65,9 +88,10 @@ export const api = {
     request<{ token: string; user: User }>("POST", "/api/auth/zalo-login", { accessToken }),
   zaloLink: (accessToken: string) => request<{ ok: boolean }>("POST", "/api/auth/zalo-link", { accessToken }),
   me: () => request<{ user: User }>("GET", "/api/auth/me"),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    request<{ ok: boolean }>("POST", "/api/auth/change-password", { currentPassword, newPassword }, false, true),
 
-  listTasks: (params: Record<string, string> = {}) =>
-    request<{ tasks: Task[]; canManage: boolean }>("GET", `/api/tasks?${new URLSearchParams(params)}`),
+  listTasks: () => request<{ tasks: Task[]; canManage: boolean }>("GET", "/api/tasks"),
   getTask: (id: number) => request<TaskDetail>("GET", `/api/tasks/${id}`),
   createTask: (input: TaskInput) => request<Task>("POST", "/api/tasks", input),
   updateTask: (id: number, input: Partial<TaskInput>) => request<Task>("PUT", `/api/tasks/${id}`, input),
