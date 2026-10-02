@@ -104,13 +104,6 @@ export default function TasksTab({ tasks, canManage, loading, error, reload, jum
     return SECTIONS.map((s) => ({ ...s, items: visible.filter((t) => bucket(t) === s.key) })).filter((s) => s.items.length);
   }, [visible, filter]);
 
-  const note =
-    counts.overdue > 0
-      ? `${effectiveScope === "store" ? "Cửa hàng có" : "Bạn có"} ${counts.overdue} việc quá hạn cần xử lý`
-      : counts.open > 0
-        ? `${effectiveScope === "store" ? "Đang có" : "Bạn còn"} ${counts.open} việc cần làm`
-        : "Mọi việc đã xong, làm tốt lắm!";
-
   const stat = (key: Filter, label: string, tone = "") => (
     <button className={`stat ${filter === key ? "active" : ""} ${tone}`} onClick={() => setFilter(key)}>
       <b>{counts[key]}</b>
@@ -131,7 +124,6 @@ export default function TasksTab({ tasks, canManage, loading, error, reload, jum
             <button className="hero-btn" onClick={reload} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
           </div>
         </div>
-        <div className="hero-note">{note}</div>
       </header>
 
       <div className="stat-card">
