@@ -1,11 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Page } from "zmp-ui";
-import { api } from "../api";
-import BottomNav from "../components/BottomNav";
-import Icon from "../components/Icon";
-import Skeleton, { EmptyState } from "../components/Skeleton";
-import { StoreSummary } from "../types";
+import { api } from "../../api";
+import Icon from "../../components/Icon";
+import Skeleton, { EmptyState } from "../../components/Skeleton";
+import { useDataVersion } from "../../data";
+import { StoreSummary } from "../../types";
 
 function Ring({ pct }: { pct: number }) {
   const r = 22;
@@ -13,14 +11,21 @@ function Ring({ pct }: { pct: number }) {
   return (
     <svg width="58" height="58" viewBox="0 0 58 58" className="ring">
       <circle cx="29" cy="29" r={r} className="ring-bg" />
-      <circle cx="29" cy="29" r={r} className="ring-fg" strokeDasharray={`${(c * pct) / 100} ${c}`} transform="rotate(-90 29 29)" />
+      {pct > 0 && (
+        <circle cx="29" cy="29" r={r} className="ring-fg" strokeDasharray={`${(c * pct) / 100} ${c}`} transform="rotate(-90 29 29)" />
+      )}
       <text x="29" y="33" textAnchor="middle">{pct}%</text>
     </svg>
   );
 }
 
-export default function SummaryPage() {
-  const nav = useNavigate();
+interface Props {
+  active: boolean;
+  onOpenStore: (storeCode: string) => void;
+}
+
+export default function SummaryTab({ active, onOpenStore }: Props) {
+  const version = useDataVersion();
   const [stores, setStores] = useState<StoreSummary[] | null>(null);
   const [error, setError] = useState("");
 
@@ -28,14 +33,17 @@ export default function SummaryPage() {
     setError("");
     api.summary().then((r) => setStores(r.stores)).catch((e) => setError(e instanceof Error ? e.message : "Lỗi tải dữ liệu"));
   };
-  useEffect(load, []);
+  // Refresh whenever the tab becomes visible or any task changes.
+  useEffect(() => {
+    if (active) load();
+  }, [active, version]);
 
   const total = (k: "todo" | "doing" | "done" | "overdue") => (stores || []).reduce((s, x) => s + x[k], 0);
   const all = total("todo") + total("doing") + total("done");
   const pct = all ? Math.round((total("done") / all) * 100) : 0;
 
   return (
-    <Page className="page">
+    <>
       <header className="hero">
         <div className="hero-row">
           <div>
@@ -64,7 +72,7 @@ export default function SummaryPage() {
           const sum = s.todo + s.doing + s.done;
           const p = sum ? Math.round((s.done / sum) * 100) : 0;
           return (
-            <button key={s.storeCode} className="card store-card" onClick={() => nav("/", { state: { storeCode: s.storeCode } })}>
+            <button key={s.storeCode} className="card store-card" onClick={() => onOpenStore(s.storeCode)}>
               <Ring pct={p} />
               <div className="store-info">
                 <b>{s.storeName || s.storeCode || "Chưa gán cửa hàng"}</b>
@@ -80,7 +88,6 @@ export default function SummaryPage() {
           );
         })}
       </div>
-      <BottomNav canManage />
-    </Page>
+    </>
   );
 }

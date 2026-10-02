@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api";
+import { bumpData } from "../data";
 import { useAuth } from "../auth";
 import { PRIORITY_LABEL, RECURRENCE_LABEL, STATUS_LABEL, Task } from "../types";
 import { dueInfo } from "../utils";
@@ -10,11 +11,10 @@ import Icon from "./Icon";
 interface Props {
   task: Task;
   showAssignee: boolean;
-  onChanged: () => void;
   onError: (msg: string) => void;
 }
 
-export default function TaskCard({ task, showAssignee, onChanged, onError }: Props) {
+export default function TaskCard({ task, showAssignee, onError }: Props) {
   const nav = useNavigate();
   const { user } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,7 @@ export default function TaskCard({ task, showAssignee, onChanged, onError }: Pro
     setBusy(true);
     try {
       await api.setStatus(task.id, status);
-      onChanged();
+      bumpData();
     } catch (e) {
       onError(e instanceof Error ? e.message : "Có lỗi xảy ra");
     } finally {

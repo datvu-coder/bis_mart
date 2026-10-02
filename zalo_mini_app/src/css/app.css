@@ -247,3 +247,30 @@ h1, h2, h3 { margin: 0; }
 .pw { position: relative; }
 .pw input { padding-right: 46px; }
 .pw button { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+
+/* ---------- Tab shell: fixed bottom bar, cross-fading panels ---------- */
+.shell-page { position: relative; height: 100vh; min-height: 0; overflow: hidden; background: var(--bg); }
+.tab-panel {
+  position: absolute; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding-bottom: 112px; background: var(--bg);
+  transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.22, 0.8, 0.3, 1), visibility 0s linear 0.32s;
+}
+.tab-panel.active { opacity: 1; transform: none; visibility: visible; transition-delay: 0s; }
+.tab-panel.left { opacity: 0; transform: translateX(-28px); visibility: hidden; pointer-events: none; }
+.tab-panel.right { opacity: 0; transform: translateX(28px); visibility: hidden; pointer-events: none; }
+.bottom-nav button { transition: color 0.2s; }
+.nav-pill { transition: background 0.25s ease, transform 0.2s ease; }
+.bottom-nav button:active .nav-pill { transform: scale(0.94); }
+.chip-scroll { display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px 0; scrollbar-width: none; }
+.chip-scroll::-webkit-scrollbar { display: none; }
+.chip-scroll .chip { flex-shrink: 0; }
+.tag { display: inline-block; margin-left: 8px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; background: var(--error-soft); color: var(--error); }
+.tag.today { background: var(--primary-soft); color: var(--primary); }
+.menu-panel { padding: 4px 16px; }
+.menu-row { position: relative; }
+.menu-row + .menu-row { border-top: 1px solid var(--border); }
+.menu-row .chev { margin-left: auto; }
+.menu .muted-row { color: var(--muted); font-size: 13px; font-weight: 500; }
+.sheet .field:first-of-type { margin-top: 4px; }
+.sheet .sheet-actions { margin-top: 16px; }
+@media (prefers-reduced-motion: reduce) { .tab-panel { transition: none; } }
