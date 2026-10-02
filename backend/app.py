@@ -4980,7 +4980,9 @@ def api_delete_event():
 ZALO_GRAPH_ME_URL = "https://graph.zalo.me/v2.0/me?fields=id,name,picture"
 ZALO_OA_SEND_URL = "https://openapi.zalo.me/v3.0/oa/message/cs"
 ZALO_OA_ACCESS_TOKEN = os.getenv("ZALO_OA_ACCESS_TOKEN", "")
-TASK_PHOTO_DIR = Path(os.getenv("TASK_PHOTO_DIR", "/data/task_photos"))
+# Default under POST_VIDEO_DIR: that path is a mounted Docker volume (see
+# scripts/bismart-vps-compose.example.yml), so photos survive container recreation.
+TASK_PHOTO_DIR = Path(os.getenv("TASK_PHOTO_DIR", str(POST_VIDEO_DIR / "task_photos")))
 try:
     TASK_PHOTO_DIR.mkdir(parents=True, exist_ok=True)
 except Exception:

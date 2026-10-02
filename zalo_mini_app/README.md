@@ -25,7 +25,7 @@ One-time setup: run `zmp login --app-id <id>` locally, then add the `ZMP_TOKEN` 
 ## Backend env
 - `ZALO_OA_ACCESS_TOKEN` — optional. Zalo OA token used to push "new task / completed / comment"
   messages. Employees must have followed the OA. Without it, notifications are skipped silently.
-- `TASK_PHOTO_DIR` — where completion-proof photos are stored (default `/data/task_photos`).
+- `TASK_PHOTO_DIR` — where completion-proof photos are stored (default `<POST_VIDEO_DIR>/task_photos` (a persistent volume)).
 
 ## Endpoints (backend/app.py)
 `GET/POST /api/tasks`, `GET/PUT/DELETE /api/tasks/<id>`, `POST /api/tasks/<id>/status`,
