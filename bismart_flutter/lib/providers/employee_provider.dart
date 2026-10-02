@@ -245,11 +245,19 @@ class EmployeeProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addEmployee(Employee employee) async {
-    final result = await _api.createEmployee(employee.toJson());
-    _employees.add(Employee.fromJson(result));
-    _recalcRanks();
-    notifyListeners();
+  Future<bool> addEmployee(Employee employee) async {
+    try {
+      final result = await _api.createEmployee(employee.toJson());
+      _employees.add(Employee.fromJson(result));
+      _recalcRanks();
+      _error = null;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = _describeError(e);
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<bool> updateEmployee(Employee updated) async {
