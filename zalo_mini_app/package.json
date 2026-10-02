@@ -6,7 +6,8 @@
     "start": "zmp start",
     "build": "vite build",
     "deploy": "zmp deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "release": "vite build && zmp deploy -e"
   },
   "dependencies": {
     "react": "^18.3.1",
