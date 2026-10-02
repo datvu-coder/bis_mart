@@ -62,5 +62,11 @@ jobs:
         run: npm install -g zmp-cli
 
       # Uploads the Development version; the Zalo app picks it up on next open.
+      # Zalo caps the version description at 500 chars, so send only the commit's first line.
+      # The message goes through an env var so it is never interpolated into the shell script.
       - name: Deploy to Zalo Mini App
-        run: zmp deploy -e -p -m "${GITHUB_SHA::7} ${{ github.event.head_commit.message || 'manual deploy' }}"
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          FIRST_LINE=$(printf '%s' "${COMMIT_MESSAGE:-manual deploy}" | head -n 1 | cut -c1-120)
+          zmp deploy -e -p -m "${GITHUB_SHA::7} ${FIRST_LINE}"
