@@ -5,6 +5,7 @@ import Avatar from "../../components/Avatar";
 import { DailyChart, RateBars, StatusBar } from "../../components/charts";
 import Icon from "../../components/Icon";
 import NotificationBell from "../../components/NotificationBell";
+import Sheet from "../../components/Sheet";
 import Skeleton, { EmptyState } from "../../components/Skeleton";
 import { uiState, useDataVersion } from "../../data";
 import type { Analytics } from "../../types";
@@ -25,6 +26,9 @@ export default function OverviewTab({ active }: { active: boolean }) {
   const [data, setData] = useState<Analytics | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftDays, setDraftDays] = useState(days);
+  const [draftStore, setDraftStore] = useState(store);
 
   const setDays = (v: number) => { uiState.overviewDays = v; setDaysState(v); };
   const setStore = (v: string) => { uiState.overviewStore = v; setStoreState(v); };
@@ -43,6 +47,18 @@ export default function OverviewTab({ active }: { active: boolean }) {
     if (active) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, days, store, version]);
+
+  const openFilter = () => {
+    setDraftDays(days);
+    setDraftStore(store);
+    setFilterOpen(true);
+  };
+  const applyFilter = () => {
+    setDays(draftDays);
+    setStore(draftStore);
+    setFilterOpen(false);
+  };
+  const filtered = days !== 30 || store !== "";
 
   const range = RANGES.find((r) => r.days === days) || RANGES[1];
   const team = data?.scope === "team";
@@ -84,25 +100,14 @@ export default function OverviewTab({ active }: { active: boolean }) {
             <h1>{team ? "Tổng quan" : "Tổng quan của tôi"}</h1>
           </div>
           <div className="hero-actions">
-            <NotificationBell />
+            <button className={`hero-btn ${filtered ? "has-filter" : ""}`} onClick={openFilter} aria-label="Bộ lọc">
+            <Icon name="filter" size={19} />
+          </button>
+          <NotificationBell />
             <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
           </div>
         </div>
       </header>
-
-      <div className="filter-bar">
-        <div className="range-seg">
-          {RANGES.map((r) => (
-            <button key={r.days} className={days === r.days ? "active" : ""} onClick={() => setDays(r.days)}>{r.label}</button>
-          ))}
-        </div>
-        {team && data && data.stores.length > 1 && (
-          <select className="filter-select" value={store} onChange={(e) => setStore(e.target.value)} aria-label="Lọc theo cửa hàng">
-            <option value="">Tất cả CH</option>
-            {data.stores.map((s) => <option key={s.storeCode} value={s.storeCode}>{s.storeName || s.storeCode}</option>)}
-          </select>
-        )}
-      </div>
 
       {error && <div className="error">{error} <button className="link" onClick={load}>Thử lại</button></div>}
       {!data && !error && <Skeleton count={3} />}
@@ -169,6 +174,36 @@ export default function OverviewTab({ active }: { active: boolean }) {
           )}
         </div>
       )}
+
+      <Sheet open={filterOpen} title="Bộ lọc" onClose={() => setFilterOpen(false)}>
+        <div className="sheet-section">
+          <h4>Khoảng thời gian</h4>
+          <div className="chip-row">
+            {RANGES.map((r) => (
+              <button key={r.days} type="button" className={`chip ${draftDays === r.days ? "active" : ""}`} onClick={() => setDraftDays(r.days)}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {team && data && data.stores.length > 1 && (
+          <div className="sheet-section">
+            <h4>Cửa hàng</h4>
+            <div className="opt-list">
+              {[{ storeCode: "", storeName: "Tất cả cửa hàng" }, ...data.stores].map((s) => (
+                <button key={s.storeCode || "all"} type="button" className={`opt ${draftStore === s.storeCode ? "on" : ""}`} onClick={() => setDraftStore(s.storeCode)}>
+                  <span>{s.storeName || s.storeCode}</span>
+                  <i className="radio">{draftStore === s.storeCode && <Icon name="check" size={13} />}</i>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="sheet-actions">
+          <button className="btn" onClick={() => { setDraftDays(30); setDraftStore(""); }}>Đặt lại</button>
+          <button className="btn primary" onClick={applyFilter}>Áp dụng</button>
+        </div>
+      </Sheet>
     </>
   );
 }
