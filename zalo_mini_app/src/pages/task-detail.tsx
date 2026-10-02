@@ -3,8 +3,20 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Page, useSnackbar } from "zmp-ui";
 import { api, photoSrc } from "../api";
 import { useAuth } from "../auth";
+import Avatar from "../components/Avatar";
+import Icon from "../components/Icon";
+import PhotoViewer from "../components/PhotoViewer";
+import Sheet, { ConfirmSheet } from "../components/Sheet";
 import { PRIORITY_LABEL, RECURRENCE_LABEL, STATUS_LABEL, TaskDetail } from "../types";
-import { formatDue } from "../utils";
+import { dueInfo, formatDateTime } from "../utils";
+
+const STEPS: { key: "todo" | "doing" | "done"; label: string }[] = [
+  { key: "todo", label: "Chưa làm" },
+  { key: "doing", label: "Đang làm" },
+  { key: "done", label: "Hoàn thành" },
+];
+
+type Confirm = null | "cancel" | "delete" | "reopen";
 
 export default function TaskDetailPage() {
   const id = Number(useParams().id);
@@ -17,6 +29,9 @@ export default function TaskDetailPage() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
+  const [viewer, setViewer] = useState<string | null>(null);
+  const [menu, setMenu] = useState(false);
+  const [confirm, setConfirm] = useState<Confirm>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -40,91 +55,139 @@ export default function TaskDetailPage() {
       await fn();
       if (okMsg) openSnackbar({ text: okMsg, type: "success" });
       await load();
+      return true;
     } catch (e) {
       openSnackbar({ text: e instanceof Error ? e.message : "Có lỗi xảy ra", type: "error" });
+      return false;
     } finally {
       setBusy(false);
     }
   };
 
   const onPickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!file) return;
+    if (!files.length) return;
     await run(async () => {
-      const { photoUrl } = await api.uploadPhoto(file);
-      setPhotos((p) => [...p, photoUrl]);
+      for (const f of files) {
+        const { photoUrl } = await api.uploadPhoto(f);
+        setPhotos((p) => [...p, photoUrl]);
+      }
     });
   };
 
   if (error) return <Page className="page"><div className="error">{error}</div></Page>;
   if (!task) return <Page className="page"><div className="center-note">Đang tải...</div></Page>;
 
-  const isAssignee = String(task.assigneeId) === user?.id;
+  const isAssignee = user ? String(task.assigneeId) === user.id : false;
   const canAct = (isAssignee || task.canManage) && task.status !== "cancelled";
   const closed = task.status === "done";
+  const due = dueInfo(task);
+  const stepIndex = task.status === "cancelled" ? -1 : STEPS.findIndex((s) => s.key === task.status);
+
+  const doConfirm = async () => {
+    if (confirm === "delete") {
+      const ok = await run(() => api.deleteTask(task.id));
+      if (ok) { openSnackbar({ text: "Đã xoá công việc", type: "success" }); nav(-1); }
+    } else if (confirm === "cancel") {
+      await run(() => api.setStatus(task.id, "cancelled"), "Đã huỷ công việc");
+    } else if (confirm === "reopen") {
+      await run(() => api.setStatus(task.id, "todo"), "Đã mở lại công việc");
+    }
+    setConfirm(null);
+  };
 
   return (
     <Page className="page with-bar">
-      <div className="topbar">
-        <button className="link" onClick={() => nav(-1)}>‹ Quay lại</button>
-        {task.canManage && <button className="link" onClick={() => nav(`/task/${task.id}/edit`)}>Sửa</button>}
-      </div>
+      <header className="hero compact">
+        <div className="hero-row">
+          <button className="hero-btn" onClick={() => nav(-1)} aria-label="Quay lại"><Icon name="back" size={22} /></button>
+          {task.canManage && (
+            <button className="hero-btn" onClick={() => setMenu(true)} aria-label="Tuỳ chọn"><span className="dots">•••</span></button>
+          )}
+        </div>
+        <h1 className="detail-title">{task.title}</h1>
+        <div className="hero-chips">
+          <span className={`pill status-${task.status}`}>{STATUS_LABEL[task.status]}</span>
+          {task.overdue && <span className="pill overdue">Quá hạn</span>}
+          <span className="pill">{PRIORITY_LABEL[task.priority]}</span>
+          {task.recurrence !== "none" && <span className="pill"><Icon name="repeat" size={12} /> {RECURRENCE_LABEL[task.recurrence]}</span>}
+        </div>
+      </header>
+
+      {stepIndex >= 0 && (
+        <div className="stepper">
+          {STEPS.map((s, i) => (
+            <div key={s.key} className={`step ${i <= stepIndex ? "on" : ""} ${i === stepIndex ? "current" : ""}`}>
+              <span className="dot">{i < stepIndex || (i === stepIndex && closed) ? <Icon name="check" size={12} /> : i + 1}</span>
+              <span className="step-label">{s.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="panel">
-        <h2>{task.title}</h2>
-        <div className="chips">
-          <span className={`chip status-${task.status}`}>{STATUS_LABEL[task.status]}</span>
-          {task.overdue && <span className="chip overdue">Quá hạn</span>}
-          <span className="chip">{PRIORITY_LABEL[task.priority]}</span>
-          {task.recurrence !== "none" && <span className="chip">🔁 {RECURRENCE_LABEL[task.recurrence]}</span>}
-        </div>
         {task.description && <p className="desc">{task.description}</p>}
-        <dl className="kv">
-          <dt>Người làm</dt><dd>{task.assigneeName || "Chưa giao"}</dd>
-          <dt>Giao bởi</dt><dd>{task.assignedByName || "-"}</dd>
-          <dt>Cửa hàng</dt><dd>{task.storeName || task.storeCode || "-"}</dd>
-          <dt>Hạn chót</dt><dd>{task.dueAt ? formatDue(task.dueAt) : "Không có"}</dd>
-          {task.completedAt && (<><dt>Hoàn thành</dt><dd>{formatDue(task.completedAt)}</dd></>)}
+        <dl className="info">
+          <div><Icon name="user" size={18} /><dt>Người làm</dt><dd>{task.assigneeName ? <><Avatar name={task.assigneeName} size={20} /> {task.assigneeName}</> : "Chưa giao"}</dd></div>
+          <div><Icon name="users" size={18} /><dt>Giao bởi</dt><dd>{task.assignedByName || "-"}</dd></div>
+          <div><Icon name="pin" size={18} /><dt>Cửa hàng</dt><dd>{task.storeName || task.storeCode || "-"}</dd></div>
+          <div><Icon name="calendar" size={18} /><dt>Hạn chót</dt><dd className={due ? `tone-${due.tone}` : ""}>{task.dueAt ? `${formatDateTime(task.dueAt)}${due && due.tone !== "done" ? ` · ${due.text}` : ""}` : "Không có"}</dd></div>
+          {task.completedAt && <div><Icon name="checkCircle" size={18} /><dt>Hoàn thành lúc</dt><dd>{formatDateTime(task.completedAt)}</dd></div>}
         </dl>
       </div>
 
       {(canAct || photos.length > 0) && (
         <div className="panel">
-          <h3>Kết quả {task.requirePhoto && <small>(bắt buộc ảnh minh chứng)</small>}</h3>
+          <div className="panel-head">
+            <h3>Kết quả công việc</h3>
+            {task.requirePhoto && <span className="req">Bắt buộc ảnh</span>}
+          </div>
           <div className="photos">
             {photos.map((p) => (
-              <img key={p} src={photoSrc(p)} alt="minh chứng" onClick={() => window.open(photoSrc(p))} />
+              <button key={p} className="photo" onClick={() => setViewer(p)}><img src={photoSrc(p)} alt="Ảnh minh chứng" /></button>
             ))}
             {canAct && !closed && (
-              <button className="photo-add" onClick={() => fileRef.current?.click()} disabled={busy}>📷 Thêm ảnh</button>
+              <button className="photo-add" onClick={() => fileRef.current?.click()} disabled={busy}>
+                <Icon name="camera" size={22} /><span>Thêm ảnh</span>
+              </button>
             )}
           </div>
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={onPickPhoto} />
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={onPickPhoto} />
           {canAct && !closed && (
-            <textarea placeholder="Ghi chú (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />
+            <textarea placeholder="Ghi chú kết quả (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />
           )}
           {closed && task.completionNote && <p className="desc">{task.completionNote}</p>}
+          {photos.length === 0 && closed && <div className="hint">Không có ảnh minh chứng</div>}
         </div>
       )}
 
       <div className="panel">
-        <h3>Bình luận</h3>
-        {task.comments.length === 0 && <div className="hint">Chưa có bình luận</div>}
+        <div className="panel-head"><h3>Trao đổi</h3><span className="count">{task.comments.length}</span></div>
+        {task.comments.length === 0 && <div className="hint">Chưa có trao đổi nào</div>}
         {task.comments.map((c) => (
           <div key={c.id} className="comment">
-            <b>{c.authorName || "Ẩn danh"}</b> <small>{formatDue(c.createdAt)}</small>
-            <div>{c.body}</div>
+            <Avatar name={c.authorName || "?"} size={30} />
+            <div className="bubble">
+              <div className="bubble-head"><b>{c.authorName || "Ẩn danh"}</b><small>{formatDateTime(c.createdAt)}</small></div>
+              <div>{c.body}</div>
+            </div>
           </div>
         ))}
-        <div className="row">
-          <input placeholder="Viết bình luận..." value={comment} onChange={(e) => setComment(e.target.value)} />
+        <div className="composer">
+          <input
+            placeholder="Viết trao đổi..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && comment.trim() && !busy) run(async () => { await api.addComment(task.id, comment.trim()); setComment(""); }); }}
+          />
           <button
-            className="btn"
+            className="send"
             disabled={busy || !comment.trim()}
             onClick={() => run(async () => { await api.addComment(task.id, comment.trim()); setComment(""); })}
+            aria-label="Gửi"
           >
-            Gửi
+            <Icon name="send" size={18} />
           </button>
         </div>
       </div>
@@ -132,25 +195,47 @@ export default function TaskDetailPage() {
       {canAct && (
         <div className="action-bar">
           {task.status === "todo" && (
-            <button className="btn" disabled={busy} onClick={() => run(() => api.setStatus(task.id, "doing"), "Đã bắt đầu")}>Bắt đầu làm</button>
+            <button className="btn" disabled={busy} onClick={() => run(() => api.setStatus(task.id, "doing"), "Đã bắt đầu làm")}>
+              <Icon name="play" size={16} /> Bắt đầu
+            </button>
           )}
           {!closed && (
-            <button
-              className="btn primary"
-              disabled={busy}
-              onClick={() => run(() => api.setStatus(task.id, "done", note, photos), "Đã hoàn thành")}
-            >
-              ✓ Hoàn thành
+            <button className="btn primary" disabled={busy} onClick={() => run(() => api.setStatus(task.id, "done", note, photos), "Đã hoàn thành công việc")}>
+              <Icon name="check" size={18} /> Hoàn thành
             </button>
           )}
           {closed && task.canManage && (
-            <button className="btn" disabled={busy} onClick={() => run(() => api.setStatus(task.id, "todo"), "Đã mở lại")}>Mở lại</button>
-          )}
-          {task.canManage && !closed && (
-            <button className="btn danger" disabled={busy} onClick={() => run(() => api.setStatus(task.id, "cancelled"), "Đã huỷ")}>Huỷ việc</button>
+            <button className="btn" disabled={busy} onClick={() => setConfirm("reopen")}>Mở lại công việc</button>
           )}
         </div>
       )}
+
+      <PhotoViewer name={viewer} onClose={() => setViewer(null)} />
+
+      <Sheet open={menu} title="Tuỳ chọn" onClose={() => setMenu(false)}>
+        <div className="menu">
+          <button onClick={() => { setMenu(false); nav(`/task/${task.id}/edit`); }}><Icon name="edit" size={20} /> Chỉnh sửa công việc</button>
+          {task.status !== "cancelled" && !closed && (
+            <button onClick={() => { setMenu(false); setConfirm("cancel"); }}><Icon name="close" size={20} /> Huỷ công việc</button>
+          )}
+          <button className="danger" onClick={() => { setMenu(false); setConfirm("delete"); }}><Icon name="trash" size={20} /> Xoá công việc</button>
+        </div>
+      </Sheet>
+
+      <ConfirmSheet
+        open={confirm !== null}
+        title={confirm === "delete" ? "Xoá công việc?" : confirm === "cancel" ? "Huỷ công việc?" : "Mở lại công việc?"}
+        message={
+          confirm === "delete" ? "Công việc, ảnh và trao đổi sẽ bị xoá vĩnh viễn."
+          : confirm === "cancel" ? "Công việc sẽ chuyển sang trạng thái đã huỷ."
+          : "Công việc sẽ quay lại trạng thái chưa làm."
+        }
+        confirmLabel={confirm === "delete" ? "Xoá" : confirm === "cancel" ? "Huỷ việc" : "Mở lại"}
+        danger={confirm !== "reopen"}
+        busy={busy}
+        onConfirm={doConfirm}
+        onClose={() => setConfirm(null)}
+      />
     </Page>
   );
 }
