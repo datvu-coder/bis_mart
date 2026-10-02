@@ -60,3 +60,45 @@ export const uiState = {
   store: "",
   assignee: "",
 };
+
+/** Unread notification count shared by every bell. Polled from one place (HomePage). */
+let unread = 0;
+const unreadListeners = new Set<() => void>();
+export const setUnread = (n: number) => {
+  if (n !== unread) {
+    unread = n;
+    unreadListeners.forEach((l) => l());
+  }
+};
+const subscribeUnread = (l: () => void) => {
+  unreadListeners.add(l);
+  return () => unreadListeners.delete(l);
+};
+export const useUnreadCount = () => useSyncExternalStore(subscribeUnread, () => unread);
+
+export async function refreshUnread() {
+  try {
+    setUnread((await api.unreadCount()).unread);
+  } catch {
+    /* keep the last known count */
+  }
+}
+
+/** Mount once: refresh on any data change, every 45s, and whenever the app becomes visible again. */
+export function useUnreadPolling() {
+  const v = useDataVersion();
+  useEffect(() => {
+    refreshUnread();
+  }, [v]);
+  useEffect(() => {
+    const id = setInterval(refreshUnread, 45000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refreshUnread();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+}

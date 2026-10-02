@@ -105,3 +105,15 @@ export interface Analytics {
   byAssignee: (Tally & { id: number; name: string; storeCode: string })[];
   daily: { date: string; created: number; done: number }[];
 }
+
+export type NotificationKind = "assigned" | "done" | "comment" | "cancelled" | "reopened" | "due_soon" | "overdue" | "info";
+
+export interface AppNotification {
+  id: number;
+  kind: NotificationKind;
+  title: string;
+  body: string;
+  taskId: number | null;
+  isRead: boolean;
+  createdAt: string;
+}

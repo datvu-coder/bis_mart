@@ -4,6 +4,7 @@ import { api } from "../../api";
 import { useAuth } from "../../auth";
 import Avatar from "../../components/Avatar";
 import Icon from "../../components/Icon";
+import NotificationBell from "../../components/NotificationBell";
 import Sheet, { ConfirmSheet } from "../../components/Sheet";
 import { clearDataCache } from "../../data";
 import { Task } from "../../types";
@@ -47,6 +48,7 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
   return (
     <>
       <header className="hero profile">
+        <div className="hero-corner"><NotificationBell /></div>
         <Avatar name={name} size={72} />
         <h1>{name}</h1>
         <div className="hero-chips center">

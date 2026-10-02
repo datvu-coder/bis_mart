@@ -4,6 +4,7 @@ import { AnimationRoutes, App as ZMPApp, SnackbarProvider, ZMPRouter } from "zmp
 import { AuthProvider, useAuth } from "../auth";
 import LoginPage from "../pages/login";
 import HomePage from "../pages/home";
+import NotificationsPage from "../pages/notifications";
 import TaskDetailPage from "../pages/task-detail";
 import TaskFormPage from "../pages/task-form";
 
@@ -18,6 +19,7 @@ function Routes() {
         <Route path="/task/:id" element={<TaskDetailPage />} />
         <Route path="/task/:id/edit" element={<TaskFormPage />} />
         <Route path="/new" element={<TaskFormPage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
       </AnimationRoutes>
     </ZMPRouter>
   );

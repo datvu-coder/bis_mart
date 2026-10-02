@@ -4,6 +4,7 @@ import { useAuth } from "../../auth";
 import Avatar from "../../components/Avatar";
 import { DailyChart, RateBars, StatusBar } from "../../components/charts";
 import Icon from "../../components/Icon";
+import NotificationBell from "../../components/NotificationBell";
 import Skeleton, { EmptyState } from "../../components/Skeleton";
 import { uiState, useDataVersion } from "../../data";
 import type { Analytics } from "../../types";
@@ -82,7 +83,10 @@ export default function OverviewTab({ active }: { active: boolean }) {
             <div className="hero-sub">{team ? "Hiệu quả công việc" : `Xin chào, ${firstName(user?.fullName || "bạn")}`}</div>
             <h1>{team ? "Tổng quan" : "Tổng quan của tôi"}</h1>
           </div>
-          <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
+          <div className="hero-actions">
+            <NotificationBell />
+            <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
+          </div>
         </div>
         <div className="hero-filters">
           <div className="range-chips">

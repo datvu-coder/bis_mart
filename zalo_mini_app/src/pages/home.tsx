@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Page } from "zmp-ui";
 import BottomNav, { TabKey } from "../components/BottomNav";
 import Icon from "../components/Icon";
-import { uiState, useTaskData } from "../data";
+import { uiState, useTaskData, useUnreadPolling } from "../data";
 import MeTab from "./tabs/me-tab";
 import OverviewTab from "./tabs/overview-tab";
 import SummaryTab from "./tabs/summary-tab";
@@ -18,6 +18,7 @@ const ORDER: TabKey[] = ["overview", "tasks", "summary", "me"];
 export default function HomePage() {
   const nav = useNavigate();
   const data = useTaskData();
+  useUnreadPolling();
   const [tab, setTabState] = useState<TabKey>(uiState.tab);
   const [jump, setJump] = useState<{ store: string; nonce: number } | null>(null);
 
