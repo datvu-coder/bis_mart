@@ -179,7 +179,7 @@ export default function TasksTab({ tasks, canManage, loading, error, reload, jum
         <EmptyState
           icon={<Icon name={filter === "done" ? "checkCircle" : "inbox"} size={34} />}
           title={query || assignee || store ? "Không tìm thấy công việc phù hợp" : "Chưa có công việc nào"}
-          hint={canManage && !query ? "Bấm “Giao việc” để tạo công việc mới" : undefined}
+          hint={canManage && !query ? "Bấm nút + để giao việc mới" : undefined}
         />
       )}
       {!loading && sections.map((s) => (
