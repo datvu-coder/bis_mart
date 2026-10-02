@@ -105,10 +105,15 @@ class _StoreListScreenState extends State<StoreListScreen> {
     return Consumer<StoreProvider>(
       builder: (context, provider, _) {
         // Visible list = stores managed by this user (manager-list membership)
-        // PLUS the store they are assigned to via employee.storeCode.
-        final stores = provider.filteredStores.where((s) =>
-            managedIds.contains(s.id) ||
-            (ownStoreCode != null && s.storeCode == ownStoreCode)).toList();
+        // PLUS the store they are assigned to via employee.storeCode — except
+        // for admins, who (like the backend's own _allowed_store_codes_for_
+        // current_user, which returns unrestricted access for them) see every
+        // store, not just the handful they personally happen to be tagged on.
+        final stores = permProv.isAdmin
+            ? provider.filteredStores
+            : provider.filteredStores.where((s) =>
+                managedIds.contains(s.id) ||
+                (ownStoreCode != null && s.storeCode == ownStoreCode)).toList();
 
         return Scaffold(
           backgroundColor: AppColors.background,
