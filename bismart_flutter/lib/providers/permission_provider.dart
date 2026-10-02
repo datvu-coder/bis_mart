@@ -85,10 +85,13 @@ class PermissionProvider extends ChangeNotifier {
   }
 
   /// Can the current user edit this store?
-  /// Two conditions must hold:
-  ///   - the user is in the managers list of that store, AND
-  ///   - their system role has CRUD power (PG cannot edit even if listed).
+  /// Admins can edit any store, matching the backend (api_update_store/
+  /// api_delete_store only check the global can_crud permission, not
+  /// store_managers membership). Everyone else needs both:
+  ///   - to be in the managers list of that store, AND
+  ///   - a system role with CRUD power (PG cannot edit even if listed).
   bool canEditStore(String storeId) {
+    if (isAdmin) return true;
     if (!_managedStoreRoles.containsKey(storeId)) return false;
     return _systemPerm?.canCrud ?? false;
   }
