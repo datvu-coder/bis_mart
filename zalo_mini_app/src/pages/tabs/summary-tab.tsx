@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../../api";
 import Icon from "../../components/Icon";
+import NotificationBell from "../../components/NotificationBell";
 import Skeleton, { EmptyState } from "../../components/Skeleton";
 import { useDataVersion } from "../../data";
 import { StoreSummary } from "../../types";
@@ -50,7 +51,10 @@ export default function SummaryTab({ active, onOpenStore }: Props) {
             <div className="hero-sub">Theo dõi công việc</div>
             <h1>Tổng quan cửa hàng</h1>
           </div>
-          <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
+          <div className="hero-actions">
+            <NotificationBell />
+            <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
+          </div>
         </div>
         <div className="hero-note">{stores ? `${stores.length} cửa hàng · ${pct}% công việc đã hoàn thành` : "Đang tải dữ liệu..."}</div>
       </header>

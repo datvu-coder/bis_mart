@@ -89,3 +89,17 @@ export const quickDeadlines = (): { label: string; value: string }[] => {
     { label: "Tuần sau", value: at(7, 17) },
   ];
 };
+
+/** "5 phút trước", "2 giờ trước", ... for notification timestamps. */
+export function timeAgo(iso: string): string {
+  const d = parseLocal(iso);
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "Vừa xong";
+  if (min < 60) return `${min} phút trước`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} giờ trước`;
+  const days = Math.floor(h / 24);
+  if (days < 7) return `${days} ngày trước`;
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
+}

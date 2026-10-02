@@ -5042,6 +5042,132 @@ def _notify_zalo(employee_id: int | None, text: str) -> None:
         pass
 
 
+def _fmt_due(iso: str | None) -> str:
+    """'2026-10-02T17:00:00' -> '17:00 02/10' for human-readable messages."""
+    try:
+        d = datetime.strptime((iso or "")[:16], "%Y-%m-%dT%H:%M")
+        return d.strftime("%H:%M %d/%m")
+    except ValueError:
+        return (iso or "").replace("T", " ")[:16]
+
+
+def _notify(employee_id: int | None, kind: str, title: str, body: str = "", task_id: int | None = None,
+            dedupe_key: str | None = None, push: bool = True) -> None:
+    """Store an in-app notification (shown under the bell) and mirror it to Zalo OA when configured.
+    A repeated dedupe_key for the same employee is ignored, which keeps reminders from piling up."""
+    if not employee_id:
+        return
+    db = get_db()
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                "INSERT INTO notifications (employee_id, kind, title, body, task_id, dedupe_key, created_at) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (employee_id, dedupe_key) DO NOTHING RETURNING id",
+                (employee_id, kind, title[:200], body[:500], task_id, dedupe_key, _now_iso()),
+            )
+            inserted = cur.fetchone()
+        db.commit()
+    except Exception:
+        db.rollback()
+        return
+    if inserted and push:
+        _notify_zalo(employee_id, f"{title}\n{body}".strip())
+
+
+def _sync_task_reminders(employee_id: int) -> None:
+    """Lazily create 'due soon' / 'overdue' notifications for the employee's open tasks."""
+    now = datetime.now(tz=VN_TZ)
+    now_iso = now.strftime("%Y-%m-%dT%H:%M:%S")
+    soon_iso = (now + timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%S")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, title, due_at FROM tasks WHERE assignee_id = %s AND status IN ('todo','doing') "
+            "AND due_at IS NOT NULL AND due_at <= %s",
+            (employee_id, soon_iso),
+        )
+        rows = cur.fetchall()
+    for r in rows:
+        due_txt = _fmt_due(r["due_at"])
+        if r["due_at"] < now_iso:
+            _notify(employee_id, "overdue", "Việc đã quá hạn", f"{r['title']} · hạn {due_txt}", r["id"],
+                    f"overdue:{r['id']}:{r['due_at']}")
+        else:
+            _notify(employee_id, "due_soon", "Việc sắp đến hạn", f"{r['title']} · hạn {due_txt}", r["id"],
+                    f"due_soon:{r['id']}:{r['due_at']}")
+
+
+def _notification_to_api_json(row: dict) -> dict:
+    return {
+        "id": row["id"],
+        "kind": row.get("kind") or "info",
+        "title": row.get("title") or "",
+        "body": row.get("body") or "",
+        "taskId": row.get("task_id"),
+        "isRead": bool(row.get("is_read")),
+        "createdAt": row.get("created_at"),
+    }
+
+
+def _unread_count(employee_id: int) -> int:
+    with get_db().cursor() as cur:
+        cur.execute("SELECT COUNT(*) AS c FROM notifications WHERE employee_id = %s AND is_read = 0", (employee_id,))
+        return int(cur.fetchone()["c"])
+
+
+@app.get("/api/notifications/unread-count")
+@login_required
+def api_notifications_unread_count():
+    emp = (g.current_user or {}).get("employee_id")
+    if not emp:
+        return jsonify({"unread": 0})
+    _sync_task_reminders(emp)
+    return jsonify({"unread": _unread_count(emp)})
+
+
+@app.get("/api/notifications")
+@login_required
+def api_list_notifications():
+    emp = (g.current_user or {}).get("employee_id")
+    if not emp:
+        return jsonify({"items": [], "unread": 0})
+    _sync_task_reminders(emp)
+    cutoff = (datetime.now(tz=VN_TZ) - timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%S")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM notifications WHERE employee_id = %s AND created_at < %s", (emp, cutoff))
+        cur.execute(
+            "SELECT id, kind, title, body, task_id, is_read, created_at FROM notifications "
+            "WHERE employee_id = %s ORDER BY id DESC LIMIT 60",
+            (emp,),
+        )
+        rows = cur.fetchall()
+    db.commit()
+    return jsonify({"items": [_notification_to_api_json(r) for r in rows], "unread": _unread_count(emp)})
+
+
+@app.post("/api/notifications/read")
+@login_required
+def api_mark_notifications_read():
+    """Mark the given ids (or all, when `ids` is omitted) as read for the caller."""
+    emp = (g.current_user or {}).get("employee_id")
+    if not emp:
+        return jsonify({"unread": 0})
+    ids = (request.get_json(silent=True) or {}).get("ids")
+    db = get_db()
+    with db.cursor() as cur:
+        if isinstance(ids, list) and ids:
+            clean = [int(i) for i in ids if str(i).isdigit()][:200]
+            cur.execute(
+                "UPDATE notifications SET is_read = 1 WHERE employee_id = %s AND is_read = 0 AND id = ANY(%s)",
+                (emp, clean),
+            )
+        else:
+            cur.execute("UPDATE notifications SET is_read = 1 WHERE employee_id = %s AND is_read = 0", (emp,))
+    db.commit()
+    return jsonify({"unread": _unread_count(emp)})
+
+
 @app.post("/api/auth/zalo-link")
 @login_required
 def api_zalo_link():
@@ -5195,7 +5321,7 @@ def _spawn_next_occurrence(task: dict) -> None:
         cur.execute(
             "INSERT INTO tasks (title, description, store_code, assignee_id, assigned_by, priority, "
             "due_at, recurrence, require_photo, created_at, updated_at) "
-            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
             (
                 task["title"], task.get("description"), task.get("store_code") or "",
                 task.get("assignee_id"), task.get("assigned_by"), task.get("priority") or "normal",
@@ -5203,6 +5329,9 @@ def _spawn_next_occurrence(task: dict) -> None:
                 task.get("require_photo") or 0, _now_iso(), _now_iso(),
             ),
         )
+        new_id = cur.fetchone()["id"]
+    if task.get("assignee_id"):
+        _notify(task["assignee_id"], "assigned", "Việc lặp lại mới", task["title"], new_id)
 
 
 def _clean_photo_list(value: Any) -> list[str]:
@@ -5289,9 +5418,9 @@ def api_create_task():
         )
         task_id = cur.fetchone()["id"]
     db.commit()
-    if assignee_id:
-        due = f" - hạn {data['dueAt'].replace('T', ' ')}" if data.get("dueAt") else ""
-        _notify_zalo(int(assignee_id), f"Bạn được giao việc mới: {title}{due}\nGiao bởi: {viewer['name']}")
+    if assignee_id and int(assignee_id) != viewer["employee_id"]:
+        due = f" · hạn {_fmt_due(data['dueAt'])}" if data.get("dueAt") else ""
+        _notify(int(assignee_id), "assigned", "Bạn được giao việc mới", f"{title}{due} · giao bởi {viewer['name']}", task_id)
     return jsonify(_task_to_api_json(_fetch_task(task_id))), 201
 
 
@@ -5548,8 +5677,8 @@ def api_update_task(task_id: int):
             ),
         )
     db.commit()
-    if new_assignee and new_assignee != task["assignee_id"]:
-        _notify_zalo(int(new_assignee), f"Bạn được giao việc: {title}\nGiao bởi: {viewer['name']}")
+    if new_assignee and new_assignee != task["assignee_id"] and int(new_assignee) != viewer["employee_id"]:
+        _notify(int(new_assignee), "assigned", "Bạn được giao việc", f"{title} · giao bởi {viewer['name']}", task_id)
     return jsonify(_task_to_api_json(_fetch_task(task_id)))
 
 
@@ -5594,7 +5723,13 @@ def api_set_task_status(task_id: int):
             _spawn_next_occurrence(task)
             db.commit()
         if task.get("assigned_by") and task["assigned_by"] != viewer["employee_id"]:
-            _notify_zalo(task["assigned_by"], f"{viewer['name']} đã hoàn thành: {task['title']}")
+            _notify(task["assigned_by"], "done", "Việc đã hoàn thành", f"{viewer['name']} đã hoàn thành: {task['title']}", task_id)
+    elif status == "cancelled" and task["status"] != "cancelled":
+        if task.get("assignee_id") and task["assignee_id"] != viewer["employee_id"]:
+            _notify(task["assignee_id"], "cancelled", "Việc đã bị huỷ", f"{task['title']} · huỷ bởi {viewer['name']}", task_id)
+    elif status == "todo" and task["status"] in ("done", "cancelled"):
+        if task.get("assignee_id") and task["assignee_id"] != viewer["employee_id"]:
+            _notify(task["assignee_id"], "reopened", "Việc được mở lại", f"{task['title']} · bởi {viewer['name']}", task_id)
     return jsonify(_task_to_api_json(_fetch_task(task_id)))
 
 
@@ -5619,7 +5754,7 @@ def api_add_task_comment(task_id: int):
         cid = cur.fetchone()["id"]
     db.commit()
     for target in {task.get("assignee_id"), task.get("assigned_by")} - {viewer["employee_id"], None}:
-        _notify_zalo(target, f"{viewer['name']} bình luận về \"{task['title']}\": {body[:200]}")
+        _notify(target, "comment", f"{viewer['name']} đã trao đổi", f"{task['title']}: {body[:160]}", task_id)
     return jsonify({"id": cid, "body": body, "authorId": viewer["employee_id"],
                     "authorName": viewer["name"], "createdAt": _now_iso()}), 201
 

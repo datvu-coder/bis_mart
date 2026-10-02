@@ -1309,3 +1309,18 @@ CREATE TABLE IF NOT EXISTS task_comments (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_task_comments_task ON task_comments(task_id);
+
+-- In-app notifications (bell icon): one row per recipient. dedupe_key keeps reminders from repeating.
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL DEFAULT 'info',     -- assigned | done | comment | cancelled | reopened | due_soon | overdue
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+    dedupe_key TEXT,
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe ON notifications(employee_id, dedupe_key);
+CREATE INDEX IF NOT EXISTS idx_notifications_employee ON notifications(employee_id, is_read, id DESC);

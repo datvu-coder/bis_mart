@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSnackbar } from "zmp-ui";
 import { useAuth } from "../../auth";
 import Icon from "../../components/Icon";
+import NotificationBell from "../../components/NotificationBell";
 import Skeleton, { EmptyState } from "../../components/Skeleton";
 import TaskCard from "../../components/TaskCard";
 import { uiState } from "../../data";
@@ -125,7 +126,10 @@ export default function TasksTab({ tasks, canManage, loading, error, reload, jum
             <div className="hero-sub">{todayLabel()}</div>
             <h1>{greeting()}, {firstName(user?.fullName || "bạn")}</h1>
           </div>
-          <button className="hero-btn" onClick={reload} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
+          <div className="hero-actions">
+            <NotificationBell />
+            <button className="hero-btn" onClick={reload} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
+          </div>
         </div>
         <div className="hero-note">{note}</div>
       </header>
