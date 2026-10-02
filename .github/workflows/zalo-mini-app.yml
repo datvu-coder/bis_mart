@@ -33,12 +33,21 @@ jobs:
           cache: npm
           cache-dependency-path: zalo_mini_app/package-lock.json
 
-      - name: Check ZMP_TOKEN secret
+      # A pasted secret often carries a trailing newline or quotes, which makes
+      # Node reject the Authorization header. Strip them (JWTs contain neither).
+      - name: Check and clean ZMP_TOKEN secret
         run: |
           if [ -z "$ZMP_TOKEN" ]; then
             echo "::error::Missing repository secret ZMP_TOKEN. Run 'zmp login' once and add the token from .env as a secret."
             exit 1
           fi
+          CLEAN=$(printf '%s' "$ZMP_TOKEN" | tr -d '[:space:]"'"'"'')
+          if [ -z "$CLEAN" ] || printf '%s' "$CLEAN" | LC_ALL=C grep -q '[^!-~]'; then
+            echo "::error::ZMP_TOKEN contains invalid characters. Re-copy the token from .env into the secret."
+            exit 1
+          fi
+          echo "::add-mask::$CLEAN"
+          echo "ZMP_TOKEN=$CLEAN" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: npm ci
