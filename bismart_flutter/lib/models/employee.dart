@@ -2,7 +2,7 @@ class Employee {
   final String id;
   final String fullName;
   final String employeeCode;
-  final String position; // ADM | PG | TLD | MNG | CS
+  final String position; // ADM | PG | TLD | SM | MNG | CS
   final String workLocation;
   final int score;
   final int rank;
