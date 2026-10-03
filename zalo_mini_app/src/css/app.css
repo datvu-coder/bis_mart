@@ -539,3 +539,8 @@ input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-
 
 /* Minimise + bell share the corner of the profile hero */
 .hero.profile { padding-right: 108px; }
+
+/* ---------- Brand ---------- */
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.brand span { font-size: 20px; font-weight: 800; letter-spacing: 1.2px; }
+.app-logo { border-radius: 14px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22); flex-shrink: 0; }
