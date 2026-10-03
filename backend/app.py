@@ -7612,6 +7612,19 @@ def api_ops_summary():
     return jsonify(out)
 
 
+ZALO_VERIFY_DIR = Path(__file__).resolve().parent / "zalo_verify"
+
+
+@app.get("/zalo_verifier<path:fname>")
+def zalo_domain_verification(fname: str):
+    """Serves the Zalo domain-verification file: /zalo_verifier<code>.html -> zalo_verify/<code>.html."""
+    safe = secure_filename(fname)
+    full = ZALO_VERIFY_DIR / safe
+    if not safe.endswith(".html") or safe == "README.md" or not full.is_file():
+        return jsonify({"error": "Not found"}), 404
+    return Response(full.read_bytes(), mimetype="text/html; charset=utf-8")
+
+
 @app.get("/healthz")
 def healthz():
     db = get_db()
