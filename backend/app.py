@@ -5456,7 +5456,10 @@ def api_zalo_oa_status():
         hooks = cur.fetchall()
         cur.execute("SELECT COUNT(*) FILTER (WHERE followed = 1) AS n, COUNT(*) AS all_n, MAX(last_interaction) AS last_at FROM oa_seen_users")
         seen = cur.fetchone()
-    if not seen["all_n"] and hooks:
+    with db.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FILTER (WHERE COALESCE(app_user,'') = '') AS missing FROM oa_seen_users")
+        missing_app = cur.fetchone()["missing"]
+    if (not seen["all_n"] or missing_app) and hooks:
         _backfill_seen_from_log()
         with db.cursor() as cur:
             cur.execute("SELECT COUNT(*) FILTER (WHERE followed = 1) AS n, COUNT(*) AS all_n, MAX(last_interaction) AS last_at FROM oa_seen_users")
@@ -5617,8 +5620,9 @@ def _care_audience(period: str) -> dict:
     if not err or ids:
         return {"ids": ids, "total": total if total is not None else len(ids), "source": "zalo", "apiError": ""}
     with get_db().cursor() as cur:
-        cur.execute("SELECT COUNT(*) AS n FROM oa_seen_users")
-        if not cur.fetchone()["n"]:
+        cur.execute("SELECT COUNT(*) AS n, COUNT(*) FILTER (WHERE COALESCE(app_user,'') = '') AS missing FROM oa_seen_users")
+        row = cur.fetchone()
+        if not row["n"] or row["missing"]:
             _backfill_seen_from_log()
     seen = _oa_seen_ids(period)
     with get_db().cursor() as cur:
@@ -5677,14 +5681,18 @@ def _care_worker(campaign_id: int, ids: list[str], text: str, image_url: str) ->
         db = get_db()
         ok_n = fail_n = 0
         errors: dict[str, int] = {}
+        with db.cursor() as cur:
+            cur.execute("SELECT user_id, app_user FROM oa_seen_users WHERE user_id = ANY(%s)", (ids,))
+            app_ids = {r["user_id"]: r["app_user"] for r in cur.fetchall() if r["app_user"]}
         try:
             for i, uid in enumerate(ids, 1):
-                ok, detail = _oa_send_care(uid, text, image_url)
-                if not ok and '"error": -201' in detail.replace('":-201', '": -201'):
-                    for alt in _oa_alt_ids(uid):
-                        ok, detail = _oa_send_care(alt, text, image_url)
-                        if ok:
-                            break
+                # The app-scoped id from the webhook event is accepted by the send API (it is what the Mini App
+                # login yields); the raw sender id is not always. Try it first, then the sender id.
+                ok, detail = False, ""
+                for cand in ([app_ids[uid]] if app_ids.get(uid) not in (None, uid) else []) + [uid]:
+                    ok, detail = _oa_send_care(cand, text, image_url)
+                    if ok or _care_error_key(detail).split(":")[0] != "-201":
+                        break
                 if ok:
                     ok_n += 1
                 else:
