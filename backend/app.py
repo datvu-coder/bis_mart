@@ -5299,6 +5299,11 @@ def api_zalo_link():
         if cur.fetchone():
             return jsonify({"error": "Zalo account already linked to another employee"}), 409
         cur.execute("UPDATE employees SET zalo_id = %s WHERE id = %s", (str(zalo["id"]), employee_id))
+        # A follow event may have arrived before the employee was linked: apply the stored pair now.
+        cur.execute("SELECT oa_user FROM zalo_oa_pending WHERE app_user = %s", (str(zalo["id"]),))
+        pend = cur.fetchone()
+        if pend:
+            cur.execute("UPDATE employees SET zalo_oa_id = %s WHERE id = %s", (pend["oa_user"], employee_id))
     db.commit()
     return jsonify({"ok": True})
 
@@ -5407,6 +5412,9 @@ def api_zalo_oa_webhook():
             cur.execute("UPDATE employees SET zalo_oa_id = %s WHERE zalo_id = %s AND COALESCE(zalo_oa_id,'') <> %s",
                         (oa_user, app_user, oa_user))
             mapped = cur.rowcount
+            cur.execute("INSERT INTO zalo_oa_pending (app_user, oa_user, created_at) VALUES (%s,%s,%s) "
+                        "ON CONFLICT (app_user) DO UPDATE SET oa_user = EXCLUDED.oa_user, created_at = EXCLUDED.created_at",
+                        (app_user, oa_user, _now_iso()))
     with db.cursor() as cur:
         cur.execute("INSERT INTO zalo_oa_push_log (employee_id, ok, detail, created_at) VALUES (NULL, 2, %s, %s)",
                     (("webhook " + json.dumps(data, ensure_ascii=False))[:500], _now_iso()))
@@ -5452,7 +5460,7 @@ def api_zalo_oa_test():
         row = cur.fetchone() or {}
     target = row.get("zalo_oa_id") or row.get("zalo_id")
     if not target:
-        return jsonify({"ok": False, "detail": "Tài khoản này chưa liên kết Zalo", "target": None}), 400
+        return jsonify({"error": "Tài khoản này chưa liên kết Zalo. Hãy thoát app, mở lại từ Zalo rồi thử lại.", "ok": False, "detail": "not linked", "target": None}), 400
     ok, detail = _oa_send_text(str(target), "Tin thử từ Bi'S MART Công việc. Nếu bạn thấy tin này trên điện thoại thì thông báo đẩy đã hoạt động.")
     with db.cursor() as cur:
         cur.execute("INSERT INTO zalo_oa_push_log (employee_id, ok, detail, created_at) VALUES (%s,%s,%s,%s)",
