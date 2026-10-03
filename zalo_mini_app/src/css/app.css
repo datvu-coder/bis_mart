@@ -489,3 +489,11 @@ h1, h2, h3 { margin: 0; }
 .entry-actions .btn { padding: 12px 8px; font-size: 13px; white-space: nowrap; }
 .entry-actions .btn svg { flex-shrink: 0; }
 .toolbar .chip { white-space: nowrap; flex-shrink: 0; }
+
+/* iOS gives date/time inputs an intrinsic width that overflows the card; pin them to the container. */
+input[type="datetime-local"], input[type="date"], input[type="time"] {
+  display: block; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+  -webkit-appearance: none; appearance: none; min-height: 46px; text-align: left; line-height: 1.2;
+}
+input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 1.2em; }
+.seg button { white-space: nowrap; font-size: 12.5px; padding-left: 2px; padding-right: 2px; }
