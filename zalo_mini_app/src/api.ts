@@ -1,4 +1,8 @@
-import type { Analytics, AppNotification, Assignee, StoreSummary, Task, TaskDetail, User } from "./types";
+import type {
+  Analytics, Announcement, AnnouncementDetail, AppNotification, Assignee, CatalogProduct, FundEntry, FundReport,
+  FundReportDetail, FundSuggest, MediaItem, Order, OrderDetail, OrderItem, OrderSummary, OpsSummary, StoreSummary,
+  Task, TaskDetail, User,
+} from "./types";
 
 const BASE_URL: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "https://api.bismart.id.vn";
 const TOKEN_KEY = "bismart_token";
@@ -32,6 +36,39 @@ const ERROR_VI: Record<string, string> = {
   "Empty comment": "Nội dung trao đổi đang trống.",
   "file too large": "Ảnh quá lớn (tối đa 10MB).",
   "Zalo account already linked to another employee": "Tài khoản Zalo này đã liên kết với nhân viên khác.",
+  "Store is required": "Vui lòng chọn cửa hàng.",
+  "Invalid date": "Ngày không hợp lệ.",
+  "Report date cannot be in the future": "Không thể chọn ngày trong tương lai.",
+  "Invalid denomination count": "Số tờ không hợp lệ.",
+  "Invalid amount": "Số tiền không hợp lệ.",
+  "Report already approved": "Báo cáo ngày này đã được duyệt, không sửa được nữa.",
+  "Report not found": "Không tìm thấy báo cáo.",
+  "Report is not awaiting review": "Báo cáo này đã được xử lý rồi.",
+  "A note is required to reject a report": "Vui lòng nhập lý do cần đếm lại.",
+  "Invalid decision": "Quyết định không hợp lệ.",
+  "Invalid fund entry": "Khoản thu/chi chưa hợp lệ (cần số tiền lớn hơn 0).",
+  "A reason is required": "Vui lòng nhập lý do thu/chi.",
+  "Entry not found": "Không tìm thấy khoản thu/chi.",
+  "At least one item is required": "Hãy thêm ít nhất một mặt hàng.",
+  "Too many items": "Đơn có quá nhiều mặt hàng.",
+  "Invalid quantity": "Số lượng không hợp lệ.",
+  "Invalid item": "Mặt hàng không hợp lệ.",
+  "Product not found": "Không tìm thấy sản phẩm.",
+  "Product name is required": "Vui lòng nhập tên sản phẩm.",
+  "Order not found": "Không tìm thấy đơn hàng.",
+  "Order can no longer be edited": "Đơn đã được xử lý, không sửa được nữa.",
+  "Order is not awaiting approval": "Đơn này không còn ở trạng thái chờ duyệt.",
+  "Order cannot be marked as ordered": "Không thể chuyển đơn sang 'Đã đặt NCC'.",
+  "Order cannot be cancelled": "Không thể huỷ đơn này.",
+  "Order cannot be received": "Đơn này không thể nhận hàng.",
+  "Invalid received quantity": "Số lượng nhận không hợp lệ.",
+  "Items are required": "Chưa có số lượng nhận.",
+  "Announcement not found": "Không tìm thấy thông báo (có thể đã bị xoá).",
+  "Invalid reminder time": "Giờ nhắc không hợp lệ.",
+  "Invalid deadline": "Hạn chót không hợp lệ.",
+  "No recipients": "Không có người nhận phù hợp.",
+  "Invalid export": "Loại báo cáo không hợp lệ.",
+  "Link expired": "Liên kết tải đã hết hạn, hãy thử lại.",
 };
 
 export const viError = (msg: string): string => ERROR_VI[msg] || msg;
@@ -107,6 +144,52 @@ export const api = {
   analytics: (days: number, storeCode: string) =>
     request<Analytics>("GET", `/api/tasks/analytics?${new URLSearchParams({ days: String(days), storeCode })}`),
   assignees: () => request<{ employees: Assignee[] }>("GET", "/api/tasks/assignees"),
+
+  // operations: cash fund
+  fundSuggest: (storeCode: string, date: string) =>
+    request<FundSuggest>("GET", `/api/fund/suggest?${new URLSearchParams({ storeCode, date })}`),
+  fundReports: (q: Record<string, string> = {}) =>
+    request<{ reports: FundReport[]; canManage: boolean }>("GET", `/api/fund/reports?${new URLSearchParams(q)}`),
+  fundReport: (id: number) => request<FundReportDetail>("GET", `/api/fund/reports/${id}`),
+  saveFundReport: (body: unknown) => request<FundReport>("POST", "/api/fund/reports", body),
+  reviewFundReport: (id: number, decision: "approve" | "reject", note: string) =>
+    request<FundReport>("POST", `/api/fund/reports/${id}/review`, { decision, note }),
+  fundMissing: (date: string) =>
+    request<{ date: string; stores: { storeCode: string; storeName: string }[] }>("GET", `/api/fund/missing?date=${date}`),
+  fundEntries: (storeCode: string, date: string) =>
+    request<{ entries: FundEntry[] }>("GET", `/api/fund/entries?${new URLSearchParams({ storeCode, date })}`),
+  addFundEntry: (body: unknown) => request<{ id: number }>("POST", "/api/fund/entries", body),
+  deleteFundEntry: (id: number) => request<{ ok: boolean }>("DELETE", `/api/fund/entries/${id}`),
+
+  // operations: purchase orders
+  catalog: (q: string) => request<{ products: CatalogProduct[] }>("GET", `/api/orders/catalog?${new URLSearchParams({ q })}`),
+  lastOrder: (storeCode: string) =>
+    request<{ orderDate: string | null; items: OrderItem[] }>("GET", `/api/orders/last?${new URLSearchParams({ storeCode })}`),
+  orders: (q: Record<string, string> = {}) =>
+    request<{ orders: Order[]; canManage: boolean }>("GET", `/api/orders?${new URLSearchParams(q)}`),
+  order: (id: number) => request<OrderDetail>("GET", `/api/orders/${id}`),
+  createOrder: (body: unknown) => request<Order>("POST", "/api/orders", body),
+  updateOrder: (id: number, body: unknown) => request<Order>("PUT", `/api/orders/${id}`, body),
+  setOrderStatus: (id: number, status: string) => request<Order>("POST", `/api/orders/${id}/status`, { status }),
+  receiveOrder: (id: number, body: unknown) => request<Order>("POST", `/api/orders/${id}/receive`, body),
+  ordersSummary: (date: string, statuses: string) =>
+    request<OrderSummary>("GET", `/api/orders/summary?${new URLSearchParams({ date, statuses })}`),
+
+  // operations: announcements
+  announcements: () => request<{ announcements: Announcement[]; canManage: boolean }>("GET", "/api/announcements"),
+  announcement: (id: number) => request<AnnouncementDetail>("GET", `/api/announcements/${id}`),
+  createAnnouncement: (body: unknown) => request<Announcement>("POST", "/api/announcements", body),
+  readAnnouncement: (id: number) => request<{ ok: boolean }>("POST", `/api/announcements/${id}/read`),
+  deleteAnnouncement: (id: number) => request<{ ok: boolean }>("DELETE", `/api/announcements/${id}`),
+  remindAnnouncement: (id: number) => request<{ sent: number }>("POST", `/api/announcements/${id}/remind`),
+  announcementToTask: (id: number, body: unknown) => request<{ created: number }>("POST", `/api/announcements/${id}/to-task`, body),
+
+  // operations: gallery, export, hub
+  media: (q: Record<string, string> = {}) =>
+    request<{ items: MediaItem[]; total: number }>("GET", `/api/media?${new URLSearchParams(q)}`),
+  exportLink: (kind: "fund" | "orders", storeCode = "", from = "", to = "") =>
+    request<{ path: string }>("POST", "/api/export-link", { kind, storeCode, from, to }),
+  opsSummary: () => request<OpsSummary>("GET", "/api/ops/summary"),
   uploadPhoto: (file: File) => {
     const form = new FormData();
     form.append("file", file);
@@ -114,4 +197,8 @@ export const api = {
   },
 };
 
-export const photoSrc = (name: string) => `${BASE_URL}/api/tasks/photo/${encodeURIComponent(name)}`;
+/** Full-size photo, or a server-resized thumbnail when `width` is given (lists and grids). */
+export const photoSrc = (name: string, width?: number) =>
+  `${BASE_URL}/api/tasks/photo/${encodeURIComponent(name)}${width ? `?w=${width}` : ""}`;
+
+export const absoluteUrl = (path: string) => `${BASE_URL}${path}`;

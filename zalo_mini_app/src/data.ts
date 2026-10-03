@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { api } from "./api";
-import type { Task } from "./types";
+import type { OpsSummary, Task } from "./types";
 
 /** Shared data layer: a version counter that mutations bump, plus a cache so screens render instantly. */
 const listeners = new Set<() => void>();
@@ -52,7 +52,7 @@ export function useTaskData() {
 
 /** Remembers filters across navigation (the Home screen is remounted when returning from detail). */
 export const uiState = {
-  tab: "overview" as "overview" | "tasks" | "summary" | "me",
+  tab: "overview" as "overview" | "tasks" | "ops" | "summary" | "me",
   overviewDays: 30,
   overviewStore: "",
   scope: null as "mine" | "store" | null,
@@ -76,12 +76,49 @@ const subscribeUnread = (l: () => void) => {
 };
 export const useUnreadCount = () => useSyncExternalStore(subscribeUnread, () => unread);
 
+/** Operations hub numbers (fund / orders / board), refreshed together with the unread count. */
+let ops: OpsSummary | null = null;
+const opsListeners = new Set<() => void>();
+const subscribeOps = (l: () => void) => {
+  opsListeners.add(l);
+  return () => opsListeners.delete(l);
+};
+export const useOpsSummary = () => useSyncExternalStore(subscribeOps, () => ops);
+export const clearOps = () => {
+  ops = null;
+  opsListeners.forEach((l) => l());
+};
+
+export async function refreshOps() {
+  try {
+    ops = await api.opsSummary();
+    opsListeners.forEach((l) => l());
+  } catch {
+    /* keep the last known numbers */
+  }
+}
+
 export async function refreshUnread() {
   try {
     setUnread((await api.unreadCount()).unread);
   } catch {
     /* keep the last known count */
   }
+  refreshOps();
+}
+
+/** Stores the user may act on (managers); cached for the session. */
+let storeCache: { storeCode: string; storeName: string }[] | null = null;
+export function useStoreList() {
+  const [stores, setStores] = useState(storeCache || []);
+  useEffect(() => {
+    if (storeCache) return;
+    api.summary().then((r) => {
+      storeCache = r.stores.map((s) => ({ storeCode: s.storeCode, storeName: s.storeName }));
+      setStores(storeCache);
+    }).catch(() => {});
+  }, []);
+  return stores;
 }
 
 /** Mount once: refresh on any data change, every 45s, and whenever the app becomes visible again. */

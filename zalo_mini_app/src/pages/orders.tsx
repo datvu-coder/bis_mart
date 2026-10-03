@@ -1,0 +1,113 @@
+import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Page, useSnackbar } from "zmp-ui";
+import { absoluteUrl, api } from "../api";
+import Icon from "../components/Icon";
+import Skeleton, { EmptyState } from "../components/Skeleton";
+import SubHero from "../components/SubHero";
+import { useDataVersion } from "../data";
+import { ORDER_STATUS_LABEL, Order, OrderSummary } from "../types";
+import { dmy, todayYmd } from "../utils";
+
+export default function OrdersPage() {
+  const nav = useNavigate();
+  const { openSnackbar } = useSnackbar();
+  const version = useDataVersion();
+  const [params] = useSearchParams();
+  const [view, setView] = useState<"open" | "all" | "sum">(params.get("open") ? "open" : "all");
+  const [orders, setOrders] = useState<Order[] | null>(null);
+  const [canManage, setCanManage] = useState(false);
+  const [error, setError] = useState("");
+  const [date, setDate] = useState(todayYmd());
+  const [sum, setSum] = useState<OrderSummary | null>(null);
+  const [withApproved, setWithApproved] = useState(true);
+
+  const load = useCallback(async () => {
+    setError("");
+    try {
+      const res = await api.orders(view === "open" ? { status: "open" } : {});
+      setOrders(res.orders);
+      setCanManage(res.canManage);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Không tải được đơn hàng");
+    }
+  }, [view]);
+
+  useEffect(() => { if (view !== "sum") load(); }, [load, view, version]);
+  useEffect(() => {
+    if (view !== "sum") return;
+    setSum(null);
+    api.ordersSummary(date, withApproved ? "submitted,approved" : "submitted,approved,ordered").then(setSum).catch((e) => setError(e instanceof Error ? e.message : "Không tải được tổng hợp"));
+  }, [view, date, withApproved, version]);
+
+  useEffect(() => { if (canManage === false && view === "sum") setView("all"); }, [canManage, view]);
+
+  const exportCsv = async () => {
+    try {
+      const { path } = await api.exportLink("orders", "", date, date);
+      window.open(absoluteUrl(path), "_blank");
+    } catch (e) {
+      openSnackbar({ text: e instanceof Error ? e.message : "Không tạo được liên kết tải", type: "error" });
+    }
+  };
+
+  const tabs: [typeof view, string][] = [["all", "Tất cả"], ["open", "Chờ hàng"], ...(canManage || view === "sum" ? [["sum", "Tổng hợp"] as [typeof view, string]] : [])];
+
+  return (
+    <Page className="page">
+      <SubHero title="Đặt hàng & nhận hàng" note="Tạo đơn, theo dõi và xác nhận hàng về"
+        right={<>
+          {canManage && <button className="hero-btn" onClick={exportCsv} aria-label="Xuất Excel (CSV)"><Icon name="download" size={20} /></button>}
+          <button className="hero-btn" onClick={() => nav("/orders/new")} aria-label="Tạo đơn mới"><Icon name="plus" size={22} /></button>
+        </>} />
+
+      <div className="segmented">
+        {tabs.map(([k, v]) => <button key={k} className={view === k ? "active" : ""} onClick={() => setView(k)}>{v}</button>)}
+      </div>
+
+      {error && <div className="error">{error} <button className="link" onClick={load}>Thử lại</button></div>}
+
+      {view === "sum" ? (
+        <>
+          <div className="toolbar">
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            <button className={`chip ${withApproved ? "" : "active"}`} onClick={() => setWithApproved((v) => !v)}>{withApproved ? "Chưa đặt NCC" : "Gồm cả đã đặt"}</button>
+          </div>
+          {!sum && !error && <Skeleton count={3} />}
+          {sum && <div className="section-title">{sum.orders} đơn · {sum.items.length} mặt hàng · {dmy(sum.date)}</div>}
+          {sum && sum.items.length === 0 && <EmptyState icon={<Icon name="cart" size={34} />} title="Chưa có đơn nào" hint="Chọn ngày khác hoặc đợi cửa hàng gửi đơn" />}
+          <div className="list">
+            {sum?.items.map((p) => (
+              <div key={`${p.productName}|${p.unit}`} className="card sum-card">
+                <div className="card-top"><span className="card-title">{p.productName}</span><b className="sum-total">{p.total} {p.unit}</b></div>
+                <div className="sum-stores">{p.byStore.map((s) => <span key={s.storeCode}>{s.storeName || s.storeCode}: <b>{s.qty}</b></span>)}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          {!orders && !error && <Skeleton count={3} />}
+          {orders && orders.length === 0 && (
+            <EmptyState icon={<Icon name="cart" size={34} />} title={view === "open" ? "Không có đơn nào đang chờ hàng" : "Chưa có đơn đặt hàng"} hint="Bấm + để tạo đơn mới" />
+          )}
+          <div className="list">
+            {(orders || []).map((o) => (
+              <button key={o.id} className="card order-card" onClick={() => nav(`/orders/${o.id}`)}>
+                <div className="card-top">
+                  <span className="card-title">{o.storeName} · {dmy(o.orderDate)}</span>
+                  <span className={`badge order-${o.status}`}>{ORDER_STATUS_LABEL[o.status]}</span>
+                </div>
+                <div className="meta">
+                  <span className="meta-item"><Icon name="box" size={14} /> {o.itemCount} mặt hàng</span>
+                  <span className="meta-item"><Icon name="user" size={14} /> {o.createdByName}</span>
+                  {o.supplier && <span className="meta-item"><Icon name="store" size={14} /> {o.supplier}</span>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </Page>
+  );
+}
