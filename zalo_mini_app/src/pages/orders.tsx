@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Page, useSnackbar } from "zmp-ui";
-import { absoluteUrl, api } from "../api";
+import { api } from "../api";
 import Icon from "../components/Icon";
 import { OrderProgress } from "../components/OrderTimeline";
 import { ConfirmSheet } from "../components/Sheet";
@@ -57,22 +57,12 @@ export default function OrdersPage() {
 
   useEffect(() => { if (canManage === false && view === "sum") setView("all"); }, [canManage, view]);
 
-  const exportCsv = async () => {
-    try {
-      const { path } = await api.exportLink("orders", "", date, date);
-      window.open(absoluteUrl(path), "_blank");
-    } catch (e) {
-      openSnackbar({ text: e instanceof Error ? e.message : "Không tạo được liên kết tải", type: "error" });
-    }
-  };
-
   const tabs: [typeof view, string][] = [["all", "Tất cả"], ["open", "Chờ hàng"], ...(canManage || view === "sum" ? [["sum", "Tổng hợp"] as [typeof view, string]] : [])];
 
   return (
     <Page className="page">
       <SubHero title="Đặt hàng & nhận hàng" note="Tạo đơn, theo dõi và xác nhận hàng về"
         right={<>
-          {canManage && <button className="hero-btn" onClick={exportCsv} aria-label="Xuất Excel (CSV)"><Icon name="download" size={20} /></button>}
           <button className="hero-btn" onClick={() => nav("/orders/new")} aria-label="Tạo đơn mới"><Icon name="plus" size={22} /></button>
         </>} />
 
