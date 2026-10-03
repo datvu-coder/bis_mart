@@ -4,7 +4,7 @@ import { Page, useSnackbar } from "zmp-ui";
 import { api } from "../api";
 import Icon from "../components/Icon";
 import { PhotoStrip } from "../components/PhotoField";
-import Sheet from "../components/Sheet";
+import Sheet, { ConfirmSheet } from "../components/Sheet";
 import SubHero from "../components/SubHero";
 import { bumpData } from "../data";
 import { FUND_DENOMS, FUND_STATUS_LABEL, FundReportDetail } from "../types";
@@ -20,6 +20,7 @@ export default function FundDetailPage() {
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(() => {
     api.fundReport(Number(id)).then(setR).catch((e) => setError(e instanceof Error ? e.message : "Không tải được báo cáo"));
@@ -42,6 +43,20 @@ export default function FundDetailPage() {
     }
   };
 
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await api.deleteFundReport(Number(id));
+      openSnackbar({ text: "Đã xoá báo cáo quỹ", type: "success" });
+      bumpData();
+      nav(-1);
+    } catch (e) {
+      openSnackbar({ text: e instanceof Error ? e.message : "Không xoá được", type: "error" });
+      setDeleting(false);
+      setBusy(false);
+    }
+  };
+
   if (error) return <Page className="page"><SubHero title="Báo cáo quỹ" /><div className="error">{error}</div></Page>;
   if (!r) return <Page className="page"><SubHero title="Báo cáo quỹ" note="Đang tải..." /></Page>;
 
@@ -49,7 +64,10 @@ export default function FundDetailPage() {
   return (
     <Page className={`page ${r.canReview ? "with-bar" : ""}`}>
       <SubHero title={`${r.storeName} · ${dmy(r.reportDate)}`} note={`${r.submittedByName} gửi lúc ${formatDateTime(r.createdAt)}`}
-        right={r.canEdit ? <button className="hero-btn" onClick={() => nav(`/fund/new?store=${r.storeCode}&date=${r.reportDate}`)} aria-label="Sửa"><Icon name="edit" size={20} /></button> : undefined} />
+        right={<>
+          {r.canEdit && <button className="hero-btn" onClick={() => nav(`/fund/new?store=${r.storeCode}&date=${r.reportDate}`)} aria-label="Sửa"><Icon name="edit" size={20} /></button>}
+          {r.canDelete && <button className="hero-btn" onClick={() => setDeleting(true)} aria-label="Xoá báo cáo"><Icon name="trash" size={20} /></button>}
+        </>} />
 
       <div className="stat-card three">
         <div className="stat static"><b className="sm">{vnd(r.cashTotal)}</b><span>Tiền đếm được</span></div>
@@ -96,6 +114,10 @@ export default function FundDetailPage() {
           <button className="btn primary" disabled={busy} onClick={() => review("approve")}>Duyệt</button>
         </div>
       )}
+
+      <ConfirmSheet open={deleting} title="Xoá báo cáo quỹ?"
+        message={r.status === "approved" ? "Báo cáo này đã được duyệt. Xoá rồi sẽ không khôi phục được." : "Báo cáo sẽ bị xoá và không khôi phục được. Các khoản thu/chi trong ngày vẫn được giữ."}
+        confirmLabel="Xoá" danger busy={busy} onConfirm={remove} onClose={() => setDeleting(false)} />
 
       <Sheet open={rejecting} title="Yêu cầu đếm lại" onClose={() => setRejecting(false)}>
         <label className="field"><span>Lý do *</span><textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="VD: Chênh lệch lớn, đếm lại giúp anh/chị" /></label>

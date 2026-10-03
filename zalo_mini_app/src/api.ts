@@ -43,6 +43,7 @@ const ERROR_VI: Record<string, string> = {
   "Invalid amount": "Số tiền không hợp lệ.",
   "Report already approved": "Báo cáo ngày này đã được duyệt, không sửa được nữa.",
   "Report not found": "Không tìm thấy báo cáo.",
+  "Only an admin can delete an approved report": "Báo cáo đã duyệt chỉ admin mới xoá được.",
   "Report is not awaiting review": "Báo cáo này đã được xử lý rồi.",
   "A note is required to reject a report": "Vui lòng nhập lý do cần đếm lại.",
   "Invalid decision": "Quyết định không hợp lệ.",
@@ -152,6 +153,7 @@ export const api = {
     request<{ reports: FundReport[]; canManage: boolean }>("GET", `/api/fund/reports?${new URLSearchParams(q)}`),
   fundReport: (id: number) => request<FundReportDetail>("GET", `/api/fund/reports/${id}`),
   saveFundReport: (body: unknown) => request<FundReport>("POST", "/api/fund/reports", body),
+  deleteFundReport: (id: number) => request<{ ok: boolean }>("DELETE", `/api/fund/reports/${id}`),
   reviewFundReport: (id: number, decision: "approve" | "reject", note: string) =>
     request<FundReport>("POST", `/api/fund/reports/${id}/review`, { decision, note }),
   fundMissing: (date: string) =>
