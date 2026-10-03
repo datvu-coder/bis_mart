@@ -109,7 +109,7 @@ export default function CarePage() {
         {audErr ? <div className="error inline">{audErr}</div> : (
           <div className="care-count">
             <b>{audience ? `${audience.count}${audience.capped ? "+" : ""}` : "…"}</b>
-            <span>người sẽ nhận tin{audience && audience.source === "webhook" ? " · lấy từ lượt tương tác đã ghi nhận" : audience ? ` · trong ${audience.total} người quan tâm` : ""}</span>
+            <span>người sẽ nhận tin</span>
           </div>
         )}
         <div className="care-note"><Icon name="clock" size={16} /><span>Zalo chỉ cho gửi tin tư vấn tới người đã nhắn tin hoặc tương tác với OA trong 48 giờ gần nhất. {hint}.</span></div>
