@@ -31,6 +31,14 @@ const PATHS = {
   chart: "M4 20V10M10 20V4M16 20v-7M22 20H2",
   bell: "M6 9a6 6 0 1112 0c0 5 2 6 2 7H4c0-1 2-2 2-7zM10 20a2 2 0 004 0",
   filter: "M3 5h18l-7 8.5V20l-4-2v-4.5L3 5z",
+  wallet: "M3 7a2 2 0 012-2h13v3M3 7v11a2 2 0 002 2h15V8H5a2 2 0 01-2-2M16 14h2",
+  cart: "M3 4h2l2.5 11h10L20 7H6M9 20a1 1 0 100-2 1 1 0 000 2zM17 20a1 1 0 100-2 1 1 0 000 2z",
+  box: "M3 8l9-5 9 5v8l-9 5-9-5V8zM3 8l9 5 9-5M12 13v8",
+  megaphone: "M3 11v3a1 1 0 001 1h2l7 4V6L6 10H4a1 1 0 00-1 1zM17 9a4 4 0 010 6M19.5 6.5a8 8 0 010 11",
+  image: "M4 5h16a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V6a1 1 0 011-1zM8.5 10a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM21 16l-5-5-8 8",
+  download: "M12 4v11M7 11l5 5 5-5M5 20h14",
+  minus: "M5 12h14",
+  grid: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
   inbox: "M3 13l3-8h12l3 8M3 13v6h18v-6M3 13h5l1 3h6l1-3h5",
 } as const;
 

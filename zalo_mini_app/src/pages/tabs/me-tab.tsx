@@ -6,7 +6,7 @@ import Avatar from "../../components/Avatar";
 import Icon from "../../components/Icon";
 import NotificationBell from "../../components/NotificationBell";
 import Sheet, { ConfirmSheet } from "../../components/Sheet";
-import { clearDataCache } from "../../data";
+import { clearDataCache, clearOps } from "../../data";
 import { Task } from "../../types";
 import { isOpen } from "../../utils";
 
@@ -96,7 +96,7 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
         message="Bạn sẽ cần đăng nhập lại bằng mã nhân viên và mật khẩu."
         confirmLabel="Đăng xuất"
         danger
-        onConfirm={() => { clearDataCache(); logout(); }}
+        onConfirm={() => { clearDataCache(); clearOps(); logout(); }}
         onClose={() => setConfirm(false)}
       />
     </>

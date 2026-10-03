@@ -17,6 +17,16 @@ const KIND: Record<NotificationKind, { icon: IconName; tone: string }> = {
   cancelled: { icon: "close", tone: "muted" },
   reopened: { icon: "refresh", tone: "primary" },
   info: { icon: "bell", tone: "primary" },
+  fund_new: { icon: "wallet", tone: "info" },
+  fund_diff: { icon: "wallet", tone: "danger" },
+  fund_review: { icon: "wallet", tone: "success" },
+  fund_missing: { icon: "wallet", tone: "warning" },
+  order_new: { icon: "cart", tone: "info" },
+  order_status: { icon: "cart", tone: "primary" },
+  order_short: { icon: "box", tone: "danger" },
+  order_received: { icon: "box", tone: "success" },
+  announcement: { icon: "megaphone", tone: "primary" },
+  ann_remind: { icon: "megaphone", tone: "warning" },
 };
 
 export default function NotificationsPage() {
@@ -47,7 +57,8 @@ export default function NotificationsPage() {
       setItems((cur) => (cur || []).map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
       api.markNotificationsRead([n.id]).then((r) => setUnread(r.unread)).catch(() => {});
     }
-    if (n.taskId) nav(`/task/${n.taskId}`);
+    if (n.link) nav(n.link);
+    else if (n.taskId) nav(`/task/${n.taskId}`);
   };
 
   const readAll = async () => {

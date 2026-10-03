@@ -103,3 +103,17 @@ export function timeAgo(iso: string): string {
   if (days < 7) return `${days} ngày trước`;
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}`;
 }
+
+/** 1250000 -> "1.250.000 đ" */
+export const vnd = (n: number | null | undefined): string => `${Math.round(Number(n) || 0).toLocaleString("vi-VN")} đ`;
+
+/** "2026-10-03" -> "03/10/2026" */
+export const dmy = (iso: string): string => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}` : "");
+
+export const todayYmd = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+/** Keep only digits, so money fields accept pasted "1.250.000". */
+export const digits = (v: string): string => v.replace(/\D/g, "");
