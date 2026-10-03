@@ -5471,6 +5471,7 @@ def api_zalo_oa_test():
 
 
 ZALO_OA_USERLIST_URL = "https://openapi.zalo.me/v3.0/oa/user/getlist"
+ZALO_OA_FOLLOWERS_V2_URL = "https://openapi.zalo.me/v2.0/oa/getfollowers"
 OA_CARE_PERIODS = {"TODAY", "YESTERDAY", "L7D", "L30D", "ALL"}
 OA_CARE_MAX_RECIPIENTS = int(os.getenv("OA_CARE_MAX_RECIPIENTS", "1000"))
 OA_CARE_DAILY_MAX = int(os.getenv("OA_CARE_DAILY_MAX", "3000"))
@@ -5512,6 +5513,19 @@ def _oa_follower_ids(period: str, limit: int = OA_CARE_MAX_RECIPIENTS) -> tuple[
         if period != "ALL":
             data["last_interaction_period"] = period
         ok, obj, raw = _oa_call_json(ZALO_OA_USERLIST_URL, query={"data": json.dumps(data)})
+        if not ok and period == "ALL":
+            # Older followers endpoint: registered separately from the v3 list, and has no interaction filter.
+            ok, obj, raw2 = _oa_call_json(ZALO_OA_FOLLOWERS_V2_URL, query={"data": json.dumps({"offset": offset, "count": 50})})
+            if ok:
+                body = obj.get("data") or {}
+                users = body.get("followers") or []
+                total = body.get("total", total)
+                ids += [str(u.get("user_id")) for u in users if u.get("user_id")]
+                if len(users) < 50:
+                    break
+                offset += 50
+                continue
+            raw = f"{raw} | v2: {raw2}"
         if not ok:
             return ids, total, raw
         body = obj.get("data") or {}
