@@ -1289,6 +1289,13 @@ CREATE TABLE IF NOT EXISTS zalo_oa_tokens (
     updated_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS zalo_oa_oauth (
+    state TEXT PRIMARY KEY,
+    verifier TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+ALTER TABLE zalo_oa_tokens ADD COLUMN IF NOT EXISTS oa_id TEXT;
+
 CREATE TABLE IF NOT EXISTS zalo_oa_push_log (
     id SERIAL PRIMARY KEY,
     employee_id INTEGER,

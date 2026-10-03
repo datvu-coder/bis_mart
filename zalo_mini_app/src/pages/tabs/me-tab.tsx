@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { followOA } from "zmp-sdk/apis";
+import { followOA, openWebview } from "zmp-sdk/apis";
 import { useSnackbar } from "zmp-ui";
 import { api } from "../../api";
 import { useAuth } from "../../auth";
@@ -39,6 +39,19 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
     } catch (e) {
       const code = (e as { code?: number })?.code;
       openSnackbar({ text: code === -201 ? "Bạn đã từ chối theo dõi OA" : "Không mở được trang theo dõi OA (chỉ chạy trong Zalo)", type: "error" });
+    }
+  };
+  const connect = async () => {
+    try {
+      const { url } = await api.oaConnect();
+      try {
+        await openWebview({ url });
+      } catch {
+        window.open(url, "_blank");
+      }
+      setTimeout(() => api.oaStatus().then(setOaStatus).catch(() => {}), 15000);
+    } catch (e) {
+      openSnackbar({ text: e instanceof Error ? e.message : "Không bắt đầu được kết nối OA", type: "error" });
     }
   };
   const sendTest = async () => {
@@ -123,6 +136,7 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
             <div><span>Nhân viên đã liên kết Zalo</span><b>{oaStatus.employees.zaloLinked}/{oaStatus.employees.total}</b></div>
             <div><span>Đã nối với OA (nhận được tin)</span><b>{oaStatus.employees.oaMapped}</b></div>
           </div>
+          <button className="btn wide soft" onClick={connect}><Icon name="refresh" size={16} /> {oaStatus.canRefresh ? "Kết nối lại OA" : "Kết nối OA"}</button>
           <button className="btn wide soft" disabled={testing || !oaStatus.configured} onClick={sendTest}>{testing ? "Đang gửi..." : "Gửi tin thử cho tôi"}</button>
           {testResult && <div className="hint">{testResult}</div>}
           {oaStatus.recent.length > 0 && (

@@ -5038,7 +5038,7 @@ _OA_REFRESH_FAILED_AT = [0.0]
 def _oa_load_tokens() -> dict:
     db = get_db()
     with db.cursor() as cur:
-        cur.execute("SELECT access_token, refresh_token, expires_at FROM zalo_oa_tokens WHERE id = 1")
+        cur.execute("SELECT access_token, refresh_token, expires_at, oa_id FROM zalo_oa_tokens WHERE id = 1")
         row = cur.fetchone()
     if row:
         return dict(row)
@@ -5303,11 +5303,87 @@ def api_zalo_link():
     return jsonify({"ok": True})
 
 
+ZALO_OA_PERMISSION_URL = "https://oauth.zaloapp.com/v4/oa/permission"
+ZALO_OA_REDIRECT_URI = os.getenv("ZALO_OA_REDIRECT_URI", "https://api.bismart.id.vn/api/zalo/oa-callback")
+
+
+@app.post("/api/zalo/oa-connect")
+@login_required
+def api_zalo_oa_connect():
+    """Admin: start the OA authorisation (OAuth v4 with PKCE). Returns the Zalo consent URL; once the OA admin
+    approves, Zalo redirects to /api/zalo/oa-callback and the tokens are stored server-side."""
+    import base64, hashlib, secrets
+    if not _is_admin_user():
+        return _forbidden()
+    if not (ZALO_OA_APP_ID and ZALO_OA_SECRET_KEY):
+        return jsonify({"error": "OA app is not configured"}), 400
+    verifier = secrets.token_urlsafe(48)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    state = secrets.token_urlsafe(16)
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM zalo_oa_oauth WHERE created_at < %s", ((datetime.now(tz=VN_TZ) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%S"),))
+        cur.execute("INSERT INTO zalo_oa_oauth (state, verifier, created_at) VALUES (%s,%s,%s)", (state, verifier, _now_iso()))
+    db.commit()
+    url = ZALO_OA_PERMISSION_URL + "?" + urllib.parse.urlencode({
+        "app_id": ZALO_OA_APP_ID, "redirect_uri": ZALO_OA_REDIRECT_URI, "code_challenge": challenge, "state": state})
+    return jsonify({"url": url})
+
+
+def _oa_callback_page(ok: bool, message: str) -> Response:
+    color = "#4c7a5d" if ok else "#b14a3d"
+    html = (f'<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<body style="font-family:-apple-system,sans-serif;text-align:center;padding:60px 24px;background:#fbf7f1;color:#2b2118">'
+            f'<h2 style="color:{color}">{"Đã kết nối OA" if ok else "Kết nối OA chưa thành công"}</h2><p>{_xml_escape(message)}</p>'
+            f'<p>Bạn có thể đóng trang này và quay lại ứng dụng.</p></body>')
+    return Response(html, mimetype="text/html; charset=utf-8", status=200 if ok else 400)
+
+
+@app.get("/api/zalo/oa-callback")
+def api_zalo_oa_callback():
+    """Zalo redirects the OA admin here with ?code=...&oa_id=...&state=...; exchange the code for the token pair."""
+    code, state, oa_id = request.args.get("code", ""), request.args.get("state", ""), request.args.get("oa_id", "")
+    if not (code and state):
+        return _oa_callback_page(False, "Thiếu mã uỷ quyền từ Zalo.")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT verifier, created_at FROM zalo_oa_oauth WHERE state = %s", (state,))
+        row = cur.fetchone()
+        cur.execute("DELETE FROM zalo_oa_oauth WHERE state = %s", (state,))
+    db.commit()
+    if not row or row["created_at"] < (datetime.now(tz=VN_TZ) - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%S"):
+        return _oa_callback_page(False, "Phiên kết nối đã hết hạn hoặc không hợp lệ. Hãy bấm Kết nối OA lại.")
+    body = urllib.parse.urlencode({"code": code, "app_id": ZALO_OA_APP_ID, "grant_type": "authorization_code",
+                                   "code_verifier": row["verifier"]}).encode()
+    req = urllib.request.Request(ZALO_OA_TOKEN_URL, data=body, headers={
+        "secret_key": ZALO_OA_SECRET_KEY, "Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception as e:
+        return _oa_callback_page(False, f"Không đổi được mã với Zalo ({type(e).__name__}).")
+    if not isinstance(data, dict) or not data.get("access_token"):
+        return _oa_callback_page(False, f"Zalo từ chối: {json.dumps(data, ensure_ascii=False)[:200]}")
+    try:
+        ttl = int(data.get("expires_in") or 3600)
+    except (TypeError, ValueError):
+        ttl = 3600
+    expires = (datetime.now(tz=VN_TZ) + timedelta(seconds=ttl)).strftime("%Y-%m-%dT%H:%M:%S")
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO zalo_oa_tokens (id, access_token, refresh_token, expires_at, updated_at, oa_id) VALUES (1,%s,%s,%s,%s,%s) "
+                    "ON CONFLICT (id) DO UPDATE SET access_token=EXCLUDED.access_token, refresh_token=EXCLUDED.refresh_token, "
+                    "expires_at=EXCLUDED.expires_at, updated_at=EXCLUDED.updated_at, oa_id=COALESCE(NULLIF(EXCLUDED.oa_id,''), zalo_oa_tokens.oa_id)",
+                    (data["access_token"], data.get("refresh_token"), expires, _now_iso(), oa_id))
+    db.commit()
+    _OA_REFRESH_FAILED_AT[0] = 0.0
+    return _oa_callback_page(True, "Hệ thống đã nhận quyền gửi tin của OA và sẽ tự gia hạn.")
+
+
 @app.get("/api/zalo/oa-info")
 @login_required
 def api_zalo_oa_info():
     """What the Mini App needs to offer 'follow our OA' (no secrets)."""
-    return jsonify({"oaId": ZALO_OA_ID})
+    return jsonify({"oaId": ZALO_OA_ID or (_oa_load_tokens().get("oa_id") or "")})
 
 
 @app.post("/api/zalo/oa-webhook")
@@ -5355,7 +5431,8 @@ def api_zalo_oa_status():
     return jsonify({
         "configured": bool(tokens.get("access_token") or tokens.get("refresh_token")),
         "canRefresh": bool(ZALO_OA_APP_ID and ZALO_OA_SECRET_KEY and tokens.get("refresh_token")),
-        "oaId": ZALO_OA_ID, "webhookKey": bool(ZALO_OA_WEBHOOK_KEY),
+        "oaId": ZALO_OA_ID or (tokens.get("oa_id") or ""), "webhookKey": bool(ZALO_OA_WEBHOOK_KEY),
+        "appConfigured": bool(ZALO_OA_APP_ID and ZALO_OA_SECRET_KEY),
         "tokenExpiresAt": tokens.get("expires_at"),
         "employees": {"total": counts["total"], "zaloLinked": counts["linked"], "oaMapped": counts["oa_mapped"]},
         "recent": [{"employeeId": r["employee_id"], "ok": r["ok"], "detail": r["detail"], "at": r["created_at"]} for r in log],

@@ -305,6 +305,7 @@ export interface StoreWithManagers {
 export interface OaStatus {
   configured: boolean;
   canRefresh: boolean;
+  appConfigured?: boolean;
   oaId: string;
   webhookKey: boolean;
   tokenExpiresAt: string | null;

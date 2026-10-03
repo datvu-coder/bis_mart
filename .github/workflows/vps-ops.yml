@@ -166,7 +166,7 @@ jobs:
           ZALO_OA_WEBHOOK_KEY: ${{ secrets.ZALO_OA_WEBHOOK_KEY }}
         run: |
           missing=""
-          for v in ZALO_OA_ID ZALO_OA_APP_ID ZALO_OA_SECRET_KEY ZALO_OA_REFRESH_TOKEN ZALO_OA_WEBHOOK_KEY; do
+          for v in ZALO_OA_ID ZALO_OA_APP_ID ZALO_OA_SECRET_KEY ZALO_OA_WEBHOOK_KEY; do
             [ -z "${!v}" ] && missing="$missing $v"
           done
           if [ -n "$missing" ]; then
