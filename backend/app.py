@@ -5264,7 +5264,8 @@ def _task_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
         "id": row["id"],
         "title": row.get("title") or "",
         "description": row.get("description") or "",
-        "storeCode": row.get("store_code") or "",
+        # A code that matches no store (stale/mistyped employee data) is shown as unassigned.
+        "storeCode": (row.get("store_code") or "") if row.get("store_name") else "",
         "storeName": row.get("store_name") or "",
         "assigneeId": row.get("assignee_id"),
         "assigneeName": row.get("assignee_name") or "",
@@ -5417,6 +5418,11 @@ def api_create_task():
         if not assignee:
             return jsonify({"error": "Assignee not found"}), 404
         store_code = store_code or (assignee.get("store_code") or "").upper()
+    if store_code:
+        with db.cursor() as cur:
+            cur.execute("SELECT 1 FROM stores WHERE UPPER(store_code) = %s LIMIT 1", (store_code,))
+            if not cur.fetchone():
+                store_code = ""  # unknown code (e.g. a stale value on the employee): leave the task unassigned
     if viewer["scope"] is not None and store_code not in viewer["scope"]:
         return _forbidden()
 
@@ -5447,7 +5453,7 @@ def api_tasks_summary():
     if not viewer["can_manage"]:
         return _forbidden()
     sql = (
-        "SELECT t.store_code, s.name AS store_name, "
+        "SELECT CASE WHEN s.name IS NULL THEN '' ELSE t.store_code END AS store_code, s.name AS store_name, "
         "COUNT(*) FILTER (WHERE t.status = 'todo') AS todo, "
         "COUNT(*) FILTER (WHERE t.status = 'doing') AS doing, "
         "COUNT(*) FILTER (WHERE t.status = 'done') AS done, "
@@ -5459,7 +5465,7 @@ def api_tasks_summary():
     if viewer["scope"] is not None:
         sql += "AND UPPER(t.store_code) = ANY(%s) "
         params.append(list(viewer["scope"]))
-    sql += "GROUP BY t.store_code, s.name ORDER BY overdue DESC, t.store_code"
+    sql += "GROUP BY 1, 2 ORDER BY overdue DESC, 1"
     with get_db().cursor() as cur:
         cur.execute(sql, params)
         rows = cur.fetchall()
@@ -5576,6 +5582,8 @@ def api_tasks_analytics():
 
     stores = {}
     for r in all_rows:
+        if not r.get("store_name"):
+            r["store_code"] = ""  # no matching store: report under "unassigned"
         sc = (r.get("store_code") or "").upper()
         if sc and sc not in stores:
             stores[sc] = r.get("store_name") or ""
