@@ -1324,3 +1324,95 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_dedupe ON notifications(employee_id, dedupe_key);
 CREATE INDEX IF NOT EXISTS idx_notifications_employee ON notifications(employee_id, is_read, id DESC);
+
+-- ---------------------------------------------------------------------------
+-- Store operations: cash-fund reports, purchase orders + receiving, announcements
+-- ---------------------------------------------------------------------------
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link TEXT;
+
+CREATE TABLE IF NOT EXISTS fund_reports (
+    id SERIAL PRIMARY KEY,
+    store_code TEXT NOT NULL,
+    report_date TEXT NOT NULL,                 -- YYYY-MM-DD
+    counts_json TEXT NOT NULL DEFAULT '{}',    -- {"500000": 3, "200000": 5, ...}
+    other_amount REAL NOT NULL DEFAULT 0,      -- loose change not covered by denominations
+    cash_total REAL NOT NULL DEFAULT 0,        -- recomputed server-side
+    system_balance REAL NOT NULL DEFAULT 0,
+    difference REAL NOT NULL DEFAULT 0,        -- cash_total - system_balance
+    note TEXT,
+    photo_urls TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL DEFAULT 'submitted',  -- submitted | approved | rejected
+    submitted_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    reviewed_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    reviewed_at TEXT,
+    review_note TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (store_code, report_date)
+);
+CREATE INDEX IF NOT EXISTS idx_fund_reports_date ON fund_reports(report_date, store_code);
+
+CREATE TABLE IF NOT EXISTS fund_entries (
+    id SERIAL PRIMARY KEY,
+    store_code TEXT NOT NULL,
+    entry_date TEXT NOT NULL,
+    kind TEXT NOT NULL,                        -- in | out
+    amount REAL NOT NULL,
+    reason TEXT,
+    photo_urls TEXT NOT NULL DEFAULT '[]',
+    created_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_fund_entries_date ON fund_entries(store_code, entry_date);
+
+CREATE TABLE IF NOT EXISTS purchase_orders (
+    id SERIAL PRIMARY KEY,
+    store_code TEXT NOT NULL,
+    order_date TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'submitted',  -- submitted | approved | ordered | partial | delivered | cancelled
+    supplier TEXT,
+    note TEXT,
+    created_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    approved_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    approved_at TEXT,
+    ordered_at TEXT,
+    received_at TEXT,
+    received_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    receipt_note TEXT,
+    receipt_photos TEXT NOT NULL DEFAULT '[]',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_purchase_orders_store ON purchase_orders(store_code, order_date);
+
+CREATE TABLE IF NOT EXISTS purchase_order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+    product_id INTEGER,
+    product_name TEXT NOT NULL,
+    unit TEXT,
+    qty REAL NOT NULL,
+    qty_received REAL,
+    note TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_po_items_order ON purchase_order_items(order_id);
+
+CREATE TABLE IF NOT EXISTS announcements (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL DEFAULT '',
+    image_urls TEXT NOT NULL DEFAULT '[]',
+    audience_stores TEXT NOT NULL DEFAULT '[]',     -- [] = every store
+    audience_positions TEXT NOT NULL DEFAULT '[]',  -- [] = every position
+    pinned INTEGER NOT NULL DEFAULT 0,
+    remind_at TEXT,
+    created_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS announcement_reads (
+    announcement_id INTEGER NOT NULL REFERENCES announcements(id) ON DELETE CASCADE,
+    employee_id INTEGER NOT NULL REFERENCES employees(id) ON DELETE CASCADE,
+    read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (announcement_id, employee_id)
+);

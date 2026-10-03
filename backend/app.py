@@ -5,10 +5,14 @@ Fixes data loss bug where báo cáo & chấm công disappeared after creation.
 """
 from __future__ import annotations
 
+import csv
+import io
 import json
 import math
 import mimetypes
 import os
+import re
+import shutil
 import urllib.error
 import urllib.request
 import uuid
@@ -5052,7 +5056,7 @@ def _fmt_due(iso: str | None) -> str:
 
 
 def _notify(employee_id: int | None, kind: str, title: str, body: str = "", task_id: int | None = None,
-            dedupe_key: str | None = None, push: bool = True) -> None:
+            dedupe_key: str | None = None, push: bool = True, link: str | None = None) -> None:
     """Store an in-app notification (shown under the bell) and mirror it to Zalo OA when configured.
     A repeated dedupe_key for the same employee is ignored, which keeps reminders from piling up."""
     if not employee_id:
@@ -5061,9 +5065,9 @@ def _notify(employee_id: int | None, kind: str, title: str, body: str = "", task
     try:
         with db.cursor() as cur:
             cur.execute(
-                "INSERT INTO notifications (employee_id, kind, title, body, task_id, dedupe_key, created_at) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (employee_id, dedupe_key) DO NOTHING RETURNING id",
-                (employee_id, kind, title[:200], body[:500], task_id, dedupe_key, _now_iso()),
+                "INSERT INTO notifications (employee_id, kind, title, body, task_id, dedupe_key, created_at, link) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (employee_id, dedupe_key) DO NOTHING RETURNING id",
+                (employee_id, kind, title[:200], body[:500], task_id, dedupe_key, _now_iso(), link),
             )
             inserted = cur.fetchone()
         db.commit()
@@ -5097,6 +5101,15 @@ def _sync_task_reminders(employee_id: int) -> None:
                     f"due_soon:{r['id']}:{r['due_at']}")
 
 
+def _sync_all_reminders(employee_id: int) -> None:
+    """Everything that is generated lazily when the bell is polled."""
+    _sync_task_reminders(employee_id)
+    try:
+        _sync_ops_reminders(employee_id)
+    except Exception:
+        get_db().rollback()
+
+
 def _notification_to_api_json(row: dict) -> dict:
     return {
         "id": row["id"],
@@ -5104,6 +5117,7 @@ def _notification_to_api_json(row: dict) -> dict:
         "title": row.get("title") or "",
         "body": row.get("body") or "",
         "taskId": row.get("task_id"),
+        "link": row.get("link"),
         "isRead": bool(row.get("is_read")),
         "createdAt": row.get("created_at"),
     }
@@ -5121,7 +5135,7 @@ def api_notifications_unread_count():
     emp = (g.current_user or {}).get("employee_id")
     if not emp:
         return jsonify({"unread": 0})
-    _sync_task_reminders(emp)
+    _sync_all_reminders(emp)
     return jsonify({"unread": _unread_count(emp)})
 
 
@@ -5131,13 +5145,13 @@ def api_list_notifications():
     emp = (g.current_user or {}).get("employee_id")
     if not emp:
         return jsonify({"items": [], "unread": 0})
-    _sync_task_reminders(emp)
+    _sync_all_reminders(emp)
     cutoff = (datetime.now(tz=VN_TZ) - timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%S")
     db = get_db()
     with db.cursor() as cur:
         cur.execute("DELETE FROM notifications WHERE employee_id = %s AND created_at < %s", (emp, cutoff))
         cur.execute(
-            "SELECT id, kind, title, body, task_id, is_read, created_at FROM notifications "
+            "SELECT id, kind, title, body, task_id, link, is_read, created_at FROM notifications "
             "WHERE employee_id = %s ORDER BY id DESC LIMIT 60",
             (emp,),
         )
@@ -5220,7 +5234,7 @@ def _task_viewer() -> dict:
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "SELECT e.id, e.full_name, e.store_code, p.can_employees, p.can_crud "
+            "SELECT e.id, e.full_name, e.store_code, e.position, p.can_employees, p.can_crud "
             "FROM users u LEFT JOIN employees e ON e.id = u.employee_id "
             "LEFT JOIN permissions p ON UPPER(p.position) = UPPER(e.position) "
             "WHERE u.id = %s",
@@ -5232,6 +5246,7 @@ def _task_viewer() -> dict:
         "employee_id": row.get("id"),
         "name": row.get("full_name") or "",
         "store_code": (row.get("store_code") or "").upper(),
+        "position": (row.get("position") or "").upper(),
         "scope": _allowed_store_codes_for_current_user(),  # None = all stores
         "can_manage": bool(is_admin or row.get("can_crud") or row.get("can_employees")),
     }
@@ -5618,6 +5633,11 @@ def api_task_photo(fname: str):
     full = TASK_PHOTO_DIR / secure_filename(fname)
     if not full.is_file():
         return jsonify({"error": "missing"}), 404
+    width = request.args.get("w", type=int)
+    if width:
+        thumb = _thumb_for(full, width)
+        if thumb:
+            return Response(thumb.read_bytes(), mimetype="image/jpeg", headers={"Cache-Control": "private, max-age=604800"})
     mime = mimetypes.guess_type(str(full))[0] or "application/octet-stream"
     return Response(full.read_bytes(), mimetype=mime, headers={"Cache-Control": "private, max-age=86400"})
 
@@ -5773,6 +5793,1335 @@ def api_delete_task(task_id: int):
         cur.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
     db.commit()
     return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Store operations: cash-fund reports, purchase orders + receiving, announcements, photo gallery
+# ---------------------------------------------------------------------------
+from datetime import date as _date_cls
+
+FUND_DENOMS = (500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000)
+ORDER_OPEN_STATUSES = ("submitted", "approved", "ordered", "partial")
+ORDER_LABELS = {"approved": "đã được duyệt", "ordered": "đã đặt nhà cung cấp", "cancelled": "đã bị huỷ",
+                "delivered": "đã nhận đủ hàng", "partial": "nhận thiếu hàng"}
+CASH_EXCLUDED_METHODS = ("transfer", "bank_transfer", "chuyen_khoan", "ck")
+ADMIN_POSITIONS = ("ADM", "ADMIN", "TMK")
+
+
+def _valid_date(v: Any) -> str | None:
+    try:
+        return _date_cls.fromisoformat(str(v)[:10]).isoformat()
+    except ValueError:
+        return None
+
+
+def _json_list(v: Any) -> list:
+    try:
+        x = json.loads(v or "[]")
+    except (TypeError, ValueError):
+        return []
+    return x if isinstance(x, list) else []
+
+
+def _to_amount(v: Any) -> float | None:
+    """Non-negative finite number, or None when invalid."""
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return None
+    return n if math.isfinite(n) and 0 <= n <= 1e12 else None
+
+
+def _vnd(n: float) -> str:
+    return f"{int(round(n)):,}".replace(",", ".") + "đ"
+
+
+def _vn_date_text(iso: str) -> str:
+    return f"{iso[8:10]}/{iso[5:7]}" if len(iso) >= 10 else iso
+
+
+def _in_scope(viewer: dict, store_code: str | None) -> bool:
+    return viewer["scope"] is None or (store_code or "").upper() in viewer["scope"]
+
+
+def _manages(viewer: dict, store_code: str | None) -> bool:
+    return bool(viewer["can_manage"]) and _in_scope(viewer, store_code)
+
+
+def _store_name(code: str | None) -> str:
+    cache = g.__dict__.setdefault("_store_names", {})
+    key = (code or "").upper()
+    if key not in cache:
+        with get_db().cursor() as cur:
+            cur.execute("SELECT name FROM stores WHERE UPPER(store_code) = %s LIMIT 1", (key,))
+            row = cur.fetchone()
+        cache[key] = (row or {}).get("name") or key
+    return cache[key]
+
+
+def _manager_ids(store_code: str) -> list[int]:
+    """Admins, people with manage permissions in that store, and its designated managers."""
+    code = (store_code or "").upper()
+    with get_db().cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT e.id FROM employees e "
+            "LEFT JOIN permissions p ON UPPER(p.position) = UPPER(e.position) "
+            "WHERE e.is_active = 1 AND ("
+            "  UPPER(e.position) = ANY(%s) "
+            "  OR (UPPER(COALESCE(e.store_code,'')) = %s AND (p.can_crud = 1 OR p.can_employees = 1)) "
+            "  OR e.id IN (SELECT sm.employee_id FROM store_managers sm JOIN stores s ON s.id = sm.store_id "
+            "              WHERE UPPER(s.store_code) = %s))",
+            (list(ADMIN_POSITIONS), code, code),
+        )
+        return [r["id"] for r in cur.fetchall()]
+
+
+def _notify_managers(store_code: str, actor_id: int | None, kind: str, title: str, body: str, link: str,
+                     dedupe_key: str | None = None, push: bool = True) -> None:
+    for mid in _manager_ids(store_code):
+        if mid != actor_id:
+            _notify(mid, kind, title, body, None, dedupe_key, push, link)
+
+
+def _bad(msg: str, code: int = 400):
+    return jsonify({"error": msg}), code
+
+
+# ----------------------------- cash fund ------------------------------------
+
+_FUND_SELECT = (
+    "SELECT f.*, s.name AS store_name, sb.full_name AS submitter_name, rb.full_name AS reviewer_name "
+    "FROM fund_reports f "
+    "LEFT JOIN stores s ON UPPER(s.store_code) = UPPER(f.store_code) "
+    "LEFT JOIN employees sb ON sb.id = f.submitted_by "
+    "LEFT JOIN employees rb ON rb.id = f.reviewed_by "
+)
+
+
+def _fund_report_to_json(r: dict) -> dict:
+    try:
+        counts = json.loads(r.get("counts_json") or "{}")
+    except ValueError:
+        counts = {}
+    return {
+        "id": r["id"], "storeCode": r["store_code"], "storeName": r.get("store_name") or r["store_code"],
+        "reportDate": r["report_date"], "counts": counts, "otherAmount": r.get("other_amount") or 0,
+        "cashTotal": r.get("cash_total") or 0, "systemBalance": r.get("system_balance") or 0,
+        "difference": r.get("difference") or 0, "note": r.get("note") or "",
+        "photoUrls": _json_list(r.get("photo_urls")), "status": r.get("status") or "submitted",
+        "submittedById": r.get("submitted_by"), "submittedByName": r.get("submitter_name") or "",
+        "reviewedByName": r.get("reviewer_name") or "", "reviewedAt": r.get("reviewed_at"),
+        "reviewNote": r.get("review_note") or "", "createdAt": r.get("created_at"), "updatedAt": r.get("updated_at"),
+    }
+
+
+def _fund_suggestion(store: str, date: str) -> dict:
+    """Expected cash in the till: yesterday's counted fund + cash sales + manual in - manual out."""
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT cash_total FROM fund_reports WHERE UPPER(store_code) = %s AND report_date < %s "
+            "AND status <> 'rejected' ORDER BY report_date DESC LIMIT 1", (store, date))
+        opening = float((cur.fetchone() or {}).get("cash_total") or 0)
+        cur.execute(
+            "SELECT COALESCE(SUM(revenue), 0) AS v FROM sales_reports WHERE UPPER(store_code) = %s "
+            "AND LEFT(report_date, 10) = %s AND LOWER(COALESCE(payment_method, 'cash')) <> ALL(%s)",
+            (store, date, list(CASH_EXCLUDED_METHODS)))
+        cash_sales = float(cur.fetchone()["v"] or 0)
+        cur.execute(
+            "SELECT COALESCE(SUM(amount) FILTER (WHERE kind = 'in'), 0) AS i, "
+            "COALESCE(SUM(amount) FILTER (WHERE kind = 'out'), 0) AS o FROM fund_entries "
+            "WHERE UPPER(store_code) = %s AND entry_date = %s", (store, date))
+        e = cur.fetchone()
+    entries_in, entries_out = float(e["i"] or 0), float(e["o"] or 0)
+    return {"storeCode": store, "date": date, "opening": opening, "cashSales": cash_sales,
+            "entriesIn": entries_in, "entriesOut": entries_out,
+            "suggested": opening + cash_sales + entries_in - entries_out}
+
+
+@app.get("/api/fund/suggest")
+@login_required
+def api_fund_suggest():
+    viewer = _task_viewer()
+    store = (request.args.get("storeCode") or viewer["store_code"]).upper()
+    date = _valid_date(request.args.get("date") or _now_iso()[:10])
+    if not store or not date:
+        return _bad("Store and date are required")
+    if not _in_scope(viewer, store):
+        return _forbidden()
+    return jsonify(_fund_suggestion(store, date))
+
+
+@app.post("/api/fund/reports")
+@login_required
+def api_save_fund_report():
+    viewer = _task_viewer()
+    data = request.get_json(silent=True) or {}
+    store = (data.get("storeCode") or viewer["store_code"]).strip().upper()
+    if not store:
+        return _bad("Store is required")
+    if not _in_scope(viewer, store):
+        return _forbidden()
+    today = _now_iso()[:10]
+    date = _valid_date(data.get("reportDate") or today)
+    if not date:
+        return _bad("Invalid date")
+    if date > today:
+        return _bad("Report date cannot be in the future")
+
+    raw_counts = data.get("counts") or {}
+    counts: dict[str, int] = {}
+    total = 0.0
+    for d in FUND_DENOMS:
+        try:
+            n = int(raw_counts.get(str(d), 0) or 0)
+        except (TypeError, ValueError):
+            return _bad("Invalid denomination count")
+        if n < 0 or n > 100000:
+            return _bad("Invalid denomination count")
+        if n:
+            counts[str(d)] = n
+        total += d * n
+    other = _to_amount(data.get("otherAmount", 0))
+    if other is None:
+        return _bad("Invalid amount")
+    total += other
+    system = _to_amount(data["systemBalance"]) if data.get("systemBalance") not in (None, "") else None
+    if data.get("systemBalance") not in (None, "") and system is None:
+        return _bad("Invalid amount")
+    if system is None:
+        system = _fund_suggestion(store, date)["suggested"]
+    diff = total - system
+    photos = _clean_photo_list(data.get("photoUrls"))
+    note = (data.get("note") or "").strip()[:1000]
+
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT id, status, submitted_by FROM fund_reports WHERE store_code = %s AND report_date = %s", (store, date))
+        existing = cur.fetchone()
+        if existing:
+            if existing["status"] == "approved":
+                return _bad("Report already approved", 409)
+            if existing["submitted_by"] != viewer["employee_id"] and not _manages(viewer, store):
+                return _forbidden()
+            cur.execute(
+                "UPDATE fund_reports SET counts_json=%s, other_amount=%s, cash_total=%s, system_balance=%s, difference=%s, "
+                "note=%s, photo_urls=%s, status='submitted', reviewed_by=NULL, reviewed_at=NULL, review_note=NULL, "
+                "updated_at=%s WHERE id=%s",
+                (json.dumps(counts), other, total, system, diff, note, json.dumps(photos), _now_iso(), existing["id"]))
+            report_id = existing["id"]
+        else:
+            cur.execute(
+                "INSERT INTO fund_reports (store_code, report_date, counts_json, other_amount, cash_total, system_balance, "
+                "difference, note, photo_urls, submitted_by, created_at, updated_at) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+                (store, date, json.dumps(counts), other, total, system, diff, note, json.dumps(photos),
+                 viewer["employee_id"], _now_iso(), _now_iso()))
+            report_id = cur.fetchone()["id"]
+    db.commit()
+
+    link = f"/fund/{report_id}"
+    where = f"{_store_name(store)} ngày {_vn_date_text(date)}"
+    if round(diff) != 0:
+        _notify_managers(store, viewer["employee_id"], "fund_diff", "Quỹ bị lệch",
+                         f"{where}: {'thừa' if diff > 0 else 'thiếu'} {_vnd(abs(diff))}", link,
+                         f"fund_diff:{store}:{date}:{int(round(diff))}")
+    else:
+        _notify_managers(store, viewer["employee_id"], "fund_new", "Báo cáo quỹ chờ duyệt",
+                         f"{where}: {_vnd(total)}, khớp hệ thống", link, f"fund_new:{store}:{date}:{int(round(total))}")
+    with db.cursor() as cur:
+        cur.execute(_FUND_SELECT + "WHERE f.id = %s", (report_id,))
+        row = cur.fetchone()
+    return jsonify(_fund_report_to_json(row)), 200 if existing else 201
+
+
+@app.get("/api/fund/reports")
+@login_required
+def api_list_fund_reports():
+    viewer = _task_viewer()
+    where, params = [], []
+    if viewer["can_manage"]:
+        if viewer["scope"] is not None:
+            where.append("UPPER(f.store_code) = ANY(%s)")
+            params.append(list(viewer["scope"]) or [""])
+    else:
+        where.append("f.submitted_by = %s")
+        params.append(viewer["employee_id"])
+    store = (request.args.get("storeCode") or "").strip().upper()
+    if store:
+        where.append("UPPER(f.store_code) = %s")
+        params.append(store)
+    status = request.args.get("status")
+    if status in ("submitted", "approved", "rejected"):
+        where.append("f.status = %s")
+        params.append(status)
+    for key, op in (("from", ">="), ("to", "<=")):
+        d = _valid_date(request.args.get(key)) if request.args.get(key) else None
+        if d:
+            where.append(f"f.report_date {op} %s")
+            params.append(d)
+    try:
+        limit = max(1, min(int(request.args.get("limit", 60)), 200))
+    except ValueError:
+        limit = 60
+    sql = _FUND_SELECT + ("WHERE " + " AND ".join(where) + " " if where else "")
+    sql += "ORDER BY f.report_date DESC, f.id DESC LIMIT %s"
+    with get_db().cursor() as cur:
+        cur.execute(sql, params + [limit])
+        rows = cur.fetchall()
+    return jsonify({"reports": [_fund_report_to_json(r) for r in rows], "canManage": viewer["can_manage"]})
+
+
+def _load_fund_report(report_id: int) -> dict | None:
+    with get_db().cursor() as cur:
+        cur.execute(_FUND_SELECT + "WHERE f.id = %s", (report_id,))
+        return cur.fetchone()
+
+
+@app.get("/api/fund/reports/<int:report_id>")
+@login_required
+def api_get_fund_report(report_id: int):
+    viewer = _task_viewer()
+    row = _load_fund_report(report_id)
+    if not row:
+        return _bad("Report not found", 404)
+    if row["submitted_by"] != viewer["employee_id"] and not _manages(viewer, row["store_code"]):
+        return _forbidden()
+    out = _fund_report_to_json(row)
+    out["canReview"] = _manages(viewer, row["store_code"]) and row["status"] == "submitted"
+    out["canEdit"] = row["status"] != "approved" and (row["submitted_by"] == viewer["employee_id"] or _manages(viewer, row["store_code"]))
+    with get_db().cursor() as cur:
+        cur.execute(
+            "SELECT e.id, e.kind, e.amount, e.reason, e.photo_urls, ee.full_name AS by_name FROM fund_entries e "
+            "LEFT JOIN employees ee ON ee.id = e.created_by "
+            "WHERE UPPER(e.store_code) = UPPER(%s) AND e.entry_date = %s ORDER BY e.id",
+            (row["store_code"], row["report_date"]))
+        out["entries"] = [{"id": r["id"], "kind": r["kind"], "amount": r["amount"], "reason": r["reason"] or "",
+                           "photoUrls": _json_list(r["photo_urls"]), "createdByName": r["by_name"] or ""}
+                          for r in cur.fetchall()]
+    return jsonify(out)
+
+
+@app.post("/api/fund/reports/<int:report_id>/review")
+@login_required
+def api_review_fund_report(report_id: int):
+    viewer = _task_viewer()
+    row = _load_fund_report(report_id)
+    if not row:
+        return _bad("Report not found", 404)
+    if not _manages(viewer, row["store_code"]):
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    decision = data.get("decision")
+    note = (data.get("note") or "").strip()[:500]
+    if decision not in ("approve", "reject"):
+        return _bad("Invalid decision")
+    if row["status"] != "submitted":
+        return _bad("Report is not awaiting review", 409)
+    if decision == "reject" and not note:
+        return _bad("A note is required to reject a report")
+    status = "approved" if decision == "approve" else "rejected"
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("UPDATE fund_reports SET status=%s, reviewed_by=%s, reviewed_at=%s, review_note=%s, updated_at=%s "
+                    "WHERE id=%s", (status, viewer["employee_id"], _now_iso(), note, _now_iso(), report_id))
+    db.commit()
+    if row["submitted_by"] and row["submitted_by"] != viewer["employee_id"]:
+        where = f"{_store_name(row['store_code'])} ngày {_vn_date_text(row['report_date'])}"
+        _notify(row["submitted_by"], "fund_review",
+                "Báo cáo quỹ đã được duyệt" if status == "approved" else "Báo cáo quỹ bị từ chối",
+                f"{where}" + (f": {note}" if note else ""), None, None, True, f"/fund/{report_id}")
+    return jsonify(_fund_report_to_json(_load_fund_report(report_id)))
+
+
+@app.get("/api/fund/missing")
+@login_required
+def api_fund_missing():
+    """Stores in the manager's scope that have not filed a fund report for the date."""
+    viewer = _task_viewer()
+    if not viewer["can_manage"]:
+        return _forbidden()
+    date = _valid_date(request.args.get("date") or _now_iso()[:10])
+    if not date:
+        return _bad("Invalid date")
+    sql = ("SELECT s.store_code, s.name FROM stores s WHERE NOT (COALESCE(s.status,'') ILIKE '%%đóng%%' "
+           "OR COALESCE(s.status,'') ILIKE '%%ngừng%%') AND NOT EXISTS (SELECT 1 FROM fund_reports f "
+           "WHERE UPPER(f.store_code) = UPPER(s.store_code) AND f.report_date = %s) ")
+    params: list[Any] = [date]
+    if viewer["scope"] is not None:
+        sql += "AND UPPER(s.store_code) = ANY(%s) "
+        params.append(list(viewer["scope"]) or [""])
+    sql += "ORDER BY s.store_code"
+    with get_db().cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    return jsonify({"date": date, "stores": [{"storeCode": r["store_code"], "storeName": r["name"]} for r in rows]})
+
+
+@app.get("/api/fund/entries")
+@login_required
+def api_list_fund_entries():
+    viewer = _task_viewer()
+    store = (request.args.get("storeCode") or viewer["store_code"]).upper()
+    date = _valid_date(request.args.get("date") or _now_iso()[:10])
+    if not store or not date:
+        return _bad("Store and date are required")
+    if not _in_scope(viewer, store):
+        return _forbidden()
+    with get_db().cursor() as cur:
+        cur.execute(
+            "SELECT e.id, e.kind, e.amount, e.reason, e.photo_urls, e.created_by, ee.full_name AS by_name "
+            "FROM fund_entries e LEFT JOIN employees ee ON ee.id = e.created_by "
+            "WHERE UPPER(e.store_code) = %s AND e.entry_date = %s ORDER BY e.id DESC", (store, date))
+        rows = cur.fetchall()
+    return jsonify({"storeCode": store, "date": date, "entries": [
+        {"id": r["id"], "kind": r["kind"], "amount": r["amount"], "reason": r["reason"] or "",
+         "photoUrls": _json_list(r["photo_urls"]), "createdByName": r["by_name"] or "",
+         "canDelete": r["created_by"] == viewer["employee_id"] or _manages(viewer, store)} for r in rows]})
+
+
+@app.post("/api/fund/entries")
+@login_required
+def api_create_fund_entry():
+    viewer = _task_viewer()
+    data = request.get_json(silent=True) or {}
+    store = (data.get("storeCode") or viewer["store_code"]).strip().upper()
+    if not store:
+        return _bad("Store is required")
+    if not _in_scope(viewer, store):
+        return _forbidden()
+    kind = data.get("kind")
+    amount = _to_amount(data.get("amount"))
+    date = _valid_date(data.get("entryDate") or _now_iso()[:10])
+    if kind not in ("in", "out") or not amount or amount <= 0 or not date:
+        return _bad("Invalid fund entry")
+    if date > _now_iso()[:10]:
+        return _bad("Report date cannot be in the future")
+    reason = (data.get("reason") or "").strip()[:300]
+    if not reason:
+        return _bad("A reason is required")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO fund_entries (store_code, entry_date, kind, amount, reason, photo_urls, created_by, created_at) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (store, date, kind, amount, reason, json.dumps(_clean_photo_list(data.get("photoUrls"))),
+             viewer["employee_id"], _now_iso()))
+        new_id = cur.fetchone()["id"]
+    db.commit()
+    return jsonify({"id": new_id}), 201
+
+
+@app.delete("/api/fund/entries/<int:entry_id>")
+@login_required
+def api_delete_fund_entry(entry_id: int):
+    viewer = _task_viewer()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT store_code, created_by FROM fund_entries WHERE id = %s", (entry_id,))
+        row = cur.fetchone()
+        if not row:
+            return _bad("Entry not found", 404)
+        if row["created_by"] != viewer["employee_id"] and not _manages(viewer, row["store_code"]):
+            return _forbidden()
+        cur.execute("DELETE FROM fund_entries WHERE id = %s", (entry_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+# ----------------------------- purchase orders + receiving -------------------
+
+_ORDER_SELECT = (
+    "SELECT o.*, s.name AS store_name, cb.full_name AS creator_name, rb.full_name AS receiver_name, "
+    "(SELECT COUNT(*) FROM purchase_order_items i WHERE i.order_id = o.id) AS item_count, "
+    "(SELECT COALESCE(SUM(i.qty), 0) FROM purchase_order_items i WHERE i.order_id = o.id) AS total_qty "
+    "FROM purchase_orders o "
+    "LEFT JOIN stores s ON UPPER(s.store_code) = UPPER(o.store_code) "
+    "LEFT JOIN employees cb ON cb.id = o.created_by "
+    "LEFT JOIN employees rb ON rb.id = o.received_by "
+)
+
+
+def _order_to_json(r: dict, items: list | None = None) -> dict:
+    out = {
+        "id": r["id"], "storeCode": r["store_code"], "storeName": r.get("store_name") or r["store_code"],
+        "orderDate": r["order_date"], "status": r["status"], "supplier": r.get("supplier") or "",
+        "note": r.get("note") or "", "createdById": r.get("created_by"), "createdByName": r.get("creator_name") or "",
+        "approvedAt": r.get("approved_at"), "orderedAt": r.get("ordered_at"), "receivedAt": r.get("received_at"),
+        "receivedByName": r.get("receiver_name") or "", "receiptNote": r.get("receipt_note") or "",
+        "receiptPhotos": _json_list(r.get("receipt_photos")), "itemCount": int(r.get("item_count") or 0),
+        "totalQty": float(r.get("total_qty") or 0), "createdAt": r.get("created_at"),
+    }
+    if items is not None:
+        out["items"] = items
+    return out
+
+
+def _order_items(order_id: int) -> list[dict]:
+    with get_db().cursor() as cur:
+        cur.execute("SELECT id, product_id, product_name, unit, qty, qty_received, note FROM purchase_order_items "
+                    "WHERE order_id = %s ORDER BY id", (order_id,))
+        return [{"id": i["id"], "productId": i["product_id"], "productName": i["product_name"], "unit": i["unit"] or "",
+                 "qty": i["qty"], "qtyReceived": i["qty_received"], "note": i["note"] or ""} for i in cur.fetchall()]
+
+
+def _load_order(order_id: int) -> dict | None:
+    with get_db().cursor() as cur:
+        cur.execute(_ORDER_SELECT + "WHERE o.id = %s", (order_id,))
+        return cur.fetchone()
+
+
+def _parse_order_items(raw: Any):
+    """Validated [(product_id, name, unit, qty, note)] or an error message."""
+    if not isinstance(raw, list) or not raw:
+        return "At least one item is required"
+    if len(raw) > 200:
+        return "Too many items"
+    out = []
+    with get_db().cursor() as cur:
+        for it in raw:
+            if not isinstance(it, dict):
+                return "Invalid item"
+            qty = _to_amount(it.get("qty"))
+            if not qty or qty <= 0 or qty > 100000:
+                return "Invalid quantity"
+            name = (it.get("productName") or "").strip()
+            unit = (it.get("unit") or "").strip()
+            pid = it.get("productId")
+            if pid:
+                try:
+                    cur.execute("SELECT name, unit FROM products WHERE id = %s", (int(pid),))
+                except (TypeError, ValueError):
+                    return "Invalid product"
+                p = cur.fetchone()
+                if not p:
+                    return "Product not found"
+                name, unit = name or p["name"], unit or (p["unit"] or "")
+            if not name:
+                return "Product name is required"
+            out.append((int(pid) if pid else None, name[:200], unit[:40], qty, (it.get("note") or "").strip()[:200]))
+    return out
+
+
+@app.get("/api/orders/catalog")
+@login_required
+def api_order_catalog():
+    q = (request.args.get("q") or "").strip()
+    sql, params = "SELECT id, name, unit, product_group FROM products ", []
+    if q:
+        sql += "WHERE name ILIKE %s "
+        params.append(f"%{q}%")
+    sql += "ORDER BY name LIMIT 200"
+    with get_db().cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    return jsonify({"products": [{"id": r["id"], "name": r["name"], "unit": r["unit"] or "", "group": r["product_group"] or ""} for r in rows]})
+
+
+@app.get("/api/orders/last")
+@login_required
+def api_order_last():
+    """Items of the store's latest non-cancelled order, for the 'copy last order' shortcut."""
+    viewer = _task_viewer()
+    store = (request.args.get("storeCode") or viewer["store_code"]).upper()
+    if not store or not _in_scope(viewer, store):
+        return _forbidden()
+    with get_db().cursor() as cur:
+        cur.execute("SELECT id, order_date FROM purchase_orders WHERE UPPER(store_code) = %s AND status <> 'cancelled' "
+                    "ORDER BY order_date DESC, id DESC LIMIT 1", (store,))
+        o = cur.fetchone()
+    if not o:
+        return jsonify({"orderDate": None, "items": []})
+    items = [{"productId": i["productId"], "productName": i["productName"], "unit": i["unit"], "qty": i["qty"], "note": i["note"]}
+             for i in _order_items(o["id"])]
+    return jsonify({"orderDate": o["order_date"], "items": items})
+
+
+@app.post("/api/orders")
+@login_required
+def api_create_order():
+    viewer = _task_viewer()
+    data = request.get_json(silent=True) or {}
+    store = (data.get("storeCode") or viewer["store_code"]).strip().upper()
+    if not store:
+        return _bad("Store is required")
+    if not _in_scope(viewer, store):
+        return _forbidden()
+    date = _valid_date(data.get("orderDate") or _now_iso()[:10])
+    if not date:
+        return _bad("Invalid date")
+    items = _parse_order_items(data.get("items"))
+    if isinstance(items, str):
+        return _bad(items)
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO purchase_orders (store_code, order_date, supplier, note, created_by, created_at, updated_at) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (store, date, (data.get("supplier") or "").strip()[:120], (data.get("note") or "").strip()[:500],
+             viewer["employee_id"], _now_iso(), _now_iso()))
+        order_id = cur.fetchone()["id"]
+        for pid, name, unit, qty, note in items:
+            cur.execute("INSERT INTO purchase_order_items (order_id, product_id, product_name, unit, qty, note) "
+                        "VALUES (%s,%s,%s,%s,%s,%s)", (order_id, pid, name, unit, qty, note))
+    db.commit()
+    _notify_managers(store, viewer["employee_id"], "order_new", "Đơn đặt hàng mới",
+                     f"{_store_name(store)}: {len(items)} mặt hàng, ngày {_vn_date_text(date)}", f"/orders/{order_id}")
+    return jsonify(_order_to_json(_load_order(order_id), _order_items(order_id))), 201
+
+
+@app.get("/api/orders")
+@login_required
+def api_list_orders():
+    viewer = _task_viewer()
+    where, params = [], []
+    if viewer["scope"] is not None:
+        where.append("UPPER(o.store_code) = ANY(%s)")
+        params.append(list(viewer["scope"]) or [""])
+    store = (request.args.get("storeCode") or "").strip().upper()
+    if store:
+        where.append("UPPER(o.store_code) = %s")
+        params.append(store)
+    status = request.args.get("status")
+    if status == "open":
+        where.append("o.status = ANY(%s)")
+        params.append(list(ORDER_OPEN_STATUSES))
+    elif status in ("submitted", "approved", "ordered", "partial", "delivered", "cancelled"):
+        where.append("o.status = %s")
+        params.append(status)
+    date = _valid_date(request.args.get("date")) if request.args.get("date") else None
+    if date:
+        where.append("o.order_date = %s")
+        params.append(date)
+    sql = _ORDER_SELECT + ("WHERE " + " AND ".join(where) + " " if where else "") + "ORDER BY o.order_date DESC, o.id DESC LIMIT 100"
+    with get_db().cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+    return jsonify({"orders": [_order_to_json(r) for r in rows], "canManage": viewer["can_manage"]})
+
+
+@app.get("/api/orders/summary")
+@login_required
+def api_orders_summary():
+    """Quantities per product summed across stores, for the person who places the supplier order."""
+    viewer = _task_viewer()
+    if not viewer["can_manage"]:
+        return _forbidden()
+    date = _valid_date(request.args.get("date") or _now_iso()[:10])
+    if not date:
+        return _bad("Invalid date")
+    statuses = [x for x in (request.args.get("statuses") or "submitted,approved").split(",")
+                if x in ("submitted", "approved", "ordered", "partial", "delivered")] or ["submitted", "approved"]
+    sql = ("SELECT i.product_name, i.unit, o.store_code, SUM(i.qty) AS qty FROM purchase_order_items i "
+           "JOIN purchase_orders o ON o.id = i.order_id WHERE o.order_date = %s AND o.status = ANY(%s) ")
+    params: list[Any] = [date, statuses]
+    if viewer["scope"] is not None:
+        sql += "AND UPPER(o.store_code) = ANY(%s) "
+        params.append(list(viewer["scope"]) or [""])
+    sql += "GROUP BY i.product_name, i.unit, o.store_code ORDER BY i.product_name, o.store_code"
+    with get_db().cursor() as cur:
+        cur.execute(sql, params)
+        rows = cur.fetchall()
+        cur.execute("SELECT COUNT(*) AS c FROM purchase_orders o WHERE o.order_date = %s AND o.status = ANY(%s)" +
+                    (" AND UPPER(o.store_code) = ANY(%s)" if viewer["scope"] is not None else ""),
+                    [date, statuses] + ([list(viewer["scope"]) or [""]] if viewer["scope"] is not None else []))
+        n_orders = cur.fetchone()["c"]
+    products: dict[tuple, dict] = {}
+    for r in rows:
+        key = (r["product_name"], r["unit"] or "")
+        p = products.setdefault(key, {"productName": r["product_name"], "unit": r["unit"] or "", "total": 0.0, "byStore": []})
+        p["total"] += float(r["qty"])
+        p["byStore"].append({"storeCode": r["store_code"], "storeName": _store_name(r["store_code"]), "qty": float(r["qty"])})
+    items = sorted(products.values(), key=lambda p: (-p["total"], p["productName"]))
+    return jsonify({"date": date, "statuses": statuses, "orders": n_orders, "items": items})
+
+
+@app.get("/api/orders/<int:order_id>")
+@login_required
+def api_get_order(order_id: int):
+    viewer = _task_viewer()
+    row = _load_order(order_id)
+    if not row:
+        return _bad("Order not found", 404)
+    if not _in_scope(viewer, row["store_code"]):
+        return _forbidden()
+    out = _order_to_json(row, _order_items(order_id))
+    mine = row["created_by"] == viewer["employee_id"]
+    manages = _manages(viewer, row["store_code"])
+    out["canManage"] = manages
+    out["canEdit"] = (row["status"] == "submitted" and (mine or manages)) or (row["status"] == "approved" and manages)
+    out["canCancel"] = row["status"] in ("submitted", "approved", "ordered") and (manages or (mine and row["status"] == "submitted"))
+    out["canReceive"] = row["status"] in ("submitted", "approved", "ordered", "partial")
+    return jsonify(out)
+
+
+@app.put("/api/orders/<int:order_id>")
+@login_required
+def api_update_order(order_id: int):
+    viewer = _task_viewer()
+    row = _load_order(order_id)
+    if not row:
+        return _bad("Order not found", 404)
+    mine = row["created_by"] == viewer["employee_id"]
+    manages = _manages(viewer, row["store_code"])
+    if not ((row["status"] == "submitted" and (mine or manages)) or (row["status"] == "approved" and manages)):
+        return _forbidden() if not (mine or manages) else _bad("Order can no longer be edited", 409)
+    data = request.get_json(silent=True) or {}
+    items = _parse_order_items(data.get("items"))
+    if isinstance(items, str):
+        return _bad(items)
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("UPDATE purchase_orders SET supplier=%s, note=%s, updated_at=%s WHERE id=%s",
+                    ((data.get("supplier") or "").strip()[:120], (data.get("note") or "").strip()[:500], _now_iso(), order_id))
+        cur.execute("DELETE FROM purchase_order_items WHERE order_id = %s", (order_id,))
+        for pid, name, unit, qty, note in items:
+            cur.execute("INSERT INTO purchase_order_items (order_id, product_id, product_name, unit, qty, note) "
+                        "VALUES (%s,%s,%s,%s,%s,%s)", (order_id, pid, name, unit, qty, note))
+    db.commit()
+    return jsonify(_order_to_json(_load_order(order_id), _order_items(order_id)))
+
+
+@app.post("/api/orders/<int:order_id>/status")
+@login_required
+def api_set_order_status(order_id: int):
+    viewer = _task_viewer()
+    row = _load_order(order_id)
+    if not row:
+        return _bad("Order not found", 404)
+    if not _in_scope(viewer, row["store_code"]):
+        return _forbidden()
+    status = (request.get_json(silent=True) or {}).get("status")
+    mine = row["created_by"] == viewer["employee_id"]
+    manages = _manages(viewer, row["store_code"])
+    now = _now_iso()
+    sets, params = ["status = %s", "updated_at = %s"], [status, now]
+    if status == "approved":
+        if not manages:
+            return _forbidden()
+        if row["status"] != "submitted":
+            return _bad("Order is not awaiting approval", 409)
+        sets += ["approved_by = %s", "approved_at = %s"]
+        params += [viewer["employee_id"], now]
+    elif status == "ordered":
+        if not manages:
+            return _forbidden()
+        if row["status"] not in ("submitted", "approved"):
+            return _bad("Order cannot be marked as ordered", 409)
+        sets += ["ordered_at = %s", "approved_by = COALESCE(approved_by, %s)", "approved_at = COALESCE(approved_at, %s)"]
+        params += [now, viewer["employee_id"], now]
+    elif status == "cancelled":
+        if row["status"] not in ("submitted", "approved", "ordered"):
+            return _bad("Order cannot be cancelled", 409)
+        if not (manages or (mine and row["status"] == "submitted")):
+            return _forbidden()
+    else:
+        return _bad("Invalid status")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(f"UPDATE purchase_orders SET {', '.join(sets)} WHERE id = %s", params + [order_id])
+    db.commit()
+    if row["created_by"] and row["created_by"] != viewer["employee_id"]:
+        _notify(row["created_by"], "order_status", f"Đơn đặt hàng {ORDER_LABELS[status]}",
+                f"{_store_name(row['store_code'])} ngày {_vn_date_text(row['order_date'])}", None, None, True, f"/orders/{order_id}")
+    return jsonify(_order_to_json(_load_order(order_id), _order_items(order_id)))
+
+
+@app.post("/api/orders/<int:order_id>/receive")
+@login_required
+def api_receive_order(order_id: int):
+    """Confirm what actually arrived; short lines flip the order to 'partial' and alert the managers."""
+    viewer = _task_viewer()
+    row = _load_order(order_id)
+    if not row:
+        return _bad("Order not found", 404)
+    if not _in_scope(viewer, row["store_code"]):
+        return _forbidden()
+    if row["status"] not in ("submitted", "approved", "ordered", "partial"):
+        return _bad("Order cannot be received", 409)
+    data = request.get_json(silent=True) or {}
+    received = data.get("items")
+    items = _order_items(order_id)
+    if not isinstance(received, list):
+        return _bad("Items are required")
+    qty_by_id: dict[int, float] = {}
+    for r in received:
+        try:
+            iid, q = int(r.get("id")), _to_amount(r.get("qtyReceived"))
+        except (TypeError, ValueError, AttributeError):
+            return _bad("Invalid received quantity")
+        if q is None or q > 100000:
+            return _bad("Invalid received quantity")
+        qty_by_id[iid] = q
+    valid_ids = {i["id"] for i in items}
+    if not qty_by_id or not set(qty_by_id) <= valid_ids:
+        return _bad("Invalid received quantity")
+    photos = _clean_photo_list(data.get("photoUrls"))
+    note = (data.get("note") or "").strip()[:500]
+    db = get_db()
+    short = []
+    with db.cursor() as cur:
+        for it in items:
+            q = qty_by_id.get(it["id"], it["qtyReceived"])
+            if q is None:
+                q = 0.0
+            if it["id"] in qty_by_id:
+                cur.execute("UPDATE purchase_order_items SET qty_received = %s WHERE id = %s", (q, it["id"]))
+            if q < it["qty"]:
+                short.append(f"{it['productName']} ({q:g}/{it['qty']:g})")
+        status = "partial" if short else "delivered"
+        cur.execute("UPDATE purchase_orders SET status=%s, received_at=%s, received_by=%s, receipt_note=%s, "
+                    "receipt_photos=%s, updated_at=%s WHERE id=%s",
+                    (status, _now_iso(), viewer["employee_id"], note,
+                     json.dumps((_json_list(row.get("receipt_photos")) + photos)[:20]), _now_iso(), order_id))
+    db.commit()
+    where = f"{_store_name(row['store_code'])} ngày {_vn_date_text(row['order_date'])}"
+    link = f"/orders/{order_id}"
+    if short:
+        _notify_managers(row["store_code"], viewer["employee_id"], "order_short", "Nhận hàng bị thiếu",
+                         f"{where}: " + ", ".join(short[:4]) + ("..." if len(short) > 4 else ""), link)
+    else:
+        _notify_managers(row["store_code"], viewer["employee_id"], "order_received", "Đã nhận đủ hàng",
+                         f"{where}: {viewer['name']} đã nhận hàng" + (f". {note}" if note else ""), link)
+    if row["created_by"] and row["created_by"] != viewer["employee_id"] and row["created_by"] not in _manager_ids(row["store_code"]):
+        _notify(row["created_by"], "order_status", f"Đơn đặt hàng {ORDER_LABELS[status]}", where, None, None, True, link)
+    return jsonify(_order_to_json(_load_order(order_id), _order_items(order_id)))
+
+
+# ----------------------------- announcements (bảng tin) ----------------------
+
+def _audience_where(stores: list[str], positions: list[str], alias: str = "e") -> tuple[str, list]:
+    sql, params = "", []
+    if stores:
+        sql += f" AND UPPER(COALESCE({alias}.store_code,'')) = ANY(%s)"
+        params.append([s.upper() for s in stores])
+    if positions:
+        sql += f" AND UPPER(COALESCE({alias}.position,'')) = ANY(%s)"
+        params.append([p.upper() for p in positions])
+    return sql, params
+
+
+def _audience_rows(stores: list[str], positions: list[str]) -> list[dict]:
+    frag, params = _audience_where(stores, positions)
+    with get_db().cursor() as cur:
+        cur.execute("SELECT e.id, e.full_name, e.store_code, e.position FROM employees e WHERE e.is_active = 1" + frag +
+                    " ORDER BY e.store_code, e.full_name", params)
+        return cur.fetchall()
+
+
+def _ann_matches(row: dict, store_code: str, position: str) -> bool:
+    stores = [s.upper() for s in _json_list(row.get("audience_stores"))]
+    positions = [p.upper() for p in _json_list(row.get("audience_positions"))]
+    return (not stores or store_code.upper() in stores) and (not positions or position.upper() in positions)
+
+
+def _ann_visible(row: dict, viewer: dict) -> bool:
+    if row.get("created_by") == viewer["employee_id"] or _ann_matches(row, viewer["store_code"], viewer["position"]):
+        return True
+    if not viewer["can_manage"]:
+        return False
+    stores = [s.upper() for s in _json_list(row.get("audience_stores"))]
+    return viewer["scope"] is None or any(s in viewer["scope"] for s in stores)
+
+
+def _ann_stats(row: dict) -> tuple[int, int]:
+    stores = _json_list(row.get("audience_stores"))
+    positions = _json_list(row.get("audience_positions"))
+    frag, params = _audience_where(stores, positions)
+    with get_db().cursor() as cur:
+        cur.execute("SELECT COUNT(*) AS c FROM employees e WHERE e.is_active = 1" + frag, params)
+        total = cur.fetchone()["c"]
+        cur.execute("SELECT COUNT(*) AS c FROM announcement_reads r JOIN employees e ON e.id = r.employee_id "
+                    "WHERE r.announcement_id = %s AND e.is_active = 1" + frag, [row["id"]] + params)
+        read = cur.fetchone()["c"]
+    return int(total), int(read)
+
+
+_ANN_SELECT = ("SELECT a.*, cb.full_name AS author_name, "
+               "EXISTS (SELECT 1 FROM announcement_reads r WHERE r.announcement_id = a.id AND r.employee_id = %s) AS is_read "
+               "FROM announcements a LEFT JOIN employees cb ON cb.id = a.created_by ")
+
+
+def _ann_to_json(row: dict, viewer: dict, with_stats: bool = False) -> dict:
+    out = {
+        "id": row["id"], "title": row["title"], "body": row.get("body") or "",
+        "imageUrls": _json_list(row.get("image_urls")), "pinned": bool(row.get("pinned")),
+        "audienceStores": _json_list(row.get("audience_stores")), "audiencePositions": _json_list(row.get("audience_positions")),
+        "remindAt": row.get("remind_at"), "authorName": row.get("author_name") or "", "authorId": row.get("created_by"),
+        "createdAt": row.get("created_at"), "isRead": bool(row.get("is_read")),
+        "canManage": row.get("created_by") == viewer["employee_id"] or (viewer["can_manage"] and _ann_visible(row, viewer)),
+    }
+    if with_stats and out["canManage"]:
+        out["audienceCount"], out["readCount"] = _ann_stats(row)
+    return out
+
+
+def _visible_announcements(viewer: dict) -> list[dict]:
+    with get_db().cursor() as cur:
+        cur.execute(_ANN_SELECT + "ORDER BY a.pinned DESC, a.id DESC LIMIT 200", (viewer["employee_id"],))
+        rows = cur.fetchall()
+    return [r for r in rows if _ann_visible(r, viewer)]
+
+
+@app.get("/api/announcements")
+@login_required
+def api_list_announcements():
+    viewer = _task_viewer()
+    rows = _visible_announcements(viewer)[:60]
+    return jsonify({"announcements": [_ann_to_json(r, viewer, with_stats=True) for r in rows], "canManage": viewer["can_manage"]})
+
+
+@app.post("/api/announcements")
+@login_required
+def api_create_announcement():
+    viewer = _task_viewer()
+    if not viewer["can_manage"]:
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()[:200]
+    if not title:
+        return _bad("Title is required")
+    stores = sorted({str(s).strip().upper() for s in (data.get("stores") or []) if str(s).strip()})
+    positions = sorted({str(p).strip().upper() for p in (data.get("positions") or []) if str(p).strip()})
+    if viewer["scope"] is not None:
+        if not stores:
+            stores = sorted(viewer["scope"])  # a scoped manager can only address their own stores
+        if not set(stores) <= viewer["scope"]:
+            return _forbidden()
+    remind_at = data.get("remindAt") or None
+    if remind_at and not re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", str(remind_at)):
+        return _bad("Invalid reminder time")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "INSERT INTO announcements (title, body, image_urls, audience_stores, audience_positions, pinned, remind_at, "
+            "created_by, created_at) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+            (title, (data.get("body") or "").strip()[:5000], json.dumps(_clean_photo_list(data.get("imageUrls"))),
+             json.dumps(stores), json.dumps(positions), 1 if data.get("pinned") else 0,
+             str(remind_at)[:19] if remind_at else None, viewer["employee_id"], _now_iso()))
+        ann_id = cur.fetchone()["id"]
+    db.commit()
+    for emp in _audience_rows(stores, positions):
+        if emp["id"] != viewer["employee_id"]:
+            _notify(emp["id"], "announcement", "Thông báo mới", f"{title}", None, None, False, f"/board/{ann_id}")
+    with db.cursor() as cur:
+        cur.execute(_ANN_SELECT + "WHERE a.id = %s", (viewer["employee_id"], ann_id))
+        row = cur.fetchone()
+    return jsonify(_ann_to_json(row, viewer, with_stats=True)), 201
+
+
+def _load_announcement(ann_id: int, viewer: dict) -> dict | None:
+    with get_db().cursor() as cur:
+        cur.execute(_ANN_SELECT + "WHERE a.id = %s", (viewer["employee_id"], ann_id))
+        return cur.fetchone()
+
+
+@app.get("/api/announcements/<int:ann_id>")
+@login_required
+def api_get_announcement(ann_id: int):
+    viewer = _task_viewer()
+    row = _load_announcement(ann_id, viewer)
+    if not row:
+        return _bad("Announcement not found", 404)
+    if not _ann_visible(row, viewer):
+        return _forbidden()
+    out = _ann_to_json(row, viewer, with_stats=True)
+    if out["canManage"]:
+        audience = _audience_rows(_json_list(row["audience_stores"]), _json_list(row["audience_positions"]))
+        with get_db().cursor() as cur:
+            cur.execute("SELECT employee_id, read_at FROM announcement_reads WHERE announcement_id = %s", (ann_id,))
+            read_at = {r["employee_id"]: r["read_at"] for r in cur.fetchall()}
+        person = lambda e: {"id": e["id"], "name": e["full_name"], "storeCode": e.get("store_code") or "", "position": e.get("position") or ""}
+        out["readers"] = [{**person(e), "readAt": read_at[e["id"]]} for e in audience if e["id"] in read_at][:300]
+        out["unread"] = [person(e) for e in audience if e["id"] not in read_at][:300]
+    return jsonify(out)
+
+
+@app.post("/api/announcements/<int:ann_id>/read")
+@login_required
+def api_read_announcement(ann_id: int):
+    viewer = _task_viewer()
+    row = _load_announcement(ann_id, viewer)
+    if not row:
+        return _bad("Announcement not found", 404)
+    if not _ann_visible(row, viewer):
+        return _forbidden()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO announcement_reads (announcement_id, employee_id, read_at) VALUES (%s,%s,%s) "
+                    "ON CONFLICT DO NOTHING", (ann_id, viewer["employee_id"], _now_iso()))
+        cur.execute("UPDATE notifications SET is_read = 1 WHERE employee_id = %s AND link = %s",
+                    (viewer["employee_id"], f"/board/{ann_id}"))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.delete("/api/announcements/<int:ann_id>")
+@login_required
+def api_delete_announcement(ann_id: int):
+    viewer = _task_viewer()
+    row = _load_announcement(ann_id, viewer)
+    if not row:
+        return _bad("Announcement not found", 404)
+    if not (row["created_by"] == viewer["employee_id"] or (viewer["can_manage"] and _ann_visible(row, viewer))):
+        return _forbidden()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM announcements WHERE id = %s", (ann_id,))
+    db.commit()
+    return jsonify({"ok": True})
+
+
+def _unread_audience(row: dict) -> list[dict]:
+    audience = _audience_rows(_json_list(row["audience_stores"]), _json_list(row["audience_positions"]))
+    with get_db().cursor() as cur:
+        cur.execute("SELECT employee_id FROM announcement_reads WHERE announcement_id = %s", (row["id"],))
+        seen = {r["employee_id"] for r in cur.fetchall()}
+    return [e for e in audience if e["id"] not in seen]
+
+
+@app.post("/api/announcements/<int:ann_id>/remind")
+@login_required
+def api_remind_announcement(ann_id: int):
+    viewer = _task_viewer()
+    row = _load_announcement(ann_id, viewer)
+    if not row:
+        return _bad("Announcement not found", 404)
+    if not (row["created_by"] == viewer["employee_id"] or (viewer["can_manage"] and _ann_visible(row, viewer))):
+        return _forbidden()
+    today = _now_iso()[:10]
+    sent = 0
+    for e in _unread_audience(row):
+        if e["id"] != viewer["employee_id"]:
+            _notify(e["id"], "ann_remind", "Nhắc đọc thông báo", row["title"], None, f"ann_remind:{ann_id}:{today}", False, f"/board/{ann_id}")
+            sent += 1
+    return jsonify({"sent": sent})
+
+
+@app.post("/api/announcements/<int:ann_id>/to-task")
+@login_required
+def api_announcement_to_task(ann_id: int):
+    """Turn an announcement into a task for everyone in its audience (or a chosen subset)."""
+    viewer = _task_viewer()
+    row = _load_announcement(ann_id, viewer)
+    if not row:
+        return _bad("Announcement not found", 404)
+    if not viewer["can_manage"] or not _ann_visible(row, viewer):
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    due = data.get("dueAt") or None
+    if due and not re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}", str(due)):
+        return _bad("Invalid deadline")
+    audience = [e for e in _audience_rows(_json_list(row["audience_stores"]), _json_list(row["audience_positions"]))
+                if _in_scope(viewer, e.get("store_code"))]
+    chosen = data.get("assigneeIds")
+    if isinstance(chosen, list) and chosen:
+        wanted = {int(x) for x in chosen if str(x).isdigit()}
+        audience = [e for e in audience if e["id"] in wanted]
+    audience = audience[:100]
+    if not audience:
+        return _bad("No recipients")
+    title = (data.get("title") or row["title"]).strip()[:200]
+    db = get_db()
+    ids = []
+    with db.cursor() as cur:
+        for e in audience:
+            cur.execute(
+                "INSERT INTO tasks (title, description, store_code, assignee_id, assigned_by, priority, due_at, "
+                "created_at, updated_at) VALUES (%s,%s,%s,%s,%s,'normal',%s,%s,%s) RETURNING id",
+                (title, row["body"] or "", (e.get("store_code") or "").upper(), e["id"], viewer["employee_id"],
+                 str(due)[:19] if due else None, _now_iso(), _now_iso()))
+            ids.append((e["id"], cur.fetchone()["id"]))
+    db.commit()
+    for emp_id, task_id in ids:
+        if emp_id != viewer["employee_id"]:
+            _notify(emp_id, "assigned", "Bạn được giao việc mới", f"{title} · giao bởi {viewer['name']}", task_id)
+    return jsonify({"created": len(ids)}), 201
+
+
+# ----------------------------- lazy reminders --------------------------------
+
+def _sync_ops_reminders(employee_id: int) -> None:
+    now = datetime.now(tz=VN_TZ)
+    now_iso, today = now.strftime("%Y-%m-%dT%H:%M:%S"), now.strftime("%Y-%m-%d")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT store_code, position FROM employees WHERE id = %s", (employee_id,))
+        me = cur.fetchone() or {}
+    store, position = (me.get("store_code") or "").upper(), (me.get("position") or "").upper()
+
+    # 1) scheduled "unread announcement" reminders
+    with db.cursor() as cur:
+        cur.execute("SELECT a.* FROM announcements a WHERE a.remind_at IS NOT NULL AND a.remind_at <= %s AND NOT EXISTS "
+                    "(SELECT 1 FROM announcement_reads r WHERE r.announcement_id = a.id AND r.employee_id = %s) "
+                    "ORDER BY a.id DESC LIMIT 20", (now_iso, employee_id))
+        due = cur.fetchall()
+    for a in due:
+        if _ann_matches(a, store, position):
+            _notify(employee_id, "ann_remind", "Thông báo chưa đọc", a["title"], None, f"ann_due:{a['id']}", False, f"/board/{a['id']}")
+
+    # 2) end-of-day cash report reminder for the people who normally file it
+    if store and now.hour * 60 + now.minute >= 21 * 60 + 30:
+        since = (now - timedelta(days=30)).strftime("%Y-%m-%d")
+        with db.cursor() as cur:
+            cur.execute("SELECT 1 FROM fund_reports WHERE UPPER(store_code) = %s AND report_date = %s", (store, today))
+            if cur.fetchone():
+                return
+            cur.execute(
+                "SELECT 1 WHERE EXISTS (SELECT 1 FROM fund_reports WHERE UPPER(store_code) = %s AND submitted_by = %s "
+                "AND report_date >= %s) OR EXISTS (SELECT 1 FROM store_managers sm JOIN stores s ON s.id = sm.store_id "
+                "WHERE UPPER(s.store_code) = %s AND sm.employee_id = %s)", (store, employee_id, since, store, employee_id))
+            reporter = cur.fetchone()
+        if reporter:
+            _notify(employee_id, "fund_missing", "Chưa báo cáo quỹ hôm nay", f"{_store_name(store)} chưa có báo cáo quỹ ngày {_vn_date_text(today)}",
+                    None, f"fund_missing:{store}:{today}", True, "/fund/new")
+
+
+# ----------------------------- photo gallery, thumbnails, retention ----------
+
+PHOTO_RETENTION_DAYS = int(os.getenv("PHOTO_RETENTION_DAYS", "0") or 0)  # 0 = keep forever
+THUMB_WIDTHS = (160, 240, 400, 800)
+
+
+def _thumb_for(full: Path, width: int) -> Path | None:
+    """Resized JPEG copy (cached on disk). Returns None when Pillow is unavailable or the file is not an image."""
+    try:
+        from PIL import Image, ImageOps
+    except ImportError:
+        return None
+    width = min(THUMB_WIDTHS, key=lambda w: abs(w - width))
+    target = TASK_PHOTO_DIR / "thumbs" / str(width) / (full.stem + ".jpg")
+    if target.is_file() and target.stat().st_mtime >= full.stat().st_mtime:
+        return target
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(full) as im:
+            im = ImageOps.exif_transpose(im)
+            im.thumbnail((width, width * 4))
+            im.convert("RGB").save(target, "JPEG", quality=78, optimize=True)
+        return target
+    except Exception:
+        return None
+
+
+def _cleanup_old_photos() -> int:
+    """Delete photo files older than PHOTO_RETENTION_DAYS (off by default). Runs at most once a day."""
+    if PHOTO_RETENTION_DAYS <= 0:
+        return 0
+    marker = TASK_PHOTO_DIR / ".last_cleanup"
+    today = _now_iso()[:10]
+    try:
+        if marker.is_file() and marker.read_text().strip() == today:
+            return 0
+        marker.write_text(today)
+    except OSError:
+        return 0
+    cutoff = datetime.now().timestamp() - PHOTO_RETENTION_DAYS * 86400
+    removed = 0
+    for f in TASK_PHOTO_DIR.iterdir():
+        if f.is_file() and not f.name.startswith(".") and f.stat().st_mtime < cutoff:
+            f.unlink(missing_ok=True)
+            removed += 1
+    shutil.rmtree(TASK_PHOTO_DIR / "thumbs", ignore_errors=True)
+    return removed
+
+
+@app.get("/api/media")
+@login_required
+def api_media_gallery():
+    """Every photo attached to tasks, fund reports, receipts and announcements, newest first (managers)."""
+    viewer = _task_viewer()
+    if not viewer["can_manage"]:
+        return _forbidden()
+    _cleanup_old_photos()
+    kind = request.args.get("kind", "all")
+    store = (request.args.get("storeCode") or "").strip().upper()
+    frm = _valid_date(request.args.get("from")) if request.args.get("from") else None
+    to = _valid_date(request.args.get("to")) if request.args.get("to") else None
+    items: list[dict] = []
+
+    def add(names_json, kind_, title, store_code, date, link):
+        for n in _json_list(names_json):
+            items.append({"name": n, "kind": kind_, "title": title, "storeCode": (store_code or "").upper(),
+                          "date": (date or "")[:10], "link": link})
+
+    def scoped(col: str, params: list) -> str:
+        frag = ""
+        if viewer["scope"] is not None:
+            frag += f" AND UPPER({col}) = ANY(%s)"
+            params.append(list(viewer["scope"]) or [""])
+        if store:
+            frag += f" AND UPPER({col}) = %s"
+            params.append(store)
+        return frag
+
+    def dated(col: str, params: list) -> str:
+        frag = ""
+        if frm:
+            frag += f" AND LEFT({col}, 10) >= %s"
+            params.append(frm)
+        if to:
+            frag += f" AND LEFT({col}, 10) <= %s"
+            params.append(to)
+        return frag
+
+    with get_db().cursor() as cur:
+        if kind in ("all", "task"):
+            p: list = []
+            cur.execute("SELECT id, title, store_code, photo_urls, COALESCE(completed_at, updated_at) AS d FROM tasks "
+                        "WHERE photo_urls <> '[]'" + scoped("store_code", p) + dated("COALESCE(completed_at, updated_at)", p) +
+                        " ORDER BY id DESC LIMIT 300", p)
+            for r in cur.fetchall():
+                add(r["photo_urls"], "task", r["title"], r["store_code"], r["d"], f"/task/{r['id']}")
+        if kind in ("all", "fund"):
+            p = []
+            cur.execute("SELECT id, store_code, report_date, photo_urls FROM fund_reports WHERE photo_urls <> '[]'" +
+                        scoped("store_code", p) + dated("report_date", p) + " ORDER BY id DESC LIMIT 300", p)
+            for r in cur.fetchall():
+                add(r["photo_urls"], "fund", "Báo cáo quỹ", r["store_code"], r["report_date"], f"/fund/{r['id']}")
+            p = []
+            cur.execute("SELECT id, store_code, entry_date, reason, photo_urls FROM fund_entries WHERE photo_urls <> '[]'" +
+                        scoped("store_code", p) + dated("entry_date", p) + " ORDER BY id DESC LIMIT 300", p)
+            for r in cur.fetchall():
+                add(r["photo_urls"], "fund", f"Thu chi quỹ: {r['reason'] or ''}", r["store_code"], r["entry_date"], "/fund")
+        if kind in ("all", "order"):
+            p = []
+            cur.execute("SELECT id, store_code, COALESCE(received_at, order_date) AS d, receipt_photos FROM purchase_orders "
+                        "WHERE receipt_photos <> '[]'" + scoped("store_code", p) + dated("COALESCE(received_at, order_date)", p) +
+                        " ORDER BY id DESC LIMIT 300", p)
+            for r in cur.fetchall():
+                add(r["receipt_photos"], "order", "Nhận hàng", r["store_code"], r["d"], f"/orders/{r['id']}")
+        if kind in ("all", "announcement"):
+            p = []
+            cur.execute("SELECT id, title, audience_stores, created_at, image_urls FROM announcements WHERE image_urls <> '[]'" +
+                        dated("created_at", p) + " ORDER BY id DESC LIMIT 300", p)
+            for r in cur.fetchall():
+                stores = [s.upper() for s in _json_list(r["audience_stores"])]
+                if viewer["scope"] is not None and not any(s in viewer["scope"] for s in stores):
+                    continue
+                if store and store not in stores:
+                    continue
+                add(r["image_urls"], "announcement", r["title"], stores[0] if len(stores) == 1 else "", r["created_at"], f"/board/{r['id']}")
+    items.sort(key=lambda x: x["date"], reverse=True)
+    return jsonify({"items": items[:300], "total": len(items)})
+
+
+# ----------------------------- CSV export (signed, short-lived links) --------
+
+@app.post("/api/export-link")
+@login_required
+def api_export_link():
+    viewer = _task_viewer()
+    if not viewer["can_manage"]:
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    kind = data.get("kind")
+    if kind not in ("fund", "orders"):
+        return _bad("Invalid export")
+    params = {k: str(data.get(k) or "")[:40] for k in ("storeCode", "from", "to")}
+    token = jwt.encode({"purpose": "export", "kind": kind, "uid": (g.current_user or {}).get("user_id"),
+                        "eid": viewer["employee_id"], "params": params,
+                        "exp": datetime.now(tz=VN_TZ) + timedelta(minutes=5)}, JWT_SECRET, algorithm="HS256")
+    return jsonify({"path": f"/api/export/{kind}.csv?t={token}"})
+
+
+def _csv_response(name: str, header: list, rows: list[list]) -> Response:
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(header)
+    w.writerows(rows)
+    return Response("﻿" + buf.getvalue(), mimetype="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.get("/api/export/<kind>.csv")
+def api_export_csv(kind: str):
+    try:
+        claims = jwt.decode(request.args.get("t", ""), JWT_SECRET, algorithms=["HS256"])
+    except Exception:
+        return _bad("Link expired", 401)
+    if claims.get("purpose") != "export" or claims.get("kind") != kind:
+        return _bad("Invalid link", 401)
+    g.current_user = {"user_id": claims.get("uid"), "employee_id": claims.get("eid")}
+    viewer = _task_viewer()
+    if not viewer["can_manage"]:
+        return _forbidden()
+    p = claims.get("params") or {}
+    where, params = [], []
+    scol = "f.store_code" if kind == "fund" else "o.store_code"
+    dcol = "f.report_date" if kind == "fund" else "o.order_date"
+    if viewer["scope"] is not None:
+        where.append(f"UPPER({scol}) = ANY(%s)")
+        params.append(list(viewer["scope"]) or [""])
+    if p.get("storeCode"):
+        where.append(f"UPPER({scol}) = %s")
+        params.append(p["storeCode"].upper())
+    for key, op in (("from", ">="), ("to", "<=")):
+        d = _valid_date(p.get(key)) if p.get(key) else None
+        if d:
+            where.append(f"{dcol} {op} %s")
+            params.append(d)
+    clause = ("WHERE " + " AND ".join(where) + " ") if where else ""
+    if kind == "fund":
+        with get_db().cursor() as cur:
+            cur.execute(_FUND_SELECT + clause + "ORDER BY f.report_date DESC, f.store_code", params)
+            rows = cur.fetchall()
+        head = ["Ngày", "Cửa hàng", "Tiền đếm được", "Quỹ hệ thống", "Chênh lệch", "Trạng thái", "Người báo cáo", "Ghi chú"] + [str(d) for d in FUND_DENOMS]
+        out = []
+        for r in rows:
+            counts = json.loads(r.get("counts_json") or "{}")
+            out.append([r["report_date"], r.get("store_name") or r["store_code"], r["cash_total"], r["system_balance"],
+                        r["difference"], r["status"], r.get("submitter_name") or "", r.get("note") or ""] +
+                       [counts.get(str(d), 0) for d in FUND_DENOMS])
+        return _csv_response("bao-cao-quy.csv", head, out)
+    with get_db().cursor() as cur:
+        cur.execute("SELECT o.id, o.order_date, o.status, o.supplier, s.name AS store_name, o.store_code, i.product_name, i.unit, "
+                    "i.qty, i.qty_received FROM purchase_orders o JOIN purchase_order_items i ON i.order_id = o.id "
+                    "LEFT JOIN stores s ON UPPER(s.store_code) = UPPER(o.store_code) " + clause +
+                    "ORDER BY o.order_date DESC, o.id, i.id", params)
+        rows = cur.fetchall()
+    return _csv_response("don-dat-hang.csv", ["Ngày", "Mã đơn", "Cửa hàng", "Trạng thái", "Nhà cung cấp", "Sản phẩm", "ĐVT", "Số lượng đặt", "Số lượng nhận"],
+                         [[r["order_date"], r["id"], r.get("store_name") or r["store_code"], r["status"], r.get("supplier") or "",
+                           r["product_name"], r.get("unit") or "", r["qty"], "" if r["qty_received"] is None else r["qty_received"]] for r in rows])
+
+
+# ----------------------------- hub summary -----------------------------------
+
+@app.get("/api/ops/summary")
+@login_required
+def api_ops_summary():
+    viewer = _task_viewer()
+    today = _now_iso()[:10]
+    out: dict[str, Any] = {"canManage": viewer["can_manage"], "storeCode": viewer["store_code"]}
+    db = get_db()
+    with db.cursor() as cur:
+        if viewer["store_code"]:
+            cur.execute("SELECT status FROM fund_reports WHERE UPPER(store_code) = %s AND report_date = %s", (viewer["store_code"], today))
+            r = cur.fetchone()
+            out["fund"] = {"reportedToday": bool(r), "status": r["status"] if r else None}
+        else:
+            out["fund"] = {"reportedToday": False, "status": None}
+        scope_sql, scope_params = "", []
+        if viewer["scope"] is not None:
+            scope_sql, scope_params = " AND UPPER(store_code) = ANY(%s)", [list(viewer["scope"]) or [""]]
+        cur.execute("SELECT status, COUNT(*) AS c FROM purchase_orders WHERE status = ANY(%s)" + scope_sql + " GROUP BY status",
+                    [list(ORDER_OPEN_STATUSES)] + scope_params)
+        counts = {r["status"]: r["c"] for r in cur.fetchall()}
+        out["orders"] = {"pendingApproval": counts.get("submitted", 0) if viewer["can_manage"] else 0,
+                         "awaitingReceipt": sum(counts.get(s, 0) for s in ORDER_OPEN_STATUSES)}
+        if viewer["can_manage"]:
+            sql = ("SELECT COUNT(*) AS c FROM stores s WHERE NOT (COALESCE(s.status,'') ILIKE '%%đóng%%' OR COALESCE(s.status,'') ILIKE '%%ngừng%%') "
+                   "AND NOT EXISTS (SELECT 1 FROM fund_reports f WHERE UPPER(f.store_code) = UPPER(s.store_code) AND f.report_date = %s)")
+            params: list[Any] = [today]
+            if viewer["scope"] is not None:
+                sql += " AND UPPER(s.store_code) = ANY(%s)"
+                params.append(list(viewer["scope"]) or [""])
+            cur.execute(sql, params)
+            out["fund"]["missingCount"] = cur.fetchone()["c"]
+            cur.execute("SELECT COUNT(*) AS c FROM fund_reports WHERE status = 'submitted'" + scope_sql, scope_params)
+            out["fund"]["pendingReview"] = cur.fetchone()["c"]
+    out["board"] = {"unread": sum(1 for r in _visible_announcements(viewer) if not r["is_read"])}
+    return jsonify(out)
 
 
 @app.get("/healthz")
