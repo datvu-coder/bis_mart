@@ -60,54 +60,6 @@ jobs:
             echo "=== backend health ==="
             docker inspect --format="Status: {{.State.Status}}  Health: {{if .State.Health}}{{.State.Health.Status}}{{else}}(no healthcheck){{end}}" bis_mart_backend 2>&1 || true
             echo
-            echo "=== bis_mart_backend env (DATABASE_URL credentials redacted) ==="
-            docker inspect bis_mart_backend --format "{{json .Config.Env}}" | sed -E "s#//[^:]+:[^@]+@#//REDACTED:REDACTED@#g"
-            echo
-            echo "=== bis_mart_backend labels ==="
-            docker inspect bis_mart_backend --format "{{json .Config.Labels}}"
-            echo
-            echo "=== bis_mart_backend networks ==="
-            docker inspect bis_mart_backend --format "{{json .NetworkSettings.Networks}}"
-            echo
-            echo "=== giaoviec env (DATABASE_URL credentials redacted) ==="
-            docker inspect giaoviec --format "{{json .Config.Env}}" 2>&1 | sed -E "s#//[^:]+:[^@]+@#//REDACTED:REDACTED@#g"
-            echo
-            echo "=== giaoviec labels ==="
-            docker inspect giaoviec --format "{{json .Config.Labels}}" 2>&1
-            echo
-            echo "=== giaoviec recent logs (last 30, timestamped) ==="
-            docker logs --tail 30 --timestamps giaoviec 2>&1
-            echo
-            echo "=== proxy (traefik) labels ==="
-            docker inspect proxy --format "{{json .Config.Labels}}" 2>&1
-            echo
-            echo "=== proxy networks ==="
-            docker inspect proxy --format "{{json .NetworkSettings.Networks}}" 2>&1
-            echo
-            echo "=== postgres container 1 (q23xio57fs9rzyealfctartz) env, redacted ==="
-            docker inspect q23xio57fs9rzyealfctartz --format "{{json .Config.Env}}" 2>&1 | sed -E "s#//[^:]+:[^@]+@#//REDACTED:REDACTED@#g"
-            echo
-            echo "=== postgres container 2 (s1le94kqxkeqnu38t2d4zurn) env, redacted ==="
-            docker inspect s1le94kqxkeqnu38t2d4zurn --format "{{json .Config.Env}}" 2>&1 | sed -E "s#//[^:]+:[^@]+@#//REDACTED:REDACTED@#g"
-            echo
-            echo "=== unidentified container kvcfdz0e8acwkh24u0sm602d-072826740011 labels ==="
-            docker inspect kvcfdz0e8acwkh24u0sm602d-072826740011 --format "{{json .Config.Labels}}" 2>&1
-            echo
-            echo "=== unidentified container cp73k73g6pywt6mazoqtvud2-123657296911 labels ==="
-            docker inspect cp73k73g6pywt6mazoqtvud2-123657296911 --format "{{json .Config.Labels}}" 2>&1
-            echo
-            echo "=== coolify leftovers: any container with coolify in the name ==="
-            docker ps -a --format "{{.Names}} | {{.Image}} | {{.Status}}" | grep -i cool || echo "(none)"
-            echo
-            echo "=== coolify leftovers: /data/coolify ==="
-            ls -la /data/coolify 2>&1 | head -30
-            echo
-            echo "=== coolify leftovers: systemd units ==="
-            systemctl list-units --all 2>&1 | grep -i cool || echo "(no coolify systemd unit)"
-            echo
-            echo "=== coolify leftovers: crontab ==="
-            crontab -l 2>&1 | grep -i cool || echo "(no coolify cron entry)"
-            echo
             echo "=== disk space ==="
             df -h /
           '
