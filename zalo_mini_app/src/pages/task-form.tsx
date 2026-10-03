@@ -144,7 +144,7 @@ export default function TaskFormPage() {
               <h3>Cửa hàng nhận việc</h3>
               <span className="count">{pickedStores.length ? `Đã chọn ${pickedStores.length}` : "Chưa chọn"}</span>
             </div>
-            <div className="hint">Việc sẽ giao cho cửa hàng trưởng, người này tự phân công nhân viên và báo kết quả.</div>
+            <div className="hint">Việc sẽ giao cho SM (cửa hàng trưởng) của cửa hàng, người này tự phân công nhân viên và báo kết quả.</div>
             <div className="people">
               {stores.length === 0 && <div className="hint">Không có cửa hàng nào</div>}
               {stores.map((st) => {
@@ -156,7 +156,7 @@ export default function TaskFormPage() {
                     <Avatar name={st.managers[0]?.name || st.storeName} size={34} />
                     <span className="person-info">
                       <b>{st.storeName || st.storeCode}</b>
-                      <small>{none ? "Chưa có cửa hàng trưởng" : `CHT: ${st.managers.map((m) => m.name).join(", ")}`}</small>
+                      <small>{none ? "Chưa có SM" : `SM: ${st.managers.map((m) => m.name).join(", ")}`}</small>
                     </span>
                     <span className="tick">{on && <Icon name="check" size={14} />}</span>
                   </button>
