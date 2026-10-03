@@ -43,6 +43,7 @@ const ERROR_VI: Record<string, string> = {
   "Invalid denomination count": "Số tờ không hợp lệ.",
   "Invalid amount": "Số tiền không hợp lệ.",
   "Report already approved": "Báo cáo ngày này đã được duyệt, không sửa được nữa.",
+  "OA app is not configured": "Chưa cấu hình App ID / Secret Key của ứng dụng OA trên máy chủ (chạy VPS Ops → set_oa_env).",
   "Webhook not configured": "Webhook chưa được cấu hình.",
   "Report not found": "Không tìm thấy báo cáo.",
   "Only an admin can delete an approved report": "Báo cáo đã duyệt chỉ admin mới xoá được.",
@@ -200,6 +201,7 @@ export const api = {
     request<{ path: string }>("POST", "/api/export-link", { kind, storeCode, from, to }),
   oaInfo: () => request<{ oaId: string }>("GET", "/api/zalo/oa-info"),
   oaStatus: () => request<OaStatus>("GET", "/api/zalo/oa-status"),
+  oaConnect: () => request<{ url: string }>("POST", "/api/zalo/oa-connect", {}),
   oaTest: () => request<{ ok: boolean; detail: string; target: string | null }>("POST", "/api/zalo/oa-test", {}),
   opsSummary: () => request<OpsSummary>("GET", "/api/ops/summary"),
   uploadPhoto: (file: File) => {
