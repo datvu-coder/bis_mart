@@ -7619,10 +7619,14 @@ ZALO_VERIFY_DIR = Path(__file__).resolve().parent / "zalo_verify"
 def zalo_domain_verification(fname: str):
     """Serves the Zalo domain-verification file: /zalo_verifier<code>.html -> zalo_verify/<code>.html."""
     safe = secure_filename(fname)
-    full = ZALO_VERIFY_DIR / safe
-    if not safe.endswith(".html") or safe == "README.md" or not full.is_file():
+    if not safe.endswith(".html"):
         return jsonify({"error": "Not found"}), 404
-    return Response(full.read_bytes(), mimetype="text/html; charset=utf-8")
+    # The file Zalo hands out may carry the "zalo_verifier" prefix itself, or only the code.
+    for candidate in (f"zalo_verifier{safe}", safe):
+        full = ZALO_VERIFY_DIR / candidate
+        if full.is_file():
+            return Response(full.read_bytes(), mimetype="text/html; charset=utf-8")
+    return jsonify({"error": "Not found"}), 404
 
 
 @app.get("/healthz")
