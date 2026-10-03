@@ -12,6 +12,17 @@ import { clearDataCache, clearOps, useOpsSummary } from "../../data";
 import { OaStatus, Task } from "../../types";
 import { isOpen } from "../../utils";
 
+const logTime = (at: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/.exec(at || "");
+  return m ? `${m[4]} · ${m[3]}/${m[2]}/${m[1]}` : at;
+};
+const logTitle = (r: { ok: number; detail: string }) => {
+  if (r.ok === 2) return "Zalo báo có người theo dõi / nhắn tin cho OA";
+  const test = r.detail.startsWith("test");
+  if (r.ok === 1) return test ? "Gửi tin thử thành công" : "Đã gửi thông báo đẩy";
+  return `${test ? "Tin thử" : "Thông báo đẩy"} bị Zalo từ chối`;
+};
+
 export default function MeTab({ tasks }: { tasks: Task[] }) {
   const { user, logout } = useAuth();
   const { openSnackbar } = useSnackbar();
@@ -140,7 +151,15 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
           <button className="btn wide soft" disabled={testing || !oaStatus.configured} onClick={sendTest}>{testing ? "Đang gửi..." : "Gửi tin thử cho tôi"}</button>
           {testResult && <div className="hint">{testResult}</div>}
           {oaStatus.recent.length > 0 && (
-            <div className="hint log">{oaStatus.recent.slice(0, 3).map((r, i) => <div key={i}>{r.ok === 1 ? "✓" : r.ok === 2 ? "•" : "✗"} {r.detail.slice(0, 90)}</div>)}</div>
+            <details className="oa-log">
+              <summary>Nhật ký gần đây</summary>
+              {oaStatus.recent.slice(0, 5).map((r, i) => (
+                <div key={i} className={`oa-log-row ${r.ok === 1 ? "ok" : r.ok === 2 ? "neutral" : "bad"}`}>
+                  <span className="dot" />
+                  <div><b>{logTitle(r)}</b><small>{logTime(r.at)}</small></div>
+                </div>
+              ))}
+            </details>
           )}
         </div>
       )}
