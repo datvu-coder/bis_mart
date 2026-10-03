@@ -32,6 +32,7 @@ export default function OpsTab({ active }: { active: boolean }) {
     { key: "receive", icon: "box", title: "Nhận hàng", hint: ops ? `${ops.orders.awaitingReceipt} đơn đang chờ hàng về` : "Đang tải...", to: "/orders?open=1",
       badge: ops?.orders.awaitingReceipt || 0 },
     { key: "board", icon: "megaphone", title: "Bảng tin", hint: "Thông báo có xác nhận đã đọc", to: "/board", badge: ops?.board.unread || 0 },
+    ...(ops?.isAdmin ? [{ key: "care", icon: "message" as IconName, title: "Chăm sóc khách hàng", hint: "Gửi tin OA cho người đã quan tâm", to: "/care" }] : []),
     ...(ops?.canManage ? [{ key: "gallery", icon: "image" as IconName, title: "Kho ảnh", hint: "Ảnh việc, quỹ, nhận hàng, bảng tin", to: "/gallery" }] : []),
   ];
 

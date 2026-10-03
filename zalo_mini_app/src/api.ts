@@ -1,7 +1,7 @@
 import type {
   Analytics, Announcement, AnnouncementDetail, AppNotification, Assignee, CatalogProduct, FundEntry, FundReport,
   FundReportDetail, FundSuggest, MediaItem, Order, OrderDetail, OrderItem, OrderSummary, OpsSummary, StoreSummary,
-  OaStatus, StoreWithManagers, Task, TaskDetail, User,
+  CareCampaign, OaStatus, StoreWithManagers, Task, TaskDetail, User,
 } from "./types";
 
 const BASE_URL: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "https://api.bismart.id.vn";
@@ -202,6 +202,10 @@ export const api = {
   oaInfo: () => request<{ oaId: string }>("GET", "/api/zalo/oa-info"),
   oaStatus: () => request<OaStatus>("GET", "/api/zalo/oa-status"),
   oaConnect: () => request<{ url: string }>("POST", "/api/zalo/oa-connect", {}),
+  careAudience: (period: string) => request<{ period: string; count: number; total: number; capped: boolean }>("GET", `/api/oa/care/audience?period=${period}`),
+  careTest: (body: string, imageName: string) => request<{ ok: boolean; detail: string }>("POST", "/api/oa/care/test", { body, imageName }),
+  careSend: (body: string, imageName: string, period: string) => request<{ id: number; total: number }>("POST", "/api/oa/care/send", { body, imageName, period }),
+  careCampaigns: () => request<{ campaigns: CareCampaign[] }>("GET", "/api/oa/care/campaigns"),
   oaTest: () => request<{ ok: boolean; detail: string; target: string | null }>("POST", "/api/zalo/oa-test", {}),
   opsSummary: () => request<OpsSummary>("GET", "/api/ops/summary"),
   uploadPhoto: (file: File) => {
