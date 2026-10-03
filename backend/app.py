@@ -6098,6 +6098,7 @@ def api_get_fund_report(report_id: int):
     out = _fund_report_to_json(row)
     out["canReview"] = _manages(viewer, row["store_code"]) and row["status"] == "submitted"
     out["canEdit"] = row["status"] != "approved" and (row["submitted_by"] == viewer["employee_id"] or _manages(viewer, row["store_code"]))
+    out["canDelete"] = _can_delete_fund_report(viewer, row)
     with get_db().cursor() as cur:
         cur.execute(
             "SELECT e.id, e.kind, e.amount, e.reason, e.photo_urls, ee.full_name AS by_name FROM fund_entries e "
@@ -6108,6 +6109,33 @@ def api_get_fund_report(report_id: int):
                            "photoUrls": _json_list(r["photo_urls"]), "createdByName": r["by_name"] or ""}
                           for r in cur.fetchall()]
     return jsonify(out)
+
+
+def _can_delete_fund_report(viewer: dict, row: dict) -> bool:
+    """Admins can delete any report; the author or a store manager only while it is not yet approved."""
+    if _is_admin_user():
+        return True
+    if row["status"] == "approved":
+        return False
+    return row["submitted_by"] == viewer["employee_id"] or _manages(viewer, row["store_code"])
+
+
+@app.delete("/api/fund/reports/<int:report_id>")
+@login_required
+def api_delete_fund_report(report_id: int):
+    viewer = _task_viewer()
+    row = _load_fund_report(report_id)
+    if not row:
+        return _bad("Report not found", 404)
+    if row["submitted_by"] != viewer["employee_id"] and not _manages(viewer, row["store_code"]):
+        return _forbidden()
+    if not _can_delete_fund_report(viewer, row):
+        return _bad("Only an admin can delete an approved report", 403)
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM fund_reports WHERE id = %s", (report_id,))
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @app.post("/api/fund/reports/<int:report_id>/review")

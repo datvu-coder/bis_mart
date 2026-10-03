@@ -161,6 +161,7 @@ export interface FundReport {
 export interface FundReportDetail extends FundReport {
   canReview: boolean;
   canEdit: boolean;
+  canDelete: boolean;
   entries: FundEntry[];
 }
 
