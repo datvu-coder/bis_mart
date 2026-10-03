@@ -8,8 +8,8 @@ import SubHero from "../components/SubHero";
 import { CareCampaign } from "../types";
 
 const PERIODS: { value: string; label: string; hint: string }[] = [
-  { value: "YESTERDAY", label: "Hôm qua", hint: "Vừa tương tác, chắc chắn gửi được" },
   { value: "TODAY", label: "Hôm nay", hint: "Vừa tương tác, chắc chắn gửi được" },
+  { value: "YESTERDAY", label: "Hôm qua", hint: "Vừa tương tác, chắc chắn gửi được" },
   { value: "L7D", label: "7 ngày", hint: "Một phần có thể ngoài 48 giờ nên bị Zalo từ chối" },
   { value: "L30D", label: "30 ngày", hint: "Nhiều người có thể ngoài 48 giờ nên bị Zalo từ chối" },
   { value: "ALL", label: "Tất cả", hint: "Người ngoài 48 giờ sẽ bị Zalo từ chối" },
@@ -26,7 +26,7 @@ export default function CarePage() {
   const { openSnackbar } = useSnackbar();
   const [body, setBody] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
-  const [period, setPeriod] = useState("YESTERDAY");
+  const [period, setPeriod] = useState("TODAY");
   const [audience, setAudience] = useState<{ count: number; total: number; capped: boolean; source: "zalo" | "webhook" } | null>(null);
   const [audErr, setAudErr] = useState("");
   const [campaigns, setCampaigns] = useState<CareCampaign[]>([]);

@@ -311,6 +311,8 @@ export interface OaStatus {
   tokenExpiresAt: string | null;
   employees: { total: number; zaloLinked: number; oaMapped: number };
   recent: { employeeId: number | null; ok: number; detail: string; at: string }[];
+  webhookEvents?: { name: string; at: string }[];
+  seen?: { total: number; lastAt: string | null };
 }
 
 export interface CareCampaign {

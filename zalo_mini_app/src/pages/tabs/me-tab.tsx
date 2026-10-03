@@ -146,6 +146,8 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
             <div><span>Tự gia hạn mã OA</span><b>{oaStatus.canRefresh ? "Có" : "Chưa"}</b></div>
             <div><span>Nhân viên đã liên kết Zalo</span><b>{oaStatus.employees.zaloLinked}/{oaStatus.employees.total}</b></div>
             <div><span>Đã nối với OA (nhận được tin)</span><b>{oaStatus.employees.oaMapped}</b></div>
+            <div><span>Khách đã ghi nhận qua webhook</span><b>{oaStatus.seen?.total ?? 0}</b></div>
+            <div><span>Sự kiện webhook gần nhất</span><b>{oaStatus.webhookEvents?.[0] ? `${oaStatus.webhookEvents[0].name} · ${logTime(oaStatus.webhookEvents[0].at)}` : "chưa có"}</b></div>
           </div>
           <button className="btn wide soft" onClick={connect}><Icon name="refresh" size={16} /> {oaStatus.canRefresh ? "Kết nối lại OA" : "Kết nối OA"}</button>
           <button className="btn wide soft" disabled={testing || !oaStatus.configured} onClick={sendTest}>{testing ? "Đang gửi..." : "Gửi tin thử cho tôi"}</button>

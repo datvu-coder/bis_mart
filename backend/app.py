@@ -5451,7 +5451,16 @@ def api_zalo_oa_status():
         counts = cur.fetchone()
         cur.execute("SELECT employee_id, ok, detail, created_at FROM zalo_oa_push_log ORDER BY id DESC LIMIT 5")
         log = cur.fetchall()
+        cur.execute("SELECT detail, created_at FROM zalo_oa_push_log WHERE ok = 2 ORDER BY id DESC LIMIT 5")
+        hooks = cur.fetchall()
+        cur.execute("SELECT COUNT(*) FILTER (WHERE followed = 1) AS n, MAX(last_interaction) AS last_at FROM oa_seen_users")
+        seen = cur.fetchone()
+    events = []
+    for h in hooks:
+        m = re.search(r'"event_name":\s*"([^"]+)"', h["detail"] or "")
+        events.append({"name": m.group(1) if m else "?", "at": h["created_at"]})
     return jsonify({
+        "webhookEvents": events, "seen": {"total": seen["n"], "lastAt": seen["last_at"]},
         "configured": bool(tokens.get("access_token") or tokens.get("refresh_token")),
         "canRefresh": bool(ZALO_OA_APP_ID and ZALO_OA_SECRET_KEY and tokens.get("refresh_token")),
         "oaId": ZALO_OA_ID or (tokens.get("oa_id") or ""), "webhookKey": bool(ZALO_OA_WEBHOOK_KEY),
