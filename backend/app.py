@@ -5426,10 +5426,11 @@ def api_zalo_oa_webhook():
         seen_user = str(sender.get("id") or "")
     if seen_user:
         with db.cursor() as cur:
-            cur.execute("INSERT INTO oa_seen_users (user_id, first_seen, last_interaction, followed) VALUES (%s,%s,%s,%s) "
+            cur.execute("INSERT INTO oa_seen_users (user_id, first_seen, last_interaction, followed, app_user) VALUES (%s,%s,%s,%s,%s) "
                         "ON CONFLICT (user_id) DO UPDATE SET last_interaction = EXCLUDED.last_interaction, "
+                        "app_user = COALESCE(NULLIF(EXCLUDED.app_user,''), oa_seen_users.app_user), "
                         "followed = CASE WHEN %s = 'unfollow' THEN 0 WHEN %s = 'follow' THEN 1 ELSE oa_seen_users.followed END",
-                        (seen_user, _now_iso(), _now_iso(), 0 if event == "unfollow" else 1, event, event))
+                        (seen_user, _now_iso(), _now_iso(), 0 if event == "unfollow" else 1, app_user, event, event))
     with db.cursor() as cur:
         cur.execute("INSERT INTO zalo_oa_push_log (employee_id, ok, detail, created_at) VALUES (NULL, 2, %s, %s)",
                     (("webhook " + json.dumps(data, ensure_ascii=False))[:500], _now_iso()))
@@ -5460,12 +5461,18 @@ def api_zalo_oa_status():
         with db.cursor() as cur:
             cur.execute("SELECT COUNT(*) FILTER (WHERE followed = 1) AS n, COUNT(*) AS all_n, MAX(last_interaction) AS last_at FROM oa_seen_users")
             seen = cur.fetchone()
+    with db.cursor() as cur:
+        cur.execute("SELECT user_id, app_user, last_interaction FROM oa_seen_users ORDER BY last_interaction DESC LIMIT 3")
+        samples = [{"userId": r["user_id"], "appUser": r["app_user"] or "", "lastAt": r["last_interaction"]} for r in cur.fetchall()]
+        cur.execute("SELECT zalo_id, zalo_oa_id FROM employees WHERE id = %s", ((g.current_user or {}).get("employee_id"),))
+        mine = cur.fetchone() or {}
     events = []
     for h in hooks:
         m = re.search(r'"event_name":\s*"([^"]+)"', h["detail"] or "")
         events.append({"name": m.group(1) if m else "?", "at": h["created_at"]})
     return jsonify({
-        "webhookEvents": events, "seen": {"total": seen["n"], "lastAt": seen["last_at"]},
+        "webhookEvents": events, "seen": {"total": seen["n"], "lastAt": seen["last_at"], "samples": samples},
+        "me": {"zaloId": mine.get("zalo_id") or "", "zaloOaId": mine.get("zalo_oa_id") or ""},
         "configured": bool(tokens.get("access_token") or tokens.get("refresh_token")),
         "canRefresh": bool(ZALO_OA_APP_ID and ZALO_OA_SECRET_KEY and tokens.get("refresh_token")),
         "oaId": ZALO_OA_ID or (tokens.get("oa_id") or ""), "webhookKey": bool(ZALO_OA_WEBHOOK_KEY),
@@ -5594,10 +5601,11 @@ def _backfill_seen_from_log() -> int:
         if not m:
             continue
         with db.cursor() as cur:
-            cur.execute("INSERT INTO oa_seen_users (user_id, first_seen, last_interaction, followed) VALUES (%s,%s,%s,%s) "
+            ap = re.search(r'"user_id_by_app":\s*"(\d+)"', d)
+            cur.execute("INSERT INTO oa_seen_users (user_id, first_seen, last_interaction, followed, app_user) VALUES (%s,%s,%s,%s,%s) "
                         "ON CONFLICT (user_id) DO UPDATE SET last_interaction = GREATEST(oa_seen_users.last_interaction, EXCLUDED.last_interaction), "
-                        "followed = EXCLUDED.followed",
-                        (m.group(1), r["created_at"], r["created_at"], 0 if name == "unfollow" else 1))
+                        "followed = EXCLUDED.followed, app_user = COALESCE(NULLIF(EXCLUDED.app_user,''), oa_seen_users.app_user)",
+                        (m.group(1), r["created_at"], r["created_at"], 0 if name == "unfollow" else 1, ap.group(1) if ap else ""))
         added += 1
     db.commit()
     return added
@@ -5627,6 +5635,15 @@ def _care_list_error(raw: str) -> str:
     except ValueError:
         why = raw[:160]
     return f"Không lấy được danh sách người quan tâm từ Zalo ({why})"
+
+
+def _oa_alt_ids(uid: str) -> list[str]:
+    """Other ids Zalo may know this person by: the Mini App/app-scoped id from the same webhook event."""
+    with get_db().cursor() as cur:
+        cur.execute("SELECT app_user FROM oa_seen_users WHERE user_id = %s", (uid,))
+        row = cur.fetchone() or {}
+    alt = row.get("app_user") or ""
+    return [alt] if alt and alt != uid else []
 
 
 def _oa_send_care(uid: str, text: str, image_url: str = "") -> tuple[bool, str]:
@@ -5663,6 +5680,11 @@ def _care_worker(campaign_id: int, ids: list[str], text: str, image_url: str) ->
         try:
             for i, uid in enumerate(ids, 1):
                 ok, detail = _oa_send_care(uid, text, image_url)
+                if not ok and '"error": -201' in detail.replace('":-201', '": -201'):
+                    for alt in _oa_alt_ids(uid):
+                        ok, detail = _oa_send_care(alt, text, image_url)
+                        if ok:
+                            break
                 if ok:
                     ok_n += 1
                 else:

@@ -147,6 +147,11 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
             <div><span>Nhân viên đã liên kết Zalo</span><b>{oaStatus.employees.zaloLinked}/{oaStatus.employees.total}</b></div>
             <div><span>Đã nối với OA (nhận được tin)</span><b>{oaStatus.employees.oaMapped}</b></div>
             <div><span>Khách đã ghi nhận qua webhook</span><b>{oaStatus.seen?.total ?? 0}</b></div>
+            <div><span>ID Zalo của tôi</span><b className="mono">{oaStatus.me?.zaloId || "chưa có"}</b></div>
+            <div><span>ID OA của tôi</span><b className="mono">{oaStatus.me?.zaloOaId || "chưa có"}</b></div>
+            {oaStatus.seen?.samples?.map((x) => (
+              <div key={x.userId}><span>Khách gần nhất</span><b className="mono">{x.userId}{x.appUser ? ` / ${x.appUser}` : ""}</b></div>
+            ))}
             <div><span>Sự kiện webhook gần nhất</span><b>{oaStatus.webhookEvents?.[0] ? `${oaStatus.webhookEvents[0].name} · ${logTime(oaStatus.webhookEvents[0].at)}` : "chưa có"}</b></div>
           </div>
           <button className="btn wide soft" onClick={connect}><Icon name="refresh" size={16} /> {oaStatus.canRefresh ? "Kết nối lại OA" : "Kết nối OA"}</button>
