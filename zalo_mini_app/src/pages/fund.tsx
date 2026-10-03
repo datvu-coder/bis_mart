@@ -8,6 +8,7 @@ import PhotoField from "../components/PhotoField";
 import Sheet, { ConfirmSheet } from "../components/Sheet";
 import Skeleton, { EmptyState } from "../components/Skeleton";
 import StoreSelect, { useStoreChoice } from "../components/StoreSelect";
+import SwipeRow from "../components/SwipeRow";
 import SubHero from "../components/SubHero";
 import { bumpData, useDataVersion, useOpsSummary } from "../data";
 import { FUND_STATUS_LABEL, FundEntry, FundReport } from "../types";
@@ -37,6 +38,8 @@ export default function FundPage() {
   const [photos, setPhotos] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [delId, setDelId] = useState<number | null>(null);
+  const [editEntry, setEditEntry] = useState<FundEntry | null>(null);
+  const [delReport, setDelReport] = useState<FundReport | null>(null);
   const today = todayYmd();
 
   const load = useCallback(async () => {
@@ -58,13 +61,33 @@ export default function FundPage() {
   useEffect(() => { load(); }, [load, version]);
   useEffect(() => { loadEntries(); }, [loadEntries, version]);
 
-  const closeSheet = () => { setSheet(null); setAmount(""); setReason(""); setPhotos([]); };
+  const closeSheet = () => { setSheet(null); setEditEntry(null); setAmount(""); setReason(""); setPhotos([]); };
+  const startEdit = (e: FundEntry) => {
+    setEditEntry(e);
+    setSheet(e.kind);
+    setAmount(String(Math.round(e.amount)));
+    setReason(e.reason);
+    setPhotos(e.photoUrls);
+  };
+  const removeReport = async () => {
+    if (!delReport) return;
+    try {
+      await api.deleteFundReport(delReport.id);
+      openSnackbar({ text: "Đã xoá báo cáo quỹ", type: "success" });
+      bumpData();
+    } catch (e) {
+      openSnackbar({ text: e instanceof Error ? e.message : "Không xoá được", type: "error" });
+    }
+    setDelReport(null);
+  };
   const saveEntry = async () => {
     if (!sheet) return;
     setBusy(true);
     try {
-      await api.addFundEntry({ storeCode: store, kind: sheet, amount: Number(amount), reason: reason.trim(), photoUrls: photos });
-      openSnackbar({ text: sheet === "in" ? "Đã ghi khoản thu" : "Đã ghi khoản chi", type: "success" });
+      const body = { storeCode: store, kind: sheet, amount: Number(amount), reason: reason.trim(), photoUrls: photos };
+      if (editEntry) await api.updateFundEntry(editEntry.id, body);
+      else await api.addFundEntry(body);
+      openSnackbar({ text: editEntry ? "Đã cập nhật khoản thu/chi" : sheet === "in" ? "Đã ghi khoản thu" : "Đã ghi khoản chi", type: "success" });
       closeSheet();
       bumpData();
     } catch (e) {
@@ -143,12 +166,13 @@ export default function FundPage() {
         </div>
         {entries.length === 0 && <div className="hint">Chưa có khoản thu/chi nào. Ghi lại khi nhập thêm hoặc chi tiền từ quỹ.</div>}
         {entries.map((e) => (
-          <div key={e.id} className="entry">
+          <SwipeRow key={e.id} inPanel onEdit={e.canEdit ? () => startEdit(e) : undefined} onDelete={e.canDelete ? () => setDelId(e.id) : undefined}>
+          <div className="entry">
             <span className={`entry-ico ${e.kind}`}><Icon name={e.kind === "in" ? "plus" : "minus"} size={16} /></span>
             <span className="entry-main"><b>{e.reason}</b><small>{e.createdByName}</small>{e.photoUrls.length > 0 && <PhotoStrip photos={e.photoUrls} />}</span>
             <span className={`entry-amt ${e.kind}`}>{e.kind === "in" ? "+" : "−"}{vnd(e.amount)}</span>
-            {e.canDelete && <button className="icon-btn" onClick={() => setDelId(e.id)} aria-label="Xoá"><Icon name="trash" size={16} /></button>}
           </div>
+          </SwipeRow>
         ))}
         <div className="sheet-actions entry-actions">
           <button className="btn" onClick={() => setSheet("in")}><Icon name="plus" size={16} /> Ghi thu</button>
@@ -167,7 +191,10 @@ export default function FundPage() {
       {reports && reports.length === 0 && <EmptyState icon={<Icon name="wallet" size={34} />} title="Chưa có báo cáo quỹ" hint="Bấm + để tạo báo cáo cuối ngày" />}
       <div className="list">
         {(reports || []).map((r) => (
-          <button key={r.id} className="card fund-card" onClick={() => nav(`/fund/${r.id}`)}>
+          <SwipeRow key={r.id}
+            onEdit={r.canEdit ? () => nav(`/fund/new?store=${r.storeCode}&date=${r.reportDate}`) : undefined}
+            onDelete={r.canDelete ? () => setDelReport(r) : undefined}>
+          <button className="card fund-card" onClick={() => nav(`/fund/${r.id}`)}>
             <div className="card-top">
               <span className="card-title">{dmy(r.reportDate)}{canManage ? ` · ${r.storeName}` : ""}</span>
               <span className={`badge fund-${r.status}`}>{FUND_STATUS_LABEL[r.status]}</span>
@@ -178,10 +205,11 @@ export default function FundPage() {
               {canManage && <span className="meta-item"><Icon name="user" size={14} /> {r.submittedByName}</span>}
             </div>
           </button>
+          </SwipeRow>
         ))}
       </div>
 
-      <Sheet open={!!sheet} title={sheet === "in" ? "Ghi khoản thu" : "Ghi khoản chi"} onClose={closeSheet}>
+      <Sheet open={!!sheet} title={editEntry ? "Sửa khoản thu/chi" : sheet === "in" ? "Ghi khoản thu" : "Ghi khoản chi"} onClose={closeSheet}>
         <label className="field"><span>Số tiền (đ) *</span>
           <input inputMode="numeric" value={amount ? Number(amount).toLocaleString("vi-VN") : ""} onChange={(e) => setAmount(digits(e.target.value))} placeholder="VD: 150.000" />
         </label>
@@ -195,6 +223,7 @@ export default function FundPage() {
         </div>
       </Sheet>
 
+      <ConfirmSheet open={!!delReport} title="Xoá báo cáo quỹ?" message={delReport?.status === "approved" ? "Báo cáo này đã được duyệt. Xoá rồi sẽ không khôi phục được." : "Báo cáo sẽ bị xoá và không khôi phục được. Các khoản thu/chi trong ngày vẫn được giữ."} confirmLabel="Xoá" danger onConfirm={removeReport} onClose={() => setDelReport(null)} />
       <ConfirmSheet open={delId != null} title="Xoá khoản này?" message="Khoản thu/chi sẽ bị xoá khỏi quỹ hôm nay." confirmLabel="Xoá" danger onConfirm={removeEntry} onClose={() => setDelId(null)} />
     </Page>
   );

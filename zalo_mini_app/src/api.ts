@@ -164,6 +164,7 @@ export const api = {
   fundEntries: (storeCode: string, date: string) =>
     request<{ entries: FundEntry[] }>("GET", `/api/fund/entries?${new URLSearchParams({ storeCode, date })}`),
   addFundEntry: (body: unknown) => request<{ id: number }>("POST", "/api/fund/entries", body),
+  updateFundEntry: (id: number, body: unknown) => request<{ ok: boolean }>("PUT", `/api/fund/entries/${id}`, body),
   deleteFundEntry: (id: number) => request<{ ok: boolean }>("DELETE", `/api/fund/entries/${id}`),
 
   // operations: purchase orders
@@ -175,6 +176,7 @@ export const api = {
   order: (id: number) => request<OrderDetail>("GET", `/api/orders/${id}`),
   createOrder: (body: unknown) => request<Order>("POST", "/api/orders", body),
   updateOrder: (id: number, body: unknown) => request<Order>("PUT", `/api/orders/${id}`, body),
+  deleteOrder: (id: number) => request<{ ok: boolean }>("DELETE", `/api/orders/${id}`),
   setOrderStatus: (id: number, status: string) => request<Order>("POST", `/api/orders/${id}/status`, { status }),
   receiveOrder: (id: number, body: unknown) => request<Order>("POST", `/api/orders/${id}/receive`, body),
   ordersSummary: (date: string, statuses: string) =>
@@ -185,6 +187,7 @@ export const api = {
   announcement: (id: number) => request<AnnouncementDetail>("GET", `/api/announcements/${id}`),
   createAnnouncement: (body: unknown) => request<Announcement>("POST", "/api/announcements", body),
   readAnnouncement: (id: number) => request<{ ok: boolean }>("POST", `/api/announcements/${id}/read`),
+  updateAnnouncement: (id: number, body: unknown) => request<Announcement>("PUT", `/api/announcements/${id}`, body),
   deleteAnnouncement: (id: number) => request<{ ok: boolean }>("DELETE", `/api/announcements/${id}`),
   remindAnnouncement: (id: number) => request<{ sent: number }>("POST", `/api/announcements/${id}/remind`),
   announcementToTask: (id: number, body: unknown) => request<{ created: number }>("POST", `/api/announcements/${id}/to-task`, body),

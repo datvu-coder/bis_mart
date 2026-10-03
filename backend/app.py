@@ -5391,7 +5391,7 @@ def api_list_tasks():
     with get_db().cursor() as cur:
         cur.execute(sql, params)
         rows = cur.fetchall()
-    return jsonify({"tasks": [_task_to_api_json(r) for r in rows], "canManage": viewer["can_manage"]})
+    return jsonify({"tasks": [_task_to_api_json(r) for r in rows], "canManage": viewer["can_manage"], "isAdmin": _is_admin_user()})
 
 
 @app.post("/api/tasks")
@@ -6103,15 +6103,23 @@ def api_save_fund_report():
         cur.execute("SELECT id, status, submitted_by FROM fund_reports WHERE store_code = %s AND report_date = %s", (store, date))
         existing = cur.fetchone()
         if existing:
-            if existing["status"] == "approved":
+            is_admin = _is_admin_user()
+            if existing["status"] == "approved" and not is_admin:
                 return _bad("Report already approved", 409)
             if existing["submitted_by"] != viewer["employee_id"] and not _manages(viewer, store):
                 return _forbidden()
-            cur.execute(
-                "UPDATE fund_reports SET counts_json=%s, other_amount=%s, cash_total=%s, system_balance=%s, difference=%s, "
-                "note=%s, photo_urls=%s, status='submitted', reviewed_by=NULL, reviewed_at=NULL, review_note=NULL, "
-                "updated_at=%s WHERE id=%s",
-                (json.dumps(counts), other, total, system, diff, note, json.dumps(photos), _now_iso(), existing["id"]))
+            if existing["status"] == "approved":
+                # An admin correcting an approved report keeps it approved.
+                cur.execute(
+                    "UPDATE fund_reports SET counts_json=%s, other_amount=%s, cash_total=%s, system_balance=%s, difference=%s, "
+                    "note=%s, photo_urls=%s, updated_at=%s WHERE id=%s",
+                    (json.dumps(counts), other, total, system, diff, note, json.dumps(photos), _now_iso(), existing["id"]))
+            else:
+                cur.execute(
+                    "UPDATE fund_reports SET counts_json=%s, other_amount=%s, cash_total=%s, system_balance=%s, difference=%s, "
+                    "note=%s, photo_urls=%s, status='submitted', reviewed_by=NULL, reviewed_at=NULL, review_note=NULL, "
+                    "updated_at=%s WHERE id=%s",
+                    (json.dumps(counts), other, total, system, diff, note, json.dumps(photos), _now_iso(), existing["id"]))
             report_id = existing["id"]
         else:
             cur.execute(
@@ -6172,7 +6180,14 @@ def api_list_fund_reports():
     with get_db().cursor() as cur:
         cur.execute(sql, params + [limit])
         rows = cur.fetchall()
-    return jsonify({"reports": [_fund_report_to_json(r) for r in rows], "canManage": viewer["can_manage"]})
+    admin = _is_admin_user()
+    out = []
+    for r in rows:
+        item = _fund_report_to_json(r)
+        item["canEdit"] = _can_edit_fund_report(viewer, r, admin)
+        item["canDelete"] = _can_delete_fund_report(viewer, r)
+        out.append(item)
+    return jsonify({"reports": out, "canManage": viewer["can_manage"]})
 
 
 def _load_fund_report(report_id: int) -> dict | None:
@@ -6192,7 +6207,7 @@ def api_get_fund_report(report_id: int):
         return _forbidden()
     out = _fund_report_to_json(row)
     out["canReview"] = _manages(viewer, row["store_code"]) and row["status"] == "submitted"
-    out["canEdit"] = row["status"] != "approved" and (row["submitted_by"] == viewer["employee_id"] or _manages(viewer, row["store_code"]))
+    out["canEdit"] = _can_edit_fund_report(viewer, row)
     out["canDelete"] = _can_delete_fund_report(viewer, row)
     with get_db().cursor() as cur:
         cur.execute(
@@ -6204,6 +6219,14 @@ def api_get_fund_report(report_id: int):
                            "photoUrls": _json_list(r["photo_urls"]), "createdByName": r["by_name"] or ""}
                           for r in cur.fetchall()]
     return jsonify(out)
+
+
+def _can_edit_fund_report(viewer: dict, row: dict, admin: bool | None = None) -> bool:
+    if admin is None:
+        admin = _is_admin_user()
+    if admin:
+        return True
+    return row["status"] != "approved" and (row["submitted_by"] == viewer["employee_id"] or _manages(viewer, row["store_code"]))
 
 
 def _can_delete_fund_report(viewer: dict, row: dict) -> bool:
@@ -6308,7 +6331,8 @@ def api_list_fund_entries():
     return jsonify({"storeCode": store, "date": date, "entries": [
         {"id": r["id"], "kind": r["kind"], "amount": r["amount"], "reason": r["reason"] or "",
          "photoUrls": _json_list(r["photo_urls"]), "createdByName": r["by_name"] or "",
-         "canDelete": r["created_by"] == viewer["employee_id"] or _manages(viewer, store)} for r in rows]})
+         "canDelete": r["created_by"] == viewer["employee_id"] or _manages(viewer, store),
+         "canEdit": r["created_by"] == viewer["employee_id"] or _manages(viewer, store)} for r in rows]})
 
 
 @app.post("/api/fund/entries")
@@ -6341,6 +6365,33 @@ def api_create_fund_entry():
         new_id = cur.fetchone()["id"]
     db.commit()
     return jsonify({"id": new_id}), 201
+
+
+@app.put("/api/fund/entries/<int:entry_id>")
+@login_required
+def api_update_fund_entry(entry_id: int):
+    viewer = _task_viewer()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT store_code, created_by FROM fund_entries WHERE id = %s", (entry_id,))
+        row = cur.fetchone()
+    if not row:
+        return _bad("Entry not found", 404)
+    if row["created_by"] != viewer["employee_id"] and not _manages(viewer, row["store_code"]):
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    kind = data.get("kind")
+    amount = _to_amount(data.get("amount"))
+    reason = (data.get("reason") or "").strip()[:300]
+    if kind not in ("in", "out") or not amount or amount <= 0:
+        return _bad("Invalid fund entry")
+    if not reason:
+        return _bad("A reason is required")
+    with db.cursor() as cur:
+        cur.execute("UPDATE fund_entries SET kind=%s, amount=%s, reason=%s, photo_urls=%s WHERE id=%s",
+                    (kind, amount, reason, json.dumps(_clean_photo_list(data.get("photoUrls"))), entry_id))
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @app.delete("/api/fund/entries/<int:entry_id>")
@@ -6528,7 +6579,15 @@ def api_list_orders():
     with get_db().cursor() as cur:
         cur.execute(sql, params)
         rows = cur.fetchall()
-    return jsonify({"orders": [_order_to_json(r) for r in rows], "canManage": viewer["can_manage"]})
+    admin = _is_admin_user()
+    out = []
+    for r in rows:
+        item = _order_to_json(r)
+        mine, manages = r["created_by"] == viewer["employee_id"], _manages(viewer, r["store_code"])
+        item["canEdit"] = admin or (r["status"] == "submitted" and (mine or manages)) or (r["status"] == "approved" and manages)
+        item["canDelete"] = admin
+        out.append(item)
+    return jsonify({"orders": out, "canManage": viewer["can_manage"]})
 
 
 @app.get("/api/orders/summary")
@@ -6580,7 +6639,9 @@ def api_get_order(order_id: int):
     mine = row["created_by"] == viewer["employee_id"]
     manages = _manages(viewer, row["store_code"])
     out["canManage"] = manages
-    out["canEdit"] = (row["status"] == "submitted" and (mine or manages)) or (row["status"] == "approved" and manages)
+    admin = _is_admin_user()
+    out["canEdit"] = admin or (row["status"] == "submitted" and (mine or manages)) or (row["status"] == "approved" and manages)
+    out["canDelete"] = admin
     out["canCancel"] = row["status"] in ("submitted", "approved", "ordered") and (manages or (mine and row["status"] == "submitted"))
     out["canReceive"] = row["status"] in ("submitted", "approved", "ordered", "partial")
     return jsonify(out)
@@ -6595,7 +6656,7 @@ def api_update_order(order_id: int):
         return _bad("Order not found", 404)
     mine = row["created_by"] == viewer["employee_id"]
     manages = _manages(viewer, row["store_code"])
-    if not ((row["status"] == "submitted" and (mine or manages)) or (row["status"] == "approved" and manages)):
+    if not (_is_admin_user() or (row["status"] == "submitted" and (mine or manages)) or (row["status"] == "approved" and manages)):
         return _forbidden() if not (mine or manages) else _bad("Order can no longer be edited", 409)
     data = request.get_json(silent=True) or {}
     items = _parse_order_items(data.get("items"))
@@ -6611,6 +6672,21 @@ def api_update_order(order_id: int):
                         "VALUES (%s,%s,%s,%s,%s,%s)", (order_id, pid, name, unit, qty, note))
     db.commit()
     return jsonify(_order_to_json(_load_order(order_id), _order_items(order_id)))
+
+
+@app.delete("/api/orders/<int:order_id>")
+@login_required
+def api_delete_order(order_id: int):
+    """Admins can remove any order outright (items go with it); everyone else cancels instead."""
+    if not _is_admin_user():
+        return _forbidden()
+    if not _load_order(order_id):
+        return _bad("Order not found", 404)
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("DELETE FROM purchase_orders WHERE id = %s", (order_id,))
+    db.commit()
+    return jsonify({"ok": True})
 
 
 @app.post("/api/orders/<int:order_id>/status")
@@ -6885,6 +6961,29 @@ def api_read_announcement(ann_id: int):
                     (viewer["employee_id"], f"/board/{ann_id}"))
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.put("/api/announcements/<int:ann_id>")
+@login_required
+def api_update_announcement(ann_id: int):
+    """Edit the content of a post (audience and read receipts stay as they were)."""
+    viewer = _task_viewer()
+    row = _load_announcement(ann_id, viewer)
+    if not row:
+        return _bad("Announcement not found", 404)
+    if not (row["created_by"] == viewer["employee_id"] or (viewer["can_manage"] and _ann_visible(row, viewer))):
+        return _forbidden()
+    data = request.get_json(silent=True) or {}
+    title = (data.get("title") or "").strip()[:200]
+    if not title:
+        return _bad("Title is required")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("UPDATE announcements SET title=%s, body=%s, image_urls=%s, pinned=%s WHERE id=%s",
+                    (title, (data.get("body") or "").strip()[:5000], json.dumps(_clean_photo_list(data.get("imageUrls"))),
+                     1 if data.get("pinned") else 0, ann_id))
+    db.commit()
+    return jsonify(_ann_to_json(_load_announcement(ann_id, viewer), viewer, with_stats=True))
 
 
 @app.delete("/api/announcements/<int:ann_id>")
@@ -7223,7 +7322,7 @@ def api_export_csv(kind: str):
 def api_ops_summary():
     viewer = _task_viewer()
     today = _now_iso()[:10]
-    out: dict[str, Any] = {"canManage": viewer["can_manage"], "storeCode": viewer["store_code"]}
+    out: dict[str, Any] = {"canManage": viewer["can_manage"], "storeCode": viewer["store_code"], "isAdmin": _is_admin_user()}
     db = get_db()
     with db.cursor() as cur:
         if viewer["store_code"]:

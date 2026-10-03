@@ -139,6 +139,7 @@ export interface FundEntry {
   photoUrls: string[];
   createdByName: string;
   canDelete?: boolean;
+  canEdit?: boolean;
 }
 
 export interface FundReport {
@@ -159,6 +160,8 @@ export interface FundReport {
   reviewedAt: string | null;
   reviewNote: string;
   createdAt: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 export interface FundReportDetail extends FundReport {
@@ -218,6 +221,8 @@ export interface Order {
   updatedAt: string | null;
   approvedAt: string | null;
   orderedAt: string | null;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 export interface OrderDetail extends Order {

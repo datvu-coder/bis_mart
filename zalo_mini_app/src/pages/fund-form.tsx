@@ -41,7 +41,7 @@ export default function FundFormPage() {
       if (!alive) return;
       const rep = r.reports[0];
       setExisting(!!rep);
-      setLocked(rep?.status === "approved");
+      setLocked(!!rep && rep.canEdit === false);
       if (rep) {
         setCounts(Object.fromEntries(Object.entries(rep.counts).map(([k, v]) => [k, String(v)])));
         setOther(rep.otherAmount ? String(rep.otherAmount) : "");

@@ -40,6 +40,7 @@ function Routes() {
         <Route path="/board" element={<BoardPage />} />
         <Route path="/board/new" element={<BoardFormPage />} />
         <Route path="/board/:id" element={<BoardDetailPage />} />
+        <Route path="/board/:id/edit" element={<BoardFormPage />} />
         <Route path="/gallery" element={<GalleryPage />} />
       </AnimationRoutes>
     </ZMPRouter>

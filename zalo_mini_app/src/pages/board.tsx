@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Page } from "zmp-ui";
+import { Page, useSnackbar } from "zmp-ui";
 import { api } from "../api";
 import Icon from "../components/Icon";
+import { ConfirmSheet } from "../components/Sheet";
 import Skeleton, { EmptyState } from "../components/Skeleton";
+import SwipeRow from "../components/SwipeRow";
 import SubHero from "../components/SubHero";
-import { useDataVersion } from "../data";
+import { bumpData, useDataVersion } from "../data";
 import { Announcement } from "../types";
 import { timeAgo } from "../utils";
 
@@ -15,6 +17,19 @@ export default function BoardPage() {
   const [items, setItems] = useState<Announcement[] | null>(null);
   const [canManage, setCanManage] = useState(false);
   const [error, setError] = useState("");
+  const { openSnackbar } = useSnackbar();
+  const [del, setDel] = useState<Announcement | null>(null);
+  const remove = async () => {
+    if (!del) return;
+    try {
+      await api.deleteAnnouncement(del.id);
+      openSnackbar({ text: "Đã xoá thông báo", type: "success" });
+      bumpData();
+    } catch (e) {
+      openSnackbar({ text: e instanceof Error ? e.message : "Không xoá được", type: "error" });
+    }
+    setDel(null);
+  };
 
   const load = useCallback(async () => {
     setError("");
@@ -38,7 +53,8 @@ export default function BoardPage() {
       {items && items.length === 0 && <EmptyState icon={<Icon name="megaphone" size={34} />} title="Chưa có thông báo" hint={canManage ? "Bấm + để đăng thông báo cho cửa hàng" : "Thông báo từ quản lý sẽ hiện ở đây"} />}
       <div className="list">
         {(items || []).map((a) => (
-          <button key={a.id} className={`card ann-card ${a.isRead ? "" : "unread"}`} onClick={() => nav(`/board/${a.id}`)}>
+          <SwipeRow key={a.id} onEdit={a.canManage ? () => nav(`/board/${a.id}/edit`) : undefined} onDelete={a.canManage ? () => setDel(a) : undefined}>
+          <button className={`card ann-card ${a.isRead ? "" : "unread"}`} onClick={() => nav(`/board/${a.id}`)}>
             <div className="card-top">
               <span className="card-title">{a.pinned && <Icon name="flag" size={14} className="pin-ico" />} {a.title}</span>
               {!a.isRead && <i className="notif-dot" aria-label="Chưa đọc" />}
@@ -56,8 +72,10 @@ export default function BoardPage() {
               </div>
             )}
           </button>
+          </SwipeRow>
         ))}
       </div>
+      <ConfirmSheet open={!!del} title="Xoá thông báo?" message="Thông báo sẽ biến mất với mọi người." confirmLabel="Xoá" danger onConfirm={remove} onClose={() => setDel(null)} />
     </Page>
   );
 }
