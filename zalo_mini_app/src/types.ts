@@ -289,6 +289,7 @@ export interface MediaItem {
 
 export interface OpsSummary {
   canManage: boolean;
+  isAdmin?: boolean;
   storeCode: string;
   fund: { reportedToday: boolean; status: FundStatus | null; missingCount?: number; pendingReview?: number };
   orders: { pendingApproval: number; awaitingReceipt: number };
@@ -299,4 +300,14 @@ export interface StoreWithManagers {
   storeCode: string;
   storeName: string;
   managers: { id: number; name: string }[];
+}
+
+export interface OaStatus {
+  configured: boolean;
+  canRefresh: boolean;
+  oaId: string;
+  webhookKey: boolean;
+  tokenExpiresAt: string | null;
+  employees: { total: number; zaloLinked: number; oaMapped: number };
+  recent: { employeeId: number | null; ok: number; detail: string; at: string }[];
 }

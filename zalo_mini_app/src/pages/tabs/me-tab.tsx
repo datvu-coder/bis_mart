@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { followOA } from "zmp-sdk/apis";
 import { useSnackbar } from "zmp-ui";
 import { api } from "../../api";
 import { useAuth } from "../../auth";
@@ -7,8 +8,8 @@ import Icon from "../../components/Icon";
 import MinimizeButton from "../../components/MinimizeButton";
 import NotificationBell from "../../components/NotificationBell";
 import Sheet, { ConfirmSheet } from "../../components/Sheet";
-import { clearDataCache, clearOps } from "../../data";
-import { Task } from "../../types";
+import { clearDataCache, clearOps, useOpsSummary } from "../../data";
+import { OaStatus, Task } from "../../types";
 import { isOpen } from "../../utils";
 
 export default function MeTab({ tasks }: { tasks: Task[] }) {
@@ -21,6 +22,38 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
   const [again, setAgain] = useState("");
   const [busy, setBusy] = useState(false);
   const [pwError, setPwError] = useState("");
+  const ops = useOpsSummary();
+  const [oaId, setOaId] = useState("");
+  const [oaStatus, setOaStatus] = useState<OaStatus | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState("");
+
+  useEffect(() => { api.oaInfo().then((r) => setOaId(r.oaId)).catch(() => {}); }, []);
+  useEffect(() => { if (ops?.isAdmin) api.oaStatus().then(setOaStatus).catch(() => {}); }, [ops?.isAdmin]);
+
+  const follow = async () => {
+    try {
+      await followOA({ id: oaId });
+      openSnackbar({ text: "Đã theo dõi OA. Bạn sẽ nhận thông báo quan trọng trên Zalo.", type: "success" });
+      if (ops?.isAdmin) setTimeout(() => api.oaStatus().then(setOaStatus).catch(() => {}), 2500);
+    } catch (e) {
+      const code = (e as { code?: number })?.code;
+      openSnackbar({ text: code === -201 ? "Bạn đã từ chối theo dõi OA" : "Không mở được trang theo dõi OA (chỉ chạy trong Zalo)", type: "error" });
+    }
+  };
+  const sendTest = async () => {
+    setTesting(true);
+    setTestResult("");
+    try {
+      const r = await api.oaTest();
+      setTestResult(r.ok ? `Đã gửi tin thử (qua ${r.target === "oa" ? "ID của OA" : "ID Mini App"}). Kiểm tra Zalo trên điện thoại.` : `Zalo từ chối: ${r.detail}`);
+    } catch (e) {
+      setTestResult(e instanceof Error ? e.message : "Không gửi được");
+    } finally {
+      setTesting(false);
+      api.oaStatus().then(setOaStatus).catch(() => {});
+    }
+  };
 
   const stats = useMemo(() => {
     const mine = tasks.filter((t) => user && String(t.assigneeId) === user.id);
@@ -73,6 +106,30 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
           <div><Icon name="pin" size={18} /><dt>Nơi làm việc</dt><dd>{user?.workLocation || "-"}</dd></div>
         </dl>
       </div>
+
+      {oaId && (
+        <div className="panel">
+          <div className="panel-head"><h3>Thông báo trên điện thoại</h3></div>
+          <p className="hint nopad">Theo dõi trang Zalo OA của Bi'S MART để nhận việc mới và cảnh báo quan trọng ngay trên màn hình điện thoại.</p>
+          <button className="btn primary wide" onClick={follow}><Icon name="bell" size={18} /> Theo dõi OA</button>
+        </div>
+      )}
+
+      {ops?.isAdmin && oaStatus && (
+        <div className="panel">
+          <div className="panel-head"><h3>Thông báo đẩy (quản trị)</h3><span className={`tag-soft ${oaStatus.configured ? "ok" : "bad"}`}>{oaStatus.configured ? "Đã cấu hình" : "Chưa cấu hình"}</span></div>
+          <div className="kv-list">
+            <div><span>Tự gia hạn mã OA</span><b>{oaStatus.canRefresh ? "Có" : "Chưa"}</b></div>
+            <div><span>Nhân viên đã liên kết Zalo</span><b>{oaStatus.employees.zaloLinked}/{oaStatus.employees.total}</b></div>
+            <div><span>Đã nối với OA (nhận được tin)</span><b>{oaStatus.employees.oaMapped}</b></div>
+          </div>
+          <button className="btn wide soft" disabled={testing || !oaStatus.configured} onClick={sendTest}>{testing ? "Đang gửi..." : "Gửi tin thử cho tôi"}</button>
+          {testResult && <div className="hint">{testResult}</div>}
+          {oaStatus.recent.length > 0 && (
+            <div className="hint log">{oaStatus.recent.slice(0, 3).map((r, i) => <div key={i}>{r.ok === 1 ? "✓" : r.ok === 2 ? "•" : "✗"} {r.detail.slice(0, 90)}</div>)}</div>
+          )}
+        </div>
+      )}
 
       <div className="panel menu-panel">
         <button className="menu-row" onClick={() => setPwOpen(true)}><Icon name="edit" size={20} /> Đổi mật khẩu <Icon name="chevron" size={16} className="chev" /></button>

@@ -1278,6 +1278,24 @@ CREATE INDEX IF NOT EXISTS idx_report_returns_report ON report_returns(report_id
 -- Zalo Mini App: link an employee to their Zalo account (one-tap login)
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS zalo_id TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_zalo_id ON employees(zalo_id) WHERE zalo_id IS NOT NULL;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS zalo_oa_id TEXT;  -- the employee's id as seen by the Official Account (needed to message them)
+
+-- Zalo OA tokens rotate (the refresh token changes on every refresh), so the live pair lives here, seeded from env.
+CREATE TABLE IF NOT EXISTS zalo_oa_tokens (
+    id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+    access_token TEXT,
+    refresh_token TEXT,
+    expires_at TEXT,
+    updated_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS zalo_oa_push_log (
+    id SERIAL PRIMARY KEY,
+    employee_id INTEGER,
+    ok INTEGER NOT NULL DEFAULT 0,
+    detail TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 
 -- Task assignment & store work tracking
 CREATE TABLE IF NOT EXISTS tasks (

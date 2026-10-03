@@ -14,7 +14,9 @@ import os
 import re
 import shutil
 import urllib.error
+import urllib.parse
 import urllib.request
+import time
 import uuid
 import xml.etree.ElementTree as ET
 from xml.sax.saxutils import escape as _xml_escape
@@ -5019,31 +5021,126 @@ def _verify_zalo_access_token(access_token: str) -> dict | None:
     return body
 
 
+ZALO_OA_ID = os.getenv("ZALO_OA_ID", "")
+ZALO_OA_APP_ID = os.getenv("ZALO_OA_APP_ID", "")
+ZALO_OA_SECRET_KEY = os.getenv("ZALO_OA_SECRET_KEY", "")
+ZALO_OA_REFRESH_TOKEN = os.getenv("ZALO_OA_REFRESH_TOKEN", "")
+ZALO_OA_WEBHOOK_KEY = os.getenv("ZALO_OA_WEBHOOK_KEY", "")
+ZALO_OA_TOKEN_URL = "https://oauth.zaloapp.com/v4/oa/access_token"
+# Event-driven kinds worth a phone push. Reminders ('overdue', 'due_soon') are only generated while the app is
+# open, so pushing those would be pointless.
+OA_PUSH_KINDS = {"assigned", "fund_diff"}
+
+
+_OA_REFRESH_FAILED_AT = [0.0]
+
+
+def _oa_load_tokens() -> dict:
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT access_token, refresh_token, expires_at FROM zalo_oa_tokens WHERE id = 1")
+        row = cur.fetchone()
+    if row:
+        return dict(row)
+    seed = {"access_token": ZALO_OA_ACCESS_TOKEN or None, "refresh_token": ZALO_OA_REFRESH_TOKEN or None, "expires_at": None}
+    if seed["access_token"] or seed["refresh_token"]:
+        with db.cursor() as cur:
+            cur.execute("INSERT INTO zalo_oa_tokens (id, access_token, refresh_token, expires_at, updated_at) "
+                        "VALUES (1,%s,%s,NULL,%s) ON CONFLICT (id) DO NOTHING", (seed["access_token"], seed["refresh_token"], _now_iso()))
+        db.commit()
+    return seed
+
+
+def _oa_refresh(tokens: dict) -> dict | None:
+    """Exchange the refresh token for a new pair (the refresh token rotates, so both are stored)."""
+    if not (ZALO_OA_APP_ID and ZALO_OA_SECRET_KEY and tokens.get("refresh_token")):
+        return None
+    body = urllib.parse.urlencode({"app_id": ZALO_OA_APP_ID, "grant_type": "refresh_token",
+                                   "refresh_token": tokens["refresh_token"]}).encode()
+    req = urllib.request.Request(ZALO_OA_TOKEN_URL, data=body, headers={
+        "secret_key": ZALO_OA_SECRET_KEY, "Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return None
+    if not isinstance(data, dict) or not data.get("access_token"):
+        return None
+    try:
+        ttl = int(data.get("expires_in") or 90000)
+    except (TypeError, ValueError):
+        ttl = 90000
+    new = {"access_token": data["access_token"], "refresh_token": data.get("refresh_token") or tokens["refresh_token"],
+           "expires_at": (datetime.now(tz=VN_TZ) + timedelta(seconds=ttl)).strftime("%Y-%m-%dT%H:%M:%S")}
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO zalo_oa_tokens (id, access_token, refresh_token, expires_at, updated_at) VALUES (1,%s,%s,%s,%s) "
+                    "ON CONFLICT (id) DO UPDATE SET access_token=EXCLUDED.access_token, refresh_token=EXCLUDED.refresh_token, "
+                    "expires_at=EXCLUDED.expires_at, updated_at=EXCLUDED.updated_at",
+                    (new["access_token"], new["refresh_token"], new["expires_at"], _now_iso()))
+    db.commit()
+    return new
+
+
+def _oa_access_token(force_refresh: bool = False) -> str:
+    """A usable OA access token, refreshed when it is close to expiry. Empty string when OA is not configured."""
+    tokens = _oa_load_tokens()
+    soon = (datetime.now(tz=VN_TZ) + timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M:%S")
+    # An unknown expiry (token seeded from env) counts as stale so the real lifetime gets recorded.
+    stale = force_refresh or not tokens.get("access_token") or not tokens.get("expires_at") or tokens["expires_at"] <= soon
+    if stale and time.time() - _OA_REFRESH_FAILED_AT[0] > 300:
+        fresh = _oa_refresh(tokens)
+        if fresh:
+            return fresh["access_token"]
+        _OA_REFRESH_FAILED_AT[0] = time.time()  # back off for 5 minutes instead of retrying on every notification
+    return tokens.get("access_token") or ""
+
+
+def _oa_send_text(zalo_user_id: str, text: str) -> tuple[bool, str]:
+    """POST one OA consultation message. Returns (ok, raw detail) so callers can log or show the Zalo answer."""
+    token = _oa_access_token()
+    if not token:
+        return False, "OA not configured"
+    payload = json.dumps({"recipient": {"user_id": zalo_user_id}, "message": {"text": text[:1900]}}).encode("utf-8")
+    req = urllib.request.Request(ZALO_OA_SEND_URL, data=payload,
+                                 headers={"Content-Type": "application/json", "access_token": token})
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
+    try:
+        err = json.loads(raw).get("error", 0)
+    except ValueError:
+        err = -1
+    return err == 0, raw[:500]
+
+
 def _notify_zalo(employee_id: int | None, text: str) -> None:
-    """Best-effort OA push to an employee's linked Zalo account. Never raises:
-    a notification failure must not fail the task write that triggered it."""
-    if not employee_id or not ZALO_OA_ACCESS_TOKEN:
+    """Best-effort OA push to an employee's phone. Never raises: a notification failure must not fail the
+    write that triggered it. Uses the OA-scoped id when known, else the Mini App id."""
+    if not employee_id or not (ZALO_OA_ACCESS_TOKEN or ZALO_OA_REFRESH_TOKEN or ZALO_OA_APP_ID):
         return
     try:
         db = get_db()
         with db.cursor() as cur:
-            cur.execute("SELECT zalo_id FROM employees WHERE id = %s", (employee_id,))
+            cur.execute("SELECT zalo_id, zalo_oa_id FROM employees WHERE id = %s", (employee_id,))
             row = cur.fetchone() or {}
-        zalo_id = row.get("zalo_id")
-        if not zalo_id:
+        target = row.get("zalo_oa_id") or row.get("zalo_id")
+        if not target:
             return
-        payload = json.dumps({
-            "recipient": {"user_id": zalo_id},
-            "message": {"text": text[:1900]},
-        }).encode("utf-8")
-        req = urllib.request.Request(
-            ZALO_OA_SEND_URL,
-            data=payload,
-            headers={"Content-Type": "application/json", "access_token": ZALO_OA_ACCESS_TOKEN},
-        )
-        urllib.request.urlopen(req, timeout=8).read()
+        ok, detail = _oa_send_text(str(target), text)
+        with db.cursor() as cur:
+            cur.execute("INSERT INTO zalo_oa_push_log (employee_id, ok, detail, created_at) VALUES (%s,%s,%s,%s)",
+                        (employee_id, 1 if ok else 0, detail[:500], _now_iso()))
+        db.commit()
     except Exception:
-        pass
+        try:
+            get_db().rollback()
+        except Exception:
+            pass
 
 
 def _fmt_due(iso: str | None) -> str:
@@ -5074,7 +5171,7 @@ def _notify(employee_id: int | None, kind: str, title: str, body: str = "", task
     except Exception:
         db.rollback()
         return
-    if inserted and push:
+    if inserted and push and kind in OA_PUSH_KINDS:
         _notify_zalo(employee_id, f"{title}\n{body}".strip())
 
 
@@ -5204,6 +5301,87 @@ def api_zalo_link():
         cur.execute("UPDATE employees SET zalo_id = %s WHERE id = %s", (str(zalo["id"]), employee_id))
     db.commit()
     return jsonify({"ok": True})
+
+
+@app.get("/api/zalo/oa-info")
+@login_required
+def api_zalo_oa_info():
+    """What the Mini App needs to offer 'follow our OA' (no secrets)."""
+    return jsonify({"oaId": ZALO_OA_ID})
+
+
+@app.post("/api/zalo/oa-webhook")
+def api_zalo_oa_webhook():
+    """Receives OA events. A follow/message event carries the user's OA-side id next to the Mini App id, which is
+    how an employee is tied to the id the OA can message. Protected by a secret in the URL (?k=...)."""
+    import hmac
+    if not ZALO_OA_WEBHOOK_KEY:
+        return jsonify({"error": "Webhook not configured"}), 503
+    if not hmac.compare_digest(request.args.get("k", ""), ZALO_OA_WEBHOOK_KEY):
+        return jsonify({"error": "Forbidden"}), 403
+    data = request.get_json(silent=True) or {}
+    db = get_db()
+    follower = data.get("follower") or {}
+    sender = data.get("sender") or {}
+    oa_user = str(follower.get("id") or sender.get("id") or data.get("user_id") or "")
+    app_user = str(data.get("user_id_by_app") or follower.get("user_id_by_app") or sender.get("user_id_by_app") or "")
+    mapped = 0
+    if oa_user and app_user:
+        with db.cursor() as cur:
+            cur.execute("UPDATE employees SET zalo_oa_id = %s WHERE zalo_id = %s AND COALESCE(zalo_oa_id,'') <> %s",
+                        (oa_user, app_user, oa_user))
+            mapped = cur.rowcount
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO zalo_oa_push_log (employee_id, ok, detail, created_at) VALUES (NULL, 2, %s, %s)",
+                    (("webhook " + json.dumps(data, ensure_ascii=False))[:500], _now_iso()))
+    db.commit()
+    return jsonify({"ok": True, "mapped": mapped})
+
+
+@app.get("/api/zalo/oa-status")
+@login_required
+def api_zalo_oa_status():
+    if not _is_admin_user():
+        return _forbidden()
+    tokens = _oa_load_tokens()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FILTER (WHERE zalo_id IS NOT NULL) AS linked, "
+                    "COUNT(*) FILTER (WHERE zalo_oa_id IS NOT NULL) AS oa_mapped, COUNT(*) AS total "
+                    "FROM employees WHERE is_active = 1")
+        counts = cur.fetchone()
+        cur.execute("SELECT employee_id, ok, detail, created_at FROM zalo_oa_push_log ORDER BY id DESC LIMIT 5")
+        log = cur.fetchall()
+    return jsonify({
+        "configured": bool(tokens.get("access_token") or tokens.get("refresh_token")),
+        "canRefresh": bool(ZALO_OA_APP_ID and ZALO_OA_SECRET_KEY and tokens.get("refresh_token")),
+        "oaId": ZALO_OA_ID, "webhookKey": bool(ZALO_OA_WEBHOOK_KEY),
+        "tokenExpiresAt": tokens.get("expires_at"),
+        "employees": {"total": counts["total"], "zaloLinked": counts["linked"], "oaMapped": counts["oa_mapped"]},
+        "recent": [{"employeeId": r["employee_id"], "ok": r["ok"], "detail": r["detail"], "at": r["created_at"]} for r in log],
+    })
+
+
+@app.post("/api/zalo/oa-test")
+@login_required
+def api_zalo_oa_test():
+    """Admin: send a test message to the caller's own Zalo and show Zalo's raw answer."""
+    if not _is_admin_user():
+        return _forbidden()
+    employee_id = (g.current_user or {}).get("employee_id")
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT zalo_id, zalo_oa_id FROM employees WHERE id = %s", (employee_id,))
+        row = cur.fetchone() or {}
+    target = row.get("zalo_oa_id") or row.get("zalo_id")
+    if not target:
+        return jsonify({"ok": False, "detail": "Tài khoản này chưa liên kết Zalo", "target": None}), 400
+    ok, detail = _oa_send_text(str(target), "Tin thử từ Bi'S MART Công việc. Nếu bạn thấy tin này trên điện thoại thì thông báo đẩy đã hoạt động.")
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO zalo_oa_push_log (employee_id, ok, detail, created_at) VALUES (%s,%s,%s,%s)",
+                    (employee_id, 1 if ok else 0, ("test " + detail)[:500], _now_iso()))
+    db.commit()
+    return jsonify({"ok": ok, "detail": detail, "target": "oa" if row.get("zalo_oa_id") else "mini-app"})
 
 
 @app.post("/api/auth/zalo-login")

@@ -29,6 +29,7 @@ on:
           - deploy_backend
           - set_admin
           - remove_stopped_coolify_proxy
+          - set_oa_env
 
 jobs:
   ops:
@@ -153,6 +154,46 @@ jobs:
           ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=accept-new root@146.196.64.92 \
             'docker exec -i bismart-postgres psql -U bismart -d bismart' < /tmp/set_admin.sql
           rm -f /tmp/set_admin.sql
+
+      - name: Set Zalo OA settings (from repo secrets) and restart backend
+        if: ${{ github.event.inputs.action == 'set_oa_env' }}
+        env:
+          ZALO_OA_ID: ${{ secrets.ZALO_OA_ID }}
+          ZALO_OA_APP_ID: ${{ secrets.ZALO_OA_APP_ID }}
+          ZALO_OA_SECRET_KEY: ${{ secrets.ZALO_OA_SECRET_KEY }}
+          ZALO_OA_REFRESH_TOKEN: ${{ secrets.ZALO_OA_REFRESH_TOKEN }}
+          ZALO_OA_ACCESS_TOKEN: ${{ secrets.ZALO_OA_ACCESS_TOKEN }}
+          ZALO_OA_WEBHOOK_KEY: ${{ secrets.ZALO_OA_WEBHOOK_KEY }}
+        run: |
+          missing=""
+          for v in ZALO_OA_ID ZALO_OA_APP_ID ZALO_OA_SECRET_KEY ZALO_OA_REFRESH_TOKEN ZALO_OA_WEBHOOK_KEY; do
+            [ -z "${!v}" ] && missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Thieu secret:$missing" >&2
+            exit 1
+          fi
+          # The values travel over SSH stdin (never on a command line) and replace any earlier ZALO_OA_* lines in the VPS .env.
+          {
+            for v in ZALO_OA_ID ZALO_OA_APP_ID ZALO_OA_SECRET_KEY ZALO_OA_REFRESH_TOKEN ZALO_OA_ACCESS_TOKEN ZALO_OA_WEBHOOK_KEY; do
+              [ -n "${!v}" ] && printf '%s=%s\n' "$v" "${!v}"
+            done
+          } | ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=accept-new root@146.196.64.92 '
+            set -e
+            cd /opt/apps/bismart
+            cp .env .env.bak
+            grep -v "^ZALO_OA_" .env > .env.new || true
+            cat >> .env.new
+            mv .env.new .env
+            chmod 600 .env
+            docker compose up -d --force-recreate
+            sleep 5
+            docker inspect bis_mart_backend --format "health={{.State.Health.Status}}" || true
+            echo "ZALO_OA_* keys now in .env:"; grep -o "^ZALO_OA_[A-Z_]*" .env
+          '
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "https://api.bismart.id.vn/healthz")
+          echo "healthz -> $code"
+          [ "$code" = "200" ]
 
       - name: Clean up SSH key
         if: always()
