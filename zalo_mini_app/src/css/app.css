@@ -600,3 +600,5 @@ input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-
 .care-row .bar i { display: block; height: 100%; background: var(--primary); transition: width 0.4s; }
 .care-audience { margin-top: 12px; }
 .panel > h3 + .chip-row.nomargin { margin-top: 10px; }
+
+.kv-list b.mono { font-family: ui-monospace, Menlo, monospace; font-size: 12px; word-break: break-all; text-align: right; }

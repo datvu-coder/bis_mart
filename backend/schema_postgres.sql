@@ -1484,3 +1484,5 @@ CREATE TABLE IF NOT EXISTS oa_seen_users (
     last_interaction TEXT,
     followed INTEGER NOT NULL DEFAULT 1
 );
+
+ALTER TABLE oa_seen_users ADD COLUMN IF NOT EXISTS app_user TEXT;
