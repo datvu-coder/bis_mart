@@ -155,6 +155,24 @@ export default function OverviewTab({ active }: { active: boolean }) {
             </section>
           )}
 
+          {team && (data.byDoer || []).length > 0 && (
+            <section className="panel">
+              <div className="panel-head"><h3>Nhân viên thực hiện</h3><span className="count">Số việc tham gia</span></div>
+              <div className="people-rank">
+                {data.byDoer.slice(0, 8).map((p) => (
+                  <div key={p.id} className="rank-row">
+                    <Avatar name={p.name} size={32} />
+                    <div className="rank-main">
+                      <div className="rate-head"><span className="rate-label">{p.name}</span><b>{p.done} việc</b></div>
+                      <div className="rate-track" aria-hidden><span style={{ width: `${Math.round((p.done / data.byDoer[0].done) * 100)}%` }} /></div>
+                      <div className="rate-sub">{p.storeCode}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {team && peopleRows.length > 0 && (
             <section className="panel">
               <div className="panel-head"><h3>Nhân viên</h3><span className="count">Top {peopleRows.length}</span></div>

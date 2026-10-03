@@ -529,3 +529,10 @@ input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-
 .otl li.skipped .otl-body b { text-decoration: line-through; }
 .hint.total { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
 @media (prefers-reduced-motion: reduce) { .otl .pulse { animation: none; } }
+
+/* ---------- Assign by store / doers ---------- */
+.mode-seg { margin: 14px 14px 0; }
+.mode-seg button { font-size: 13.5px; }
+.person:disabled { opacity: 0.55; }
+.field.doers { margin-top: 14px; }
+.info dd.wrap { display: block; line-height: 1.4; }

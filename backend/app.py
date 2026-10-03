@@ -5267,6 +5267,7 @@ def _task_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
         # A code that matches no store (stale/mistyped employee data) is shown as unassigned.
         "storeCode": (row.get("store_code") or "") if row.get("store_name") else "",
         "storeName": row.get("store_name") or "",
+        "doerIds": [int(x) for x in _json_list(row.get("doer_ids")) if str(x).isdigit()],
         "assigneeId": row.get("assignee_id"),
         "assigneeName": row.get("assignee_name") or "",
         "assignedById": row.get("assigned_by"),
@@ -5509,7 +5510,12 @@ def _compute_task_analytics(rows: list[dict], days: int, now_iso: str, today: st
 
     by_store: dict[str, dict] = {}
     by_person: dict[int, dict] = {}
+    by_doer: dict[int, int] = {}
     for r in cohort:
+        if r["status"] == "done":
+            for d in _json_list(r.get("doer_ids")):
+                if str(d).isdigit():
+                    by_doer[int(d)] = by_doer.get(int(d), 0) + 1
         sc = (r.get("store_code") or "").upper()
         by_store.setdefault(sc, {"name": r.get("store_name") or "", "items": []})["items"].append(r)
         if r.get("assignee_id"):
@@ -5539,7 +5545,83 @@ def _compute_task_analytics(rows: list[dict], days: int, now_iso: str, today: st
             key=lambda x: (-x["total"], x["name"]),
         )[:30],
         "daily": [{"date": d, "created": created_by_day.get(d, 0), "done": done_by_day.get(d, 0)} for d in day_list],
+        "byDoer": [{"id": k, "done": v} for k, v in sorted(by_doer.items(), key=lambda kv: -kv[1])[:30]],
     }
+
+
+def _employee_names(ids: list[int]) -> list[dict]:
+    if not ids:
+        return []
+    with get_db().cursor() as cur:
+        cur.execute("SELECT id, full_name FROM employees WHERE id = ANY(%s)", (ids,))
+        found = {r["id"]: r["full_name"] for r in cur.fetchall()}
+    return [{"id": i, "name": found[i]} for i in ids if i in found]
+
+
+def _valid_doer_ids(raw: Any, store_code: str | None) -> list[int] | None:
+    """Employee ids of active staff in the task's store, or None when the input is not acceptable."""
+    if raw in (None, ""):
+        return []
+    if not isinstance(raw, list) or len(raw) > 30:
+        return None
+    try:
+        ids = sorted({int(x) for x in raw})
+    except (TypeError, ValueError):
+        return None
+    if not ids:
+        return []
+    with get_db().cursor() as cur:
+        cur.execute("SELECT id FROM employees WHERE id = ANY(%s) AND is_active = 1 AND UPPER(COALESCE(store_code,'')) = %s",
+                    (ids, (store_code or "").upper()))
+        ok = {r["id"] for r in cur.fetchall()}
+    return ids if set(ids) <= ok else None
+
+
+@app.get("/api/tasks/stores")
+@login_required
+def api_task_stores():
+    """Stores in the caller's scope with their store managers (store_role SM), for 'assign by store'."""
+    viewer = _task_viewer()
+    if not viewer["can_manage"]:
+        return _forbidden()
+    sql = ("SELECT s.store_code, s.name, e.id AS emp_id, e.full_name FROM stores s "
+           "LEFT JOIN store_managers sm ON sm.store_id = s.id AND UPPER(sm.store_role) = 'SM' "
+           "LEFT JOIN employees e ON e.id = sm.employee_id AND e.is_active = 1 "
+           "WHERE NOT (COALESCE(s.status,'') ILIKE '%%đóng%%' OR COALESCE(s.status,'') ILIKE '%%ngừng%%') ")
+    params: list[Any] = []
+    if viewer["scope"] is not None:
+        sql += "AND UPPER(s.store_code) = ANY(%s) "
+        params.append(list(viewer["scope"]) or [""])
+    sql += "ORDER BY s.name, e.full_name"
+    stores: dict[str, dict] = {}
+    with get_db().cursor() as cur:
+        cur.execute(sql, params)
+        for r in cur.fetchall():
+            st = stores.setdefault(r["store_code"], {"storeCode": r["store_code"], "storeName": r["name"], "managers": []})
+            if r["emp_id"]:
+                st["managers"].append({"id": r["emp_id"], "name": r["full_name"]})
+    return jsonify({"stores": list(stores.values())})
+
+
+@app.get("/api/tasks/<int:task_id>/staff")
+@login_required
+def api_task_staff(task_id: int):
+    """Staff of the task's store, so the person reporting the result can tick who carried it out."""
+    viewer = _task_viewer()
+    task = _fetch_task(task_id)
+    if not task:
+        return jsonify({"error": "Task not found"}), 404
+    if not _can_view_task(task, viewer):
+        return _forbidden()
+    store = (task.get("store_code") or "").upper()
+    if not store:
+        return jsonify({"employees": []})
+    with get_db().cursor() as cur:
+        cur.execute("SELECT id, full_name, employee_code, position FROM employees WHERE is_active = 1 "
+                    "AND UPPER(COALESCE(store_code,'')) = %s ORDER BY full_name", (store,))
+        rows = cur.fetchall()
+    return jsonify({"employees": [{"id": r["id"], "fullName": r["full_name"], "employeeCode": r["employee_code"],
+                                   "position": r["position"] or ""} for r in rows]})
 
 
 @app.get("/api/tasks/analytics")
@@ -5571,7 +5653,7 @@ def api_tasks_analytics():
 
     select = (
         "SELECT t.id, t.store_code, s.name AS store_name, t.assignee_id, a.full_name AS assignee_name, "
-        "t.status, t.due_at, t.completed_at, t.created_at FROM tasks t "
+        "t.status, t.due_at, t.completed_at, t.created_at, t.doer_ids FROM tasks t "
         "LEFT JOIN employees a ON a.id = t.assignee_id "
         "LEFT JOIN stores s ON UPPER(s.store_code) = UPPER(t.store_code) WHERE "
     )
@@ -5590,6 +5672,12 @@ def api_tasks_analytics():
     rows = [r for r in all_rows if not store or (r.get("store_code") or "").upper() == store]
 
     out = _compute_task_analytics(rows, days, _now_iso(), _now_iso()[:10])
+    if out["byDoer"]:
+        with db.cursor() as cur:
+            cur.execute("SELECT id, full_name, store_code FROM employees WHERE id = ANY(%s)", ([d["id"] for d in out["byDoer"]],))
+            info = {r["id"]: r for r in cur.fetchall()}
+        out["byDoer"] = [{"id": d["id"], "name": info[d["id"]]["full_name"], "storeCode": (info[d["id"]].get("store_code") or ""),
+                          "done": d["done"]} for d in out["byDoer"] if d["id"] in info]
     out["scope"] = "team" if viewer["can_manage"] else "mine"
     out["storeCode"] = store
     out["stores"] = [{"storeCode": k, "storeName": v} for k, v in sorted(stores.items())]
@@ -5668,6 +5756,7 @@ def api_get_task(task_id: int):
         comments = cur.fetchall()
     out = _task_to_api_json(task)
     out["canManage"] = _can_manage_task(task, viewer)
+    out["doers"] = _employee_names(out["doerIds"])
     out["comments"] = [
         {"id": c["id"], "body": c["body"], "createdAt": c["created_at"],
          "authorId": c["author_id"], "authorName": c.get("full_name") or ""} for c in comments
@@ -5733,16 +5822,22 @@ def api_set_task_status(task_id: int):
     if status == "done" and task.get("require_photo") and not photos:
         return jsonify({"error": "Photo proof is required to complete this task"}), 400
 
+    doer_ids = _json_list(task.get("doer_ids"))
+    if "doerIds" in data:
+        doer_ids = _valid_doer_ids(data.get("doerIds"), task.get("store_code"))
+        if doer_ids is None:
+            return jsonify({"error": "Invalid doers"}), 400
+
     done_now = status == "done" and task["status"] != "done"
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
-            "UPDATE tasks SET status=%s, photo_urls=%s, completion_note=%s, completed_at=%s, updated_at=%s "
-            "WHERE id=%s",
+            "UPDATE tasks SET status=%s, photo_urls=%s, completion_note=%s, completed_at=%s, updated_at=%s, "
+            "doer_ids=%s WHERE id=%s",
             (
                 status, json.dumps(photos),
                 (data.get("note") if "note" in data else task.get("completion_note")),
-                _now_iso() if status == "done" else None, _now_iso(), task_id,
+                _now_iso() if status == "done" else None, _now_iso(), json.dumps(doer_ids), task_id,
             ),
         )
     db.commit()

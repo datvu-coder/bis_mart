@@ -16,6 +16,7 @@ export interface Task {
   description: string;
   storeCode: string;
   storeName: string;
+  doerIds: number[];
   assigneeId: number | null;
   assigneeName: string;
   assignedById: number | null;
@@ -43,6 +44,7 @@ export interface TaskComment {
 
 export interface TaskDetail extends Task {
   canManage: boolean;
+  doers: { id: number; name: string }[];
   comments: TaskComment[];
 }
 
@@ -104,6 +106,7 @@ export interface Analytics {
   byStore: (Tally & { storeCode: string; storeName: string })[];
   byAssignee: (Tally & { id: number; name: string; storeCode: string })[];
   daily: { date: string; created: number; done: number }[];
+  byDoer: { id: number; name: string; storeCode: string; done: number }[];
 }
 
 export type NotificationKind =
@@ -284,4 +287,10 @@ export interface OpsSummary {
   fund: { reportedToday: boolean; status: FundStatus | null; missingCount?: number; pendingReview?: number };
   orders: { pendingApproval: number; awaitingReceipt: number };
   board: { unread: number };
+}
+
+export interface StoreWithManagers {
+  storeCode: string;
+  storeName: string;
+  managers: { id: number; name: string }[];
 }
