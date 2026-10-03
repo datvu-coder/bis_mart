@@ -135,36 +135,72 @@ class _FloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A faint top-lit gradient instead of a flat fill — the single biggest
+    // thing that reads as "cheap" on a dark bar is no tonal variation at
+    // all, so the top edge catches a hint of light like a lacquered surface.
+    final topTone = Color.lerp(AppColors.textDark, AppColors.white, 0.1)!;
+    const radius = 33.0;
     return Container(
-      height: 68,
+      height: 66,
       decoration: BoxDecoration(
-        color: AppColors.textDark,
-        borderRadius: BorderRadius.circular(34),
-        border: Border.all(color: AppColors.white.withValues(alpha: 0.06)),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [topTone, AppColors.textDark],
+        ),
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: AppColors.white.withValues(alpha: 0.08)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.22),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
+            color: Colors.black.withValues(alpha: 0.26),
+            blurRadius: 30,
+            offset: const Offset(0, 14),
           ),
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.14),
-            blurRadius: 20,
-            offset: const Offset(0, 6),
+            color: AppColors.primary.withValues(alpha: 0.16),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          for (var i = 0; i < items.length; i++)
-            Expanded(
-              child: _FloatingNavItem(
-                item: items[i],
-                isSelected: i == selectedIndex,
-                onTap: () => onTap(i),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: Stack(
+          children: [
+            // Thin horizontal glint along the top edge — the detail that
+            // turns a flat dark pill into something that reads as lacquer
+            // or brushed metal instead of just "dark gray bar".
+            Positioned(
+              top: 0,
+              left: 28,
+              right: 28,
+              child: Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      AppColors.white.withValues(alpha: 0.22),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
               ),
             ),
-        ],
+            Row(
+              children: [
+                for (var i = 0; i < items.length; i++)
+                  Expanded(
+                    child: _FloatingNavItem(
+                      item: items[i],
+                      isSelected: i == selectedIndex,
+                      onTap: () => onTap(i),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -193,14 +229,14 @@ class _FloatingNavItem extends StatelessWidget {
         child: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            // Selected tab gets a gradient medallion with its own soft glow
-            // behind its icon — a richer "you are here" cue than a flat
-            // colour fill on a white bar.
+            // Selected tab gets a gradient medallion — a thin light ring
+            // plus a tight glow and a softer, wider halo behind it — a
+            // richer "you are here" cue than a flat colour fill.
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
-              width: 44,
-              height: 44,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: isSelected
@@ -210,12 +246,23 @@ class _FloatingNavItem extends StatelessWidget {
                         colors: [AppColors.primary, AppColors.primaryDark],
                       )
                     : null,
+                border: isSelected
+                    ? Border.all(
+                        color: AppColors.white.withValues(alpha: 0.22),
+                        width: 1.2,
+                      )
+                    : null,
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.5),
-                          blurRadius: 18,
-                          offset: const Offset(0, 5),
+                          color: AppColors.primary.withValues(alpha: 0.55),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.28),
+                          blurRadius: 30,
+                          spreadRadius: 2,
                         ),
                       ]
                     : null,
@@ -224,10 +271,10 @@ class _FloatingNavItem extends StatelessWidget {
                 // Always the bold/filled glyph — inactive tabs differ only
                 // by color, not by a thinner outline icon.
                 item.selectedIcon,
-                size: 23,
+                size: isSelected ? 24 : 22,
                 color: isSelected
                     ? AppColors.white
-                    : AppColors.white.withValues(alpha: 0.4),
+                    : AppColors.white.withValues(alpha: 0.45),
                 semanticLabel: item.label,
               ),
             ),
