@@ -5524,6 +5524,16 @@ def _oa_follower_ids(period: str, limit: int = OA_CARE_MAX_RECIPIENTS) -> tuple[
     return ids[:limit], total, ""
 
 
+def _care_list_error(raw: str) -> str:
+    """Readable one-liner for a failed follower lookup, including Zalo's own code and message."""
+    try:
+        obj = json.loads(raw)
+        why = f"Zalo báo lỗi {obj.get('error')}: {obj.get('message', '')}"
+    except ValueError:
+        why = raw[:160]
+    return f"Không lấy được danh sách người quan tâm từ Zalo ({why})"
+
+
 def _oa_send_care(uid: str, text: str, image_url: str = "") -> tuple[bool, str]:
     """Text first, then the picture. The message counts as delivered when the text went through."""
     ok, detail = _oa_send_text(uid, text)
@@ -5600,7 +5610,7 @@ def api_oa_care_audience():
         return jsonify({"error": "Invalid period"}), 400
     ids, total, err = _oa_follower_ids(period)
     if err and not ids:
-        return jsonify({"error": "Không lấy được danh sách người quan tâm từ Zalo", "detail": err}), 502
+        return jsonify({"error": _care_list_error(err), "detail": err}), 502
     return jsonify({"period": period, "count": len(ids), "total": total if total is not None else len(ids),
                     "capped": len(ids) >= OA_CARE_MAX_RECIPIENTS})
 
@@ -5658,7 +5668,7 @@ def api_oa_care_send():
         sent_today = cur.fetchone()["n"]
     ids, _total, err = _oa_follower_ids(period)
     if err and not ids:
-        return jsonify({"error": "Không lấy được danh sách người quan tâm từ Zalo", "detail": err}), 502
+        return jsonify({"error": _care_list_error(err), "detail": err}), 502
     if not ids:
         return jsonify({"error": "Không có người nhận phù hợp"}), 400
     if sent_today + len(ids) > OA_CARE_DAILY_MAX:
