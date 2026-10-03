@@ -116,9 +116,12 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-/// Bottom nav as a floating rounded card with a gap from the screen edges,
-/// icon-only (the active tab's icon sits in a solid colored circle) instead
-/// of a full-width bar with icon+label flush to the edges.
+/// Bottom nav as a floating pill in a deep espresso-ink finish — a dark,
+/// jewel-box surface (instead of a plain white card) is what reads as
+/// premium next to the warm-ivory background, with the active tab glowing
+/// in a terracotta gradient medallion rather than a flat colour swap.
+/// Icon-only (the active tab's icon sits in the medallion) instead of a
+/// full-width bar with icon+label flush to the edges.
 class _FloatingNavBar extends StatelessWidget {
   final List<_NavItem> items;
   final int selectedIndex;
@@ -133,14 +136,20 @@ class _FloatingNavBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 64,
+      height: 68,
       decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(28),
+        color: AppColors.textDark,
+        borderRadius: BorderRadius.circular(34),
+        border: Border.all(color: AppColors.white.withValues(alpha: 0.06)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 16,
+            color: Colors.black.withValues(alpha: 0.22),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.14),
+            blurRadius: 20,
             offset: const Offset(0, 6),
           ),
         ],
@@ -180,27 +189,45 @@ class _FloatingNavItem extends StatelessWidget {
       message: item.label,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         child: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            // Selected tab gets a solid colored circle behind its icon
-            // instead of only a color change — a clearer, more premium
-            // "you are here" cue than color alone.
+            // Selected tab gets a gradient medallion with its own soft glow
+            // behind its icon — a richer "you are here" cue than a flat
+            // colour fill on a white bar.
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 40,
-              height: 40,
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : Colors.transparent,
                 shape: BoxShape.circle,
+                gradient: isSelected
+                    ? const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.primary, AppColors.primaryDark],
+                      )
+                    : null,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.5),
+                          blurRadius: 18,
+                          offset: const Offset(0, 5),
+                        ),
+                      ]
+                    : null,
               ),
               child: Icon(
                 // Always the bold/filled glyph — inactive tabs differ only
                 // by color, not by a thinner outline icon.
                 item.selectedIcon,
-                size: 24,
-                color: isSelected ? AppColors.white : AppColors.textDark,
+                size: 23,
+                color: isSelected
+                    ? AppColors.white
+                    : AppColors.white.withValues(alpha: 0.4),
                 semanticLabel: item.label,
               ),
             ),
