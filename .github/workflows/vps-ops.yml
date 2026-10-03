@@ -28,6 +28,7 @@ on:
           - restart_backend
           - deploy_backend
           - set_admin
+          - remove_stopped_coolify_proxy
 
 jobs:
   ops:
@@ -62,6 +63,28 @@ jobs:
             echo
             echo "=== disk space ==="
             df -h /
+          '
+
+      - name: Remove stopped coolify-proxy leftover
+        if: ${{ github.event.inputs.action == 'remove_stopped_coolify_proxy' }}
+        run: |
+          ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=accept-new root@146.196.64.92 '
+            set -e
+            echo "=== before ==="
+            docker ps -a --filter "name=coolify-proxy"
+            STATUS=$(docker inspect coolify-proxy --format "{{.State.Status}}" 2>/dev/null || echo "missing")
+            IMAGE=$(docker inspect coolify-proxy --format "{{.Config.Image}}" 2>/dev/null || echo "missing")
+            echo "status=$STATUS image=$IMAGE"
+            if [ "$STATUS" = "exited" ] && [ "$IMAGE" = "traefik:v3.6" ]; then
+              docker rm coolify-proxy
+              echo "Removed coolify-proxy."
+            else
+              echo "::error::Refusing to remove: expected a stopped traefik:v3.6 container named coolify-proxy, got status=$STATUS image=$IMAGE"
+              exit 1
+            fi
+            echo
+            echo "=== after ==="
+            docker ps -a --filter "name=coolify-proxy"
           '
 
       - name: Restart backend
