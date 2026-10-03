@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Page } from "zmp-ui";
 import BottomNav, { TabKey } from "../components/BottomNav";
 import Icon from "../components/Icon";
-import { uiState, useOpsSummary, useTaskData, useUnreadPolling } from "../data";
+import { bumpData, refreshOps, uiState, useOpsSummary, useTaskData, useUnreadPolling } from "../data";
 import MeTab from "./tabs/me-tab";
 import OpsTab from "./tabs/ops-tab";
 import OverviewTab from "./tabs/overview-tab";
@@ -26,6 +26,9 @@ export default function HomePage() {
   const [fabHidden, setFabHidden] = useState(false);
   const [fabPressed, setFabPressed] = useState(false);
   const lastScroll = useRef(0);
+  const [pull, setPull] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const touchStart = useRef<number | null>(null);
 
   const current: TabKey = tab === "summary" && !data.canManage ? "tasks" : tab;
   const setTab = (t: TabKey) => { uiState.tab = t; setTabState(t); };
@@ -41,6 +44,29 @@ export default function HomePage() {
     }
   };
 
+  // Pull down from the top of any tab to reload its data (replaces the old refresh buttons).
+  const PULL_TRIGGER = 64;
+  const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    touchStart.current = e.currentTarget.scrollTop <= 0 && !refreshing ? e.touches[0].clientY : null;
+  };
+  const onTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStart.current == null) return;
+    const dy = e.touches[0].clientY - touchStart.current;
+    if (dy > 0 && e.currentTarget.scrollTop <= 0) setPull(Math.min(dy * 0.5, 96));
+    else if (dy <= 0) setPull(0);
+  };
+  const onTouchEnd = async () => {
+    const go = touchStart.current != null && pull >= PULL_TRIGGER;
+    touchStart.current = null;
+    if (!go) return setPull(0);
+    setRefreshing(true);
+    setPull(PULL_TRIGGER);
+    bumpData();
+    await Promise.all([refreshOps(), new Promise((r) => setTimeout(r, 800))]);
+    setRefreshing(false);
+    setPull(0);
+  };
+
   const openNewTask = () => {
     setFabPressed(true);
     setTimeout(() => {
@@ -53,7 +79,15 @@ export default function HomePage() {
     const idx = ORDER.indexOf(key);
     const state = idx === activeIndex ? "active" : idx < activeIndex ? "left" : "right";
     return (
-      <div className={`tab-panel ${state}`} aria-hidden={idx !== activeIndex} onScroll={onScroll}>
+      <div
+        className={`tab-panel ${state}`}
+        aria-hidden={idx !== activeIndex}
+        onScroll={onScroll}
+        onTouchStart={idx === activeIndex ? onTouchStart : undefined}
+        onTouchMove={idx === activeIndex ? onTouchMove : undefined}
+        onTouchEnd={idx === activeIndex ? onTouchEnd : undefined}
+        onTouchCancel={idx === activeIndex ? onTouchEnd : undefined}
+      >
         {children}
       </div>
     );
@@ -61,6 +95,9 @@ export default function HomePage() {
 
   return (
     <Page className="shell-page disable-scrolling">
+      <div className={`ptr ${pull > 0 || refreshing ? "show" : ""} ${refreshing ? "spin" : ""}`} style={{ transform: `translate(-50%, ${pull - 44}px)` }} aria-hidden>
+        <Icon name="refresh" size={20} className="ptr-ico" />
+      </div>
       {panel("overview", <OverviewTab active={current === "overview"} />)}
       {panel("tasks", <TasksTab {...data} jump={jump} />, onTasksScroll)}
       {panel("ops", <OpsTab active={current === "ops"} />)}

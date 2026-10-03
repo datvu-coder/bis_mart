@@ -121,9 +121,8 @@ export default function TasksTab({ tasks, canManage, loading, error, reload, jum
             <h1>{greeting()}, {firstName(user?.fullName || "bạn")}</h1>
           </div>
           <div className="hero-actions">
-            <MinimizeButton />
             <NotificationBell />
-            <button className="hero-btn" onClick={reload} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
+            <MinimizeButton />
           </div>
         </div>
       </header>

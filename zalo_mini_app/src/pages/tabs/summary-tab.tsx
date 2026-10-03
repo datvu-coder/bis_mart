@@ -53,9 +53,8 @@ export default function SummaryTab({ active, onOpenStore }: Props) {
             <h1>Tổng quan cửa hàng</h1>
           </div>
           <div className="hero-actions">
-            <MinimizeButton />
             <NotificationBell />
-            <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
+            <MinimizeButton />
           </div>
         </div>
       </header>

@@ -101,12 +101,11 @@ export default function OverviewTab({ active }: { active: boolean }) {
             <h1>{team ? "Tổng quan" : "Tổng quan của tôi"}</h1>
           </div>
           <div className="hero-actions">
+            <NotificationBell />
             <button className={`hero-btn ${filtered ? "has-filter" : ""}`} onClick={openFilter} aria-label="Bộ lọc">
-            <Icon name="filter" size={19} />
-          </button>
-          <MinimizeButton />
-          <NotificationBell />
-            <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
+              <Icon name="filter" size={19} />
+            </button>
+            <MinimizeButton />
           </div>
         </div>
       </header>

@@ -49,7 +49,7 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
   return (
     <>
       <header className="hero profile">
-        <div className="hero-corner hero-actions"><MinimizeButton /><NotificationBell /></div>
+        <div className="hero-corner hero-actions"><NotificationBell /><MinimizeButton /></div>
         <Avatar name={name} size={56} />
         <div className="profile-info">
           <h1>{name}</h1>

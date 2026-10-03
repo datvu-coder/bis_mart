@@ -43,7 +43,7 @@ export default function OpsTab({ active }: { active: boolean }) {
             <div className="hero-sub">{greeting()}</div>
             <h1>Vận hành cửa hàng</h1>
           </div>
-          <div className="hero-actions"><MinimizeButton /><NotificationBell /></div>
+          <div className="hero-actions"><NotificationBell /><MinimizeButton /></div>
         </div>
       </header>
 
