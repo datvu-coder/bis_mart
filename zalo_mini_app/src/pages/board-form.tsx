@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Page, useSnackbar } from "zmp-ui";
 import { api } from "../api";
 import PhotoField from "../components/PhotoField";
@@ -19,6 +19,8 @@ const REMINDS = (() => {
 })();
 
 export default function BoardFormPage() {
+  const { id } = useParams();
+  const editId = id ? Number(id) : null;
   const nav = useNavigate();
   const { openSnackbar } = useSnackbar();
   const stores = useStoreList();
@@ -32,6 +34,12 @@ export default function BoardFormPage() {
   const [remind, setRemind] = useState(0);
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    if (!editId) return;
+    api.announcement(editId).then((a) => { setTitle(a.title); setBody(a.body); setPhotos(a.imageUrls); setPinned(a.pinned); })
+      .catch((e) => openSnackbar({ text: e instanceof Error ? e.message : "Không tải được thông báo", type: "error" }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
   useEffect(() => { api.assignees().then((r) => setPeople(r.employees)).catch(() => {}); }, []);
   const positions = useMemo(() => Array.from(new Set(people.map((p) => p.position).filter(Boolean))).sort(), [people]);
   const toggle = (list: string[], set: (v: string[]) => void, v: string) => set(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
@@ -43,11 +51,15 @@ export default function BoardFormPage() {
     setBusy(true);
     try {
       const r = REMINDS[remind].value;
-      await api.createAnnouncement({
-        title: title.trim(), body: body.trim(), imageUrls: photos, stores: selStores, positions: selPos, pinned,
-        remindAt: typeof r === "function" ? r() : r || null,
-      });
-      openSnackbar({ text: "Đã đăng thông báo", type: "success" });
+      if (editId) {
+        await api.updateAnnouncement(editId, { title: title.trim(), body: body.trim(), imageUrls: photos, pinned });
+      } else {
+        await api.createAnnouncement({
+          title: title.trim(), body: body.trim(), imageUrls: photos, stores: selStores, positions: selPos, pinned,
+          remindAt: typeof r === "function" ? r() : r || null,
+        });
+      }
+      openSnackbar({ text: editId ? "Đã cập nhật thông báo" : "Đã đăng thông báo", type: "success" });
       bumpData();
       nav(-1);
     } catch (e) {
@@ -59,7 +71,7 @@ export default function BoardFormPage() {
 
   return (
     <Page className="page with-bar">
-      <SubHero title="Đăng thông báo" note="Nhân viên sẽ nhận thông báo và bạn xem được ai đã đọc" />
+      <SubHero title={editId ? "Sửa thông báo" : "Đăng thông báo"} note={editId ? "Nội dung mới hiện cho mọi người đã nhận" : "Nhân viên sẽ nhận thông báo và bạn xem được ai đã đọc"} />
       <section className="panel">
         <h3>Nội dung</h3>
         <label className="field"><span>Tiêu đề *</span><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Khuyến mãi tuần này" maxLength={200} /></label>
@@ -67,7 +79,7 @@ export default function BoardFormPage() {
         <div className="field"><span>Ảnh đính kèm</span><PhotoField value={photos} onChange={setPhotos} max={6} /></div>
       </section>
 
-      <section className="panel">
+      {!editId && <section className="panel">
         <div className="panel-head"><h3>Gửi cho</h3><span className="count">{people.length ? `${audience} người` : ""}</span></div>
         {stores.length > 1 && (
           <div className="field"><span>Cửa hàng (bỏ trống = tất cả)</span>
@@ -85,20 +97,20 @@ export default function BoardFormPage() {
             </div>
           </div>
         )}
-      </section>
+      </section>}
 
       <section className="panel">
         <h3>Tuỳ chọn</h3>
-        <div className="field"><span>Nhắc người chưa đọc</span>
+        {!editId && <div className="field"><span>Nhắc người chưa đọc</span>
           <div className="seg">{REMINDS.map((r, k) => <button type="button" key={r.label} className={remind === k ? "active" : ""} onClick={() => setRemind(k)}>{r.label}</button>)}</div>
-        </div>
+        </div>}
         <button type="button" className="switch-row" onClick={() => setPinned((v) => !v)}>
           <span><b>Ghim lên đầu</b><small>Thông báo quan trọng luôn hiện trên cùng</small></span>
           <span className={`switch ${pinned ? "on" : ""}`}><i /></span>
         </button>
       </section>
 
-      <div className="action-bar"><button className="btn primary wide" disabled={busy || !title.trim()} onClick={submit}>{busy ? "Đang đăng..." : "Đăng thông báo"}</button></div>
+      <div className="action-bar"><button className="btn primary wide" disabled={busy || !title.trim()} onClick={submit}>{busy ? "Đang lưu..." : editId ? "Lưu thay đổi" : "Đăng thông báo"}</button></div>
     </Page>
   );
 }

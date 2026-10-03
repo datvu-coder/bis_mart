@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useSnackbar } from "zmp-ui";
+import { api } from "../../api";
 import { useAuth } from "../../auth";
 import Icon from "../../components/Icon";
 import MinimizeButton from "../../components/MinimizeButton";
 import NotificationBell from "../../components/NotificationBell";
+import { ConfirmSheet } from "../../components/Sheet";
 import Skeleton, { EmptyState } from "../../components/Skeleton";
+import SwipeRow from "../../components/SwipeRow";
 import TaskCard from "../../components/TaskCard";
-import { uiState } from "../../data";
+import { bumpData, uiState } from "../../data";
 import { Task } from "../../types";
 import { firstName, greeting, isDueToday, isOpen, todayLabel } from "../../utils";
 
@@ -31,6 +35,19 @@ const SECTIONS: { key: string; title: string }[] = [
 ];
 
 export default function TasksTab({ tasks, canManage, loading, error, reload, jump }: Props) {
+  const nav = useNavigate();
+  const [delTask, setDelTask] = useState<Task | null>(null);
+  const removeTask = async () => {
+    if (!delTask) return;
+    try {
+      await api.deleteTask(delTask.id);
+      openSnackbar({ text: "Đã xoá công việc", type: "success" });
+      bumpData();
+    } catch (e) {
+      openSnackbar({ text: e instanceof Error ? e.message : "Không xoá được", type: "error" });
+    }
+    setDelTask(null);
+  };
   const { user } = useAuth();
   const { openSnackbar } = useSnackbar();
   const [scope, setScopeState] = useState<Scope>(uiState.scope ?? "mine");
@@ -180,11 +197,14 @@ export default function TasksTab({ tasks, canManage, loading, error, reload, jum
           {s.title && <h3 className={`section-title ${s.key}`}>{s.title} <small>{s.items.length}</small></h3>}
           <div className="list">
             {s.items.map((t) => (
-              <TaskCard key={t.id} task={t} showAssignee={effectiveScope === "store"} onError={(text) => openSnackbar({ text, type: "error" })} />
+              <SwipeRow key={t.id} onEdit={canManage ? () => nav(`/task/${t.id}/edit`) : undefined} onDelete={canManage ? () => setDelTask(t) : undefined}>
+                <TaskCard task={t} showAssignee={effectiveScope === "store"} onError={(text) => openSnackbar({ text, type: "error" })} />
+              </SwipeRow>
             ))}
           </div>
         </section>
       ))}
+      <ConfirmSheet open={!!delTask} title="Xoá công việc?" message={delTask ? `"${delTask.title}" sẽ bị xoá cùng toàn bộ trao đổi và không khôi phục được.` : ""} confirmLabel="Xoá" danger onConfirm={removeTask} onClose={() => setDelTask(null)} />
     </>
   );
 }

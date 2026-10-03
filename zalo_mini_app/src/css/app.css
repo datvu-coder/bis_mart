@@ -552,3 +552,14 @@ input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-
 .ptr.spin .ptr-ico { animation: ptr-spin 0.8s linear infinite; }
 @keyframes ptr-spin { to { transform: rotate(360deg); } }
 .tab-panel { overscroll-behavior-y: contain; }
+
+/* ---------- Swipe rows ---------- */
+.swipe { position: relative; margin-bottom: 10px; border-radius: var(--radius); overflow: hidden; background: #efe6da; }
+.swipe .card { margin-bottom: 0; }
+.swipe-front { position: relative; z-index: 1; touch-action: pan-y; transition: transform 0.22s cubic-bezier(0.22, 0.8, 0.3, 1); background: var(--bg); border-radius: var(--radius); }
+.swipe-front.dragging { transition: none; }
+.swipe-act { position: absolute; top: 0; bottom: 0; width: 84px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #fff; font-size: 12px; font-weight: 700; }
+.swipe-act.edit { left: 0; background: #3e7c9c; }
+.swipe-act.del { right: 0; background: var(--error); }
+.swipe.in-panel { margin-bottom: 0; border-radius: 0; }
+.swipe.in-panel .swipe-front { background: var(--surface); border-radius: 0; }

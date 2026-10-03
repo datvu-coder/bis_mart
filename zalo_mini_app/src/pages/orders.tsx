@@ -4,9 +4,11 @@ import { Page, useSnackbar } from "zmp-ui";
 import { absoluteUrl, api } from "../api";
 import Icon from "../components/Icon";
 import { OrderProgress } from "../components/OrderTimeline";
+import { ConfirmSheet } from "../components/Sheet";
 import Skeleton, { EmptyState } from "../components/Skeleton";
+import SwipeRow from "../components/SwipeRow";
 import SubHero from "../components/SubHero";
-import { useDataVersion } from "../data";
+import { bumpData, useDataVersion } from "../data";
 import { ORDER_STATUS_LABEL, Order, OrderSummary } from "../types";
 import { dmy, todayYmd } from "../utils";
 
@@ -22,6 +24,18 @@ export default function OrdersPage() {
   const [date, setDate] = useState(todayYmd());
   const [sum, setSum] = useState<OrderSummary | null>(null);
   const [withApproved, setWithApproved] = useState(true);
+  const [delOrder, setDelOrder] = useState<Order | null>(null);
+  const removeOrder = async () => {
+    if (!delOrder) return;
+    try {
+      await api.deleteOrder(delOrder.id);
+      openSnackbar({ text: "Đã xoá đơn hàng", type: "success" });
+      bumpData();
+    } catch (e) {
+      openSnackbar({ text: e instanceof Error ? e.message : "Không xoá được", type: "error" });
+    }
+    setDelOrder(null);
+  };
 
   const load = useCallback(async () => {
     setError("");
@@ -94,7 +108,8 @@ export default function OrdersPage() {
           )}
           <div className="list">
             {(orders || []).map((o) => (
-              <button key={o.id} className="card order-card" onClick={() => nav(`/orders/${o.id}`)}>
+              <SwipeRow key={o.id} onEdit={o.canEdit ? () => nav(`/orders/${o.id}/edit`) : undefined} onDelete={o.canDelete ? () => setDelOrder(o) : undefined}>
+              <button className="card order-card" onClick={() => nav(`/orders/${o.id}`)}>
                 <div className="card-top">
                   <span className="card-title">{o.storeName} · {dmy(o.orderDate)}</span>
                   <span className={`badge order-${o.status}`}>{ORDER_STATUS_LABEL[o.status]}</span>
@@ -106,10 +121,12 @@ export default function OrdersPage() {
                 </div>
                 <OrderProgress order={o} />
               </button>
+              </SwipeRow>
             ))}
           </div>
         </>
       )}
+      <ConfirmSheet open={!!delOrder} title="Xoá đơn hàng?" message="Đơn và toàn bộ mặt hàng sẽ bị xoá hẳn, không khôi phục được." confirmLabel="Xoá" danger onConfirm={removeOrder} onClose={() => setDelOrder(null)} />
     </Page>
   );
 }
