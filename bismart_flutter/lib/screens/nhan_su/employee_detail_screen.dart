@@ -390,7 +390,7 @@ class _EmployeeDetailScreenState extends State<EmployeeDetailScreen> {
             DropdownButtonFormField<String>(
               value: selectedPosition,
               decoration: const InputDecoration(labelText: 'Vị trí'),
-              items: ['ADM', 'PG', 'TLD', 'MNG', 'CS']
+              items: ['ADM', 'PG', 'TLD', 'SM', 'MNG', 'CS']
                   .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                   .toList(),
               onChanged: (v) => setDialogState(() => selectedPosition = v!),

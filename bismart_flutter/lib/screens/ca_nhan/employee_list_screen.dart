@@ -16,7 +16,7 @@ class EmployeeListScreen extends StatefulWidget {
 }
 
 class _EmployeeListScreenState extends State<EmployeeListScreen> {
-  static const _positions = ['Tất cả', 'ADM', 'PG', 'TLD', 'MNG', 'CS'];
+  static const _positions = ['Tất cả', 'ADM', 'PG', 'TLD', 'SM', 'MNG', 'CS'];
 
   String _searchQuery = '';
   String _selectedPosition = 'Tất cả';
@@ -295,7 +295,7 @@ class _EmployeeListScreenState extends State<EmployeeListScreen> {
             DropdownButtonFormField<String>(
               value: selectedPosition,
               decoration: const InputDecoration(labelText: 'Vị trí'),
-              items: ['ADM', 'PG', 'TLD', 'MNG', 'CS']
+              items: ['ADM', 'PG', 'TLD', 'SM', 'MNG', 'CS']
                   .map((p) => DropdownMenuItem(value: p, child: Text(p)))
                   .toList(),
               onChanged: (v) => setDialogState(() => selectedPosition = v!),
