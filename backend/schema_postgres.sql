@@ -1462,3 +1462,18 @@ CREATE TABLE IF NOT EXISTS zalo_oa_pending (
     oa_user TEXT NOT NULL,
     created_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS oa_care_campaigns (
+    id SERIAL PRIMARY KEY,
+    body TEXT NOT NULL,
+    image_url TEXT,
+    period TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'sending',
+    total INTEGER NOT NULL DEFAULT 0,
+    ok_count INTEGER NOT NULL DEFAULT 0,
+    fail_count INTEGER NOT NULL DEFAULT 0,
+    errors TEXT,
+    created_by INTEGER,
+    created_at TEXT,
+    finished_at TEXT
+);

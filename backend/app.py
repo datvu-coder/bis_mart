@@ -16,6 +16,7 @@ import shutil
 import urllib.error
 import urllib.parse
 import urllib.request
+import threading
 import time
 import uuid
 import xml.etree.ElementTree as ET
@@ -5467,6 +5468,220 @@ def api_zalo_oa_test():
                     (employee_id, 1 if ok else 0, ("test " + detail)[:500], _now_iso()))
     db.commit()
     return jsonify({"ok": ok, "detail": detail, "target": "oa" if row.get("zalo_oa_id") else "mini-app"})
+
+
+ZALO_OA_USERLIST_URL = "https://openapi.zalo.me/v3.0/oa/user/getlist"
+OA_CARE_PERIODS = {"TODAY", "YESTERDAY", "L7D", "L30D", "ALL"}
+OA_CARE_MAX_RECIPIENTS = int(os.getenv("OA_CARE_MAX_RECIPIENTS", "1000"))
+OA_CARE_DAILY_MAX = int(os.getenv("OA_CARE_DAILY_MAX", "3000"))
+
+
+def _oa_call_json(url: str, payload: dict | None = None, query: dict | None = None) -> tuple[bool, dict, str]:
+    """One OA API call. Zalo answers HTTP 200 with {"error": code, "message": ...}; ok means error == 0."""
+    token = _oa_access_token()
+    if not token:
+        return False, {}, "OA not configured"
+    if query:
+        url += "?" + urllib.parse.urlencode(query)
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {"access_token": token}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        raw = e.read().decode("utf-8", "replace")
+    except Exception as e:
+        return False, {}, f"{type(e).__name__}: {e}"
+    try:
+        obj = json.loads(raw)
+    except ValueError:
+        return False, {}, raw[:300]
+    return obj.get("error", 0) == 0, obj, raw[:500]
+
+
+def _oa_follower_ids(period: str, limit: int = OA_CARE_MAX_RECIPIENTS) -> tuple[list[str], int | None, str]:
+    """OA-scoped ids of followers, optionally limited to those who interacted recently. Returns (ids, total, error)."""
+    ids: list[str] = []
+    total = None
+    offset = 0
+    while len(ids) < limit:
+        data = {"offset": offset, "count": 50, "is_follower": "true"}
+        if period != "ALL":
+            data["last_interaction_period"] = period
+        ok, obj, raw = _oa_call_json(ZALO_OA_USERLIST_URL, query={"data": json.dumps(data)})
+        if not ok:
+            return ids, total, raw
+        body = obj.get("data") or {}
+        users = body.get("users") or []
+        total = body.get("total", total)
+        ids += [str(u.get("user_id")) for u in users if u.get("user_id")]
+        if len(users) < 50:
+            break
+        offset += 50
+    return ids[:limit], total, ""
+
+
+def _oa_send_care(uid: str, text: str, image_url: str = "") -> tuple[bool, str]:
+    """Text first, then the picture. The message counts as delivered when the text went through."""
+    ok, detail = _oa_send_text(uid, text)
+    if ok and image_url:
+        payload = {"recipient": {"user_id": uid}, "message": {"attachment": {"type": "template", "payload": {
+            "template_type": "media", "elements": [{"media_type": "image", "url": image_url}]}}}}
+        _oa_call_json(ZALO_OA_SEND_URL, payload=payload)
+    return ok, detail
+
+
+def _care_image_url(name: str) -> str:
+    name = secure_filename((name or "").strip())
+    if not name or not (TASK_PHOTO_DIR / name).is_file():
+        return ""
+    return f"https://api.bismart.id.vn/api/tasks/photo/{urllib.parse.quote(name)}?w=1000"
+
+
+def _care_error_key(detail: str) -> str:
+    try:
+        obj = json.loads(detail)
+        return f"{obj.get('error')}: {str(obj.get('message', ''))[:80]}"
+    except ValueError:
+        return detail[:80]
+
+
+def _care_worker(campaign_id: int, ids: list[str], text: str, image_url: str) -> None:
+    """Send a campaign in the background, a few per second, recording progress after every batch."""
+    with app.app_context():
+        db = get_db()
+        ok_n = fail_n = 0
+        errors: dict[str, int] = {}
+        try:
+            for i, uid in enumerate(ids, 1):
+                ok, detail = _oa_send_care(uid, text, image_url)
+                if ok:
+                    ok_n += 1
+                else:
+                    fail_n += 1
+                    key = _care_error_key(detail)
+                    errors[key] = errors.get(key, 0) + 1
+                if i % 10 == 0 or i == len(ids):
+                    with db.cursor() as cur:
+                        cur.execute("UPDATE oa_care_campaigns SET ok_count=%s, fail_count=%s, errors=%s WHERE id=%s",
+                                    (ok_n, fail_n, json.dumps(errors, ensure_ascii=False), campaign_id))
+                    db.commit()
+                time.sleep(0.15)
+            status = "done"
+        except Exception as e:
+            status = "failed"
+            errors[f"{type(e).__name__}"] = 1
+        with db.cursor() as cur:
+            cur.execute("UPDATE oa_care_campaigns SET status=%s, ok_count=%s, fail_count=%s, errors=%s, finished_at=%s WHERE id=%s",
+                        (status, ok_n, fail_n, json.dumps(errors, ensure_ascii=False), _now_iso(), campaign_id))
+        db.commit()
+
+
+def _care_campaign_json(r: dict) -> dict:
+    try:
+        errors = json.loads(r.get("errors") or "{}")
+    except ValueError:
+        errors = {}
+    return {"id": r["id"], "body": r["body"], "imageUrl": r["image_url"] or "", "period": r["period"], "status": r["status"],
+            "total": r["total"], "okCount": r["ok_count"], "failCount": r["fail_count"], "errors": errors,
+            "createdAt": r["created_at"], "finishedAt": r["finished_at"]}
+
+
+@app.get("/api/oa/care/audience")
+@login_required
+def api_oa_care_audience():
+    if not _is_admin_user():
+        return _forbidden()
+    period = (request.args.get("period") or "L7D").upper()
+    if period not in OA_CARE_PERIODS:
+        return jsonify({"error": "Invalid period"}), 400
+    ids, total, err = _oa_follower_ids(period)
+    if err and not ids:
+        return jsonify({"error": "Không lấy được danh sách người quan tâm từ Zalo", "detail": err}), 502
+    return jsonify({"period": period, "count": len(ids), "total": total if total is not None else len(ids),
+                    "capped": len(ids) >= OA_CARE_MAX_RECIPIENTS})
+
+
+def _care_payload() -> tuple[str, str] | tuple[None, None]:
+    data = request.get_json(silent=True) or {}
+    text = (data.get("body") or "").strip()
+    if not text or len(text) > 1500:
+        return None, None
+    return text, _care_image_url(data.get("imageName") or "")
+
+
+@app.post("/api/oa/care/test")
+@login_required
+def api_oa_care_test():
+    """Send the draft to the caller's own Zalo only."""
+    if not _is_admin_user():
+        return _forbidden()
+    text, image_url = _care_payload()
+    if text is None:
+        return jsonify({"error": "Nội dung tin phải có từ 1 đến 1500 ký tự"}), 400
+    employee_id = (g.current_user or {}).get("employee_id")
+    with get_db().cursor() as cur:
+        cur.execute("SELECT zalo_id, zalo_oa_id FROM employees WHERE id = %s", (employee_id,))
+        row = cur.fetchone() or {}
+    target = row.get("zalo_oa_id") or row.get("zalo_id")
+    if not target:
+        return jsonify({"error": "Tài khoản này chưa liên kết Zalo. Hãy thoát app, mở lại từ Zalo rồi thử lại."}), 400
+    ok, detail = _oa_send_care(str(target), text, image_url)
+    return jsonify({"ok": ok, "detail": detail})
+
+
+@app.post("/api/oa/care/send")
+@login_required
+def api_oa_care_send():
+    if not _is_admin_user():
+        return _forbidden()
+    text, image_url = _care_payload()
+    if text is None:
+        return jsonify({"error": "Nội dung tin phải có từ 1 đến 1500 ký tự"}), 400
+    data = request.get_json(silent=True) or {}
+    period = (data.get("period") or "L7D").upper()
+    if period not in OA_CARE_PERIODS:
+        return jsonify({"error": "Invalid period"}), 400
+    db = get_db()
+    now = datetime.now(tz=VN_TZ)
+    with db.cursor() as cur:
+        cur.execute("UPDATE oa_care_campaigns SET status='interrupted' WHERE status='sending' AND created_at < %s",
+                    ((now - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%S"),))
+        cur.execute("SELECT COUNT(*) AS n FROM oa_care_campaigns WHERE status='sending'")
+        if cur.fetchone()["n"]:
+            db.commit()
+            return jsonify({"error": "Đang có một đợt gửi chạy. Hãy đợi đợt đó xong rồi gửi tiếp."}), 409
+        cur.execute("SELECT COALESCE(SUM(total),0) AS n FROM oa_care_campaigns WHERE created_at >= %s", (now.strftime("%Y-%m-%d"),))
+        sent_today = cur.fetchone()["n"]
+    ids, _total, err = _oa_follower_ids(period)
+    if err and not ids:
+        return jsonify({"error": "Không lấy được danh sách người quan tâm từ Zalo", "detail": err}), 502
+    if not ids:
+        return jsonify({"error": "Không có người nhận phù hợp"}), 400
+    if sent_today + len(ids) > OA_CARE_DAILY_MAX:
+        return jsonify({"error": f"Vượt giới hạn {OA_CARE_DAILY_MAX} tin mỗi ngày (hôm nay đã gửi {sent_today})"}), 429
+    with db.cursor() as cur:
+        cur.execute("INSERT INTO oa_care_campaigns (body, image_url, period, status, total, created_by, created_at) "
+                    "VALUES (%s,%s,%s,'sending',%s,%s,%s) RETURNING id",
+                    (text, image_url, period, len(ids), (g.current_user or {}).get("employee_id"), _now_iso()))
+        cid = cur.fetchone()["id"]
+    db.commit()
+    threading.Thread(target=_care_worker, args=(cid, ids, text, image_url), daemon=True).start()
+    return jsonify({"id": cid, "total": len(ids)}), 202
+
+
+@app.get("/api/oa/care/campaigns")
+@login_required
+def api_oa_care_campaigns():
+    if not _is_admin_user():
+        return _forbidden()
+    with get_db().cursor() as cur:
+        cur.execute("SELECT * FROM oa_care_campaigns ORDER BY id DESC LIMIT 20")
+        rows = cur.fetchall()
+    return jsonify({"campaigns": [_care_campaign_json(r) for r in rows]})
 
 
 @app.post("/api/auth/zalo-login")

@@ -312,3 +312,17 @@ export interface OaStatus {
   employees: { total: number; zaloLinked: number; oaMapped: number };
   recent: { employeeId: number | null; ok: number; detail: string; at: string }[];
 }
+
+export interface CareCampaign {
+  id: number;
+  body: string;
+  imageUrl: string;
+  period: string;
+  status: "sending" | "done" | "failed" | "interrupted";
+  total: number;
+  okCount: number;
+  failCount: number;
+  errors: Record<string, number>;
+  createdAt: string;
+  finishedAt: string | null;
+}
