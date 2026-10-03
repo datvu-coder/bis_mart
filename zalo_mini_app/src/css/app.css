@@ -497,3 +497,35 @@ input[type="datetime-local"], input[type="date"], input[type="time"] {
 }
 input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-webkit-date-and-time-value { text-align: left; min-height: 1.2em; }
 .seg button { white-space: nowrap; font-size: 12.5px; padding-left: 2px; padding-right: 2px; }
+
+/* ---------- Order progress + timeline ---------- */
+.oprog { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
+.oprog i { flex: 1; height: 6px; border-radius: 3px; background: #efe6da; transition: background 0.3s; }
+.oprog i.on { background: var(--primary); }
+.oprog i.short { background: var(--error); }
+.oprog span { margin-left: 6px; font-size: 11px; font-weight: 700; color: var(--muted); min-width: 34px; text-align: right; }
+.oprog.cancelled i { background: #e4d8c9; }
+.oprog.big { margin: 4px 0 14px; }
+.oprog.big i { height: 8px; }
+.count.bad { color: var(--error); }
+.otl { list-style: none; margin: 0; padding: 0; }
+.otl li { position: relative; display: flex; gap: 12px; padding-bottom: 16px; }
+.otl li:last-child { padding-bottom: 0; }
+.otl li:not(:last-child)::before { content: ""; position: absolute; left: 11px; top: 24px; bottom: 0; width: 2px; background: #efe6da; }
+.otl li.done:not(:last-child)::before { background: var(--primary); }
+.otl-dot { width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: #efe6da; color: #fff; z-index: 1; }
+.otl li.done .otl-dot { background: var(--primary); }
+.otl li.done.warn .otl-dot { background: var(--error); }
+.otl li.skipped .otl-dot { background: #e4d8c9; }
+.otl li.cancelled .otl-dot { background: var(--error); }
+.otl li.current .otl-dot { background: var(--primary-soft); border: 2px solid var(--primary); box-sizing: border-box; }
+.otl .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); animation: otl-pulse 1.4s ease-in-out infinite; }
+@keyframes otl-pulse { 0%, 100% { transform: scale(0.7); opacity: 0.6; } 50% { transform: scale(1.15); opacity: 1; } }
+.otl-body { display: flex; flex-direction: column; gap: 1px; padding-top: 2px; min-width: 0; }
+.otl-body b { font-size: 14px; }
+.otl li:not(.done):not(.current) .otl-body b { color: var(--muted); font-weight: 600; }
+.otl-body small { color: var(--muted); font-size: 12px; }
+.otl-body small.wait { color: var(--warning); font-weight: 600; }
+.otl li.skipped .otl-body b { text-decoration: line-through; }
+.hint.total { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
+@media (prefers-reduced-motion: reduce) { .otl .pulse { animation: none; } }

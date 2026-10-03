@@ -5,6 +5,7 @@ import { api } from "../api";
 import Icon from "../components/Icon";
 import PhotoField, { PhotoStrip } from "../components/PhotoField";
 import Sheet, { ConfirmSheet } from "../components/Sheet";
+import OrderTimeline from "../components/OrderTimeline";
 import SubHero from "../components/SubHero";
 import { bumpData } from "../data";
 import { ORDER_STATUS_LABEL, OrderDetail } from "../types";
@@ -72,6 +73,8 @@ export default function OrderDetailPage() {
           {o.canEdit && <button className="hero-btn" onClick={() => nav(`/orders/${o.id}/edit`)} aria-label="Sửa"><Icon name="edit" size={20} /></button>}
           {o.canCancel && <button className="hero-btn" onClick={() => setCancel(true)} aria-label="Huỷ đơn"><Icon name="trash" size={20} /></button>}
         </>} />
+
+      <OrderTimeline order={o} />
 
       <section className="panel">
         <div className="panel-head"><h3>Trạng thái</h3><span className={`badge order-${o.status}`}>{ORDER_STATUS_LABEL[o.status]}</span></div>

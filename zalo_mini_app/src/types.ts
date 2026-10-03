@@ -212,6 +212,9 @@ export interface Order {
   itemCount: number;
   totalQty: number;
   createdAt: string;
+  updatedAt: string | null;
+  approvedAt: string | null;
+  orderedAt: string | null;
 }
 
 export interface OrderDetail extends Order {
