@@ -9,7 +9,7 @@ import Avatar from "../components/Avatar";
 import Icon from "../components/Icon";
 import PhotoViewer from "../components/PhotoViewer";
 import Sheet, { ConfirmSheet } from "../components/Sheet";
-import { PRIORITY_LABEL, RECURRENCE_LABEL, STATUS_LABEL, TaskDetail } from "../types";
+import { Assignee, PRIORITY_LABEL, RECURRENCE_LABEL, STATUS_LABEL, TaskDetail } from "../types";
 import { dueInfo, formatDateTime } from "../utils";
 
 const STEPS: { key: "todo" | "doing" | "done"; label: string }[] = [
@@ -35,6 +35,8 @@ export default function TaskDetailPage() {
   const [menu, setMenu] = useState(false);
   const [photoSheet, setPhotoSheet] = useState(false);
   const [confirm, setConfirm] = useState<Confirm>(null);
+  const [staff, setStaff] = useState<Assignee[]>([]);
+  const [doers, setDoers] = useState<number[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -43,6 +45,7 @@ export default function TaskDetailPage() {
       setTask(t);
       setPhotos(t.photoUrls);
       setNote(t.completionNote);
+      setDoers(t.doerIds);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Không tải được công việc");
     }
@@ -51,6 +54,11 @@ export default function TaskDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const actable = !!task && !!user && (String(task.assigneeId) === user.id || task.canManage);
+  useEffect(() => {
+    if (actable) api.taskStaff(id).then((r) => setStaff(r.employees)).catch(() => {});
+  }, [actable, id]);
 
   const run = async (fn: () => Promise<unknown>, okMsg?: string) => {
     setBusy(true);
@@ -158,6 +166,7 @@ export default function TaskDetailPage() {
           <div><Icon name="users" size={18} /><dt>Giao bởi</dt><dd>{task.assignedByName || "-"}</dd></div>
           <div><Icon name="pin" size={18} /><dt>Cửa hàng</dt><dd>{task.storeName || task.storeCode || "-"}</dd></div>
           <div><Icon name="calendar" size={18} /><dt>Hạn chót</dt><dd className={due ? `tone-${due.tone}` : ""}>{task.dueAt ? formatDateTime(task.dueAt) : "Không có"}{due && (due.tone === "overdue" || due.tone === "today") && <span className={`tag ${due.tone}`}>{due.tone === "overdue" ? "Quá hạn" : "Hôm nay"}</span>}</dd></div>
+          {task.doers.length > 0 && <div><Icon name="users" size={18} /><dt>Thực hiện bởi</dt><dd className="wrap">{task.doers.map((d) => d.name).join(", ")}</dd></div>}
           {task.completedAt && <div><Icon name="checkCircle" size={18} /><dt>Hoàn thành lúc</dt><dd>{formatDateTime(task.completedAt)}</dd></div>}
         </dl>
       </div>
@@ -179,6 +188,19 @@ export default function TaskDetailPage() {
             )}
           </div>
           <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onFallbackPick} />
+          {canAct && !closed && staff.length > 0 && (
+            <div className="field doers">
+              <span>Nhân viên thực hiện</span>
+              <div className="chip-row nomargin">
+                {staff.map((e) => (
+                  <button type="button" key={e.id} className={`chip ${doers.includes(e.id) ? "active" : ""}`}
+                    onClick={() => setDoers((cur) => (cur.includes(e.id) ? cur.filter((x) => x !== e.id) : [...cur, e.id]))}>
+                    {doers.includes(e.id) && <Icon name="check" size={13} />} {e.fullName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {canAct && !closed && (
             <textarea placeholder="Ghi chú kết quả (không bắt buộc)" value={note} onChange={(e) => setNote(e.target.value)} />
           )}
@@ -225,7 +247,7 @@ export default function TaskDetailPage() {
             </button>
           )}
           {!closed && (
-            <button className="btn primary" disabled={busy} onClick={() => run(() => api.setStatus(task.id, "done", note, photos), "Đã hoàn thành công việc")}>
+            <button className="btn primary" disabled={busy} onClick={() => run(() => api.setStatus(task.id, "done", note, photos, doers), "Đã hoàn thành công việc")}>
               <Icon name="check" size={18} /> Hoàn thành
             </button>
           )}

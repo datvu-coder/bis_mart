@@ -1,7 +1,7 @@
 import type {
   Analytics, Announcement, AnnouncementDetail, AppNotification, Assignee, CatalogProduct, FundEntry, FundReport,
   FundReportDetail, FundSuggest, MediaItem, Order, OrderDetail, OrderItem, OrderSummary, OpsSummary, StoreSummary,
-  Task, TaskDetail, User,
+  StoreWithManagers, Task, TaskDetail, User,
 } from "./types";
 
 const BASE_URL: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "https://api.bismart.id.vn";
@@ -32,6 +32,7 @@ const ERROR_VI: Record<string, string> = {
   "Title is required": "Vui lòng nhập tiêu đề công việc.",
   "Assignee not found": "Không tìm thấy nhân viên được giao.",
   "Invalid status": "Trạng thái không hợp lệ.",
+  "Invalid doers": "Danh sách nhân viên thực hiện không hợp lệ (chỉ chọn nhân viên của cửa hàng).",
   "Invalid priority or recurrence": "Mức ưu tiên hoặc lịch lặp không hợp lệ.",
   "Empty comment": "Nội dung trao đổi đang trống.",
   "file too large": "Ảnh quá lớn (tối đa 10MB).",
@@ -134,8 +135,10 @@ export const api = {
   createTask: (input: TaskInput) => request<Task>("POST", "/api/tasks", input),
   updateTask: (id: number, input: Partial<TaskInput>) => request<Task>("PUT", `/api/tasks/${id}`, input),
   deleteTask: (id: number) => request<{ ok: boolean }>("DELETE", `/api/tasks/${id}`),
-  setStatus: (id: number, status: string, note?: string, photoUrls?: string[]) =>
-    request<Task>("POST", `/api/tasks/${id}/status`, { status, note, photoUrls }),
+  setStatus: (id: number, status: string, note?: string, photoUrls?: string[], doerIds?: number[]) =>
+    request<Task>("POST", `/api/tasks/${id}/status`, { status, note, photoUrls, ...(doerIds ? { doerIds } : {}) }),
+  taskStores: () => request<{ stores: StoreWithManagers[] }>("GET", "/api/tasks/stores"),
+  taskStaff: (id: number) => request<{ employees: Assignee[] }>("GET", `/api/tasks/${id}/staff`),
   addComment: (id: number, body: string) =>
     request<{ id: number }>("POST", `/api/tasks/${id}/comments`, { body }),
   summary: () => request<{ stores: StoreSummary[] }>("GET", "/api/tasks/summary"),

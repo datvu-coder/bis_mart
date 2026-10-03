@@ -5,7 +5,7 @@ import { api } from "../api";
 import { bumpData } from "../data";
 import Avatar from "../components/Avatar";
 import Icon from "../components/Icon";
-import { Assignee, PRIORITY_LABEL, RECURRENCE_LABEL } from "../types";
+import { Assignee, PRIORITY_LABEL, RECURRENCE_LABEL, StoreWithManagers } from "../types";
 import { fromInputValue, quickDeadlines, toInputValue } from "../utils";
 
 const TEMPLATES = [
@@ -27,6 +27,9 @@ export default function TaskFormPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [selected, setSelected] = useState<number[]>([]);
+  const [mode, setMode] = useState<"person" | "store">("person");
+  const [stores, setStores] = useState<StoreWithManagers[]>([]);
+  const [pickedStores, setPickedStores] = useState<string[]>([]);
   const [priority, setPriority] = useState("normal");
   const [dueAt, setDueAt] = useState("");
   const [recurrence, setRecurrence] = useState("none");
@@ -35,6 +38,7 @@ export default function TaskFormPage() {
   const deadlines = useMemo(quickDeadlines, []);
 
   useEffect(() => {
+    if (!editId) api.taskStores().then((r) => setStores(r.stores)).catch(() => {});
     api.assignees().then((r) => setEmployees(r.employees)).catch(() => openSnackbar({ text: "Không tải được danh sách nhân viên", type: "error" }));
     if (editId) {
       api.getTask(editId).then((t) => {
@@ -75,6 +79,11 @@ export default function TaskFormPage() {
     try {
       if (editId) {
         await api.updateTask(editId, { ...base, assigneeId: selected[0] ?? null });
+      } else if (mode === "store") {
+        const targets = stores.filter((st) => pickedStores.includes(st.storeCode) && st.managers.length > 0);
+        const results = await Promise.allSettled(targets.map((st) => api.createTask({ ...base, assigneeId: st.managers[0].id })));
+        const failed = results.filter((r) => r.status === "rejected").length;
+        if (failed) throw new Error(`Giao thành công ${targets.length - failed}/${targets.length} cửa hàng, ${failed} lần lỗi`);
       } else if (selected.length === 0) {
         await api.createTask({ ...base, assigneeId: null });
       } else {
@@ -82,7 +91,7 @@ export default function TaskFormPage() {
         const failed = results.filter((r) => r.status === "rejected").length;
         if (failed) throw new Error(`Giao thành công ${selected.length - failed}/${selected.length} người, ${failed} lần lỗi`);
       }
-      openSnackbar({ text: editId ? "Đã cập nhật công việc" : selected.length > 1 ? `Đã giao việc cho ${selected.length} người` : "Đã giao việc", type: "success" });
+      openSnackbar({ text: editId ? "Đã cập nhật công việc" : mode === "store" ? `Đã giao việc cho ${pickedStores.length} cửa hàng` : selected.length > 1 ? `Đã giao việc cho ${selected.length} người` : "Đã giao việc", type: "success" });
       nav(-1);
     } catch (err) {
       openSnackbar({ text: err instanceof Error ? err.message : "Có lỗi xảy ra", type: "error" });
@@ -122,6 +131,43 @@ export default function TaskFormPage() {
           </label>
         </section>
 
+        {!editId && (
+          <div className="seg mode-seg">
+            <button type="button" className={mode === "person" ? "active" : ""} onClick={() => setMode("person")}>Giao cho người</button>
+            <button type="button" className={mode === "store" ? "active" : ""} onClick={() => setMode("store")}>Giao cho cửa hàng</button>
+          </div>
+        )}
+
+        {mode === "store" ? (
+          <section className="panel">
+            <div className="panel-head">
+              <h3>Cửa hàng nhận việc</h3>
+              <span className="count">{pickedStores.length ? `Đã chọn ${pickedStores.length}` : "Chưa chọn"}</span>
+            </div>
+            <div className="hint">Việc sẽ giao cho cửa hàng trưởng, người này tự phân công nhân viên và báo kết quả.</div>
+            <div className="people">
+              {stores.length === 0 && <div className="hint">Không có cửa hàng nào</div>}
+              {stores.map((st) => {
+                const on = pickedStores.includes(st.storeCode);
+                const none = st.managers.length === 0;
+                return (
+                  <button type="button" key={st.storeCode} disabled={none} className={`person ${on ? "on" : ""}`}
+                    onClick={() => setPickedStores((cur) => (cur.includes(st.storeCode) ? cur.filter((x) => x !== st.storeCode) : [...cur, st.storeCode]))}>
+                    <Avatar name={st.managers[0]?.name || st.storeName} size={34} />
+                    <span className="person-info">
+                      <b>{st.storeName || st.storeCode}</b>
+                      <small>{none ? "Chưa có cửa hàng trưởng" : `CHT: ${st.managers.map((m) => m.name).join(", ")}`}</small>
+                    </span>
+                    <span className="tick">{on && <Icon name="check" size={14} />}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {stores.length > 1 && (
+              <button type="button" className="link" onClick={() => setPickedStores(stores.filter((x) => x.managers.length).map((x) => x.storeCode))}>Chọn tất cả</button>
+            )}
+          </section>
+        ) : (
         <section className="panel">
           <div className="panel-head">
             <h3>Người thực hiện</h3>
@@ -150,6 +196,7 @@ export default function TaskFormPage() {
             ))}
           </div>
         </section>
+        )}
 
         <section className="panel">
           <h3>Thời hạn</h3>
@@ -190,8 +237,8 @@ export default function TaskFormPage() {
         </section>
 
         <div className="action-bar">
-          <button className="btn primary wide" disabled={busy || !title.trim()}>
-            {busy ? "Đang lưu..." : editId ? "Lưu thay đổi" : selected.length > 1 ? `Giao cho ${selected.length} người` : "Giao việc"}
+          <button className="btn primary wide" disabled={busy || !title.trim() || (mode === "store" && pickedStores.length === 0)}>
+            {busy ? "Đang lưu..." : editId ? "Lưu thay đổi" : mode === "store" ? (pickedStores.length > 1 ? `Giao cho ${pickedStores.length} cửa hàng` : "Giao cho cửa hàng") : selected.length > 1 ? `Giao cho ${selected.length} người` : "Giao việc"}
           </button>
         </div>
       </form>
