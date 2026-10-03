@@ -5453,8 +5453,13 @@ def api_zalo_oa_status():
         log = cur.fetchall()
         cur.execute("SELECT detail, created_at FROM zalo_oa_push_log WHERE ok = 2 ORDER BY id DESC LIMIT 5")
         hooks = cur.fetchall()
-        cur.execute("SELECT COUNT(*) FILTER (WHERE followed = 1) AS n, MAX(last_interaction) AS last_at FROM oa_seen_users")
+        cur.execute("SELECT COUNT(*) FILTER (WHERE followed = 1) AS n, COUNT(*) AS all_n, MAX(last_interaction) AS last_at FROM oa_seen_users")
         seen = cur.fetchone()
+    if not seen["all_n"] and hooks:
+        _backfill_seen_from_log()
+        with db.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FILTER (WHERE followed = 1) AS n, COUNT(*) AS all_n, MAX(last_interaction) AS last_at FROM oa_seen_users")
+            seen = cur.fetchone()
     events = []
     for h in hooks:
         m = re.search(r'"event_name":\s*"([^"]+)"', h["detail"] or "")
@@ -5566,11 +5571,47 @@ def _oa_seen_ids(period: str, limit: int = OA_CARE_MAX_RECIPIENTS) -> list[str]:
         return [r["user_id"] for r in cur.fetchall()]
 
 
+def _backfill_seen_from_log() -> int:
+    """Webhook events logged before oa_seen_users existed still hold the sender/follower id in their first 500
+    characters. Replay them once so earlier messages count as interactions."""
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT detail, created_at FROM zalo_oa_push_log WHERE ok = 2 ORDER BY id")
+        rows = cur.fetchall()
+    added = 0
+    for r in rows:
+        d = r["detail"] or ""
+        ev = re.search(r'"event_name":\s*"([^"]+)"', d)
+        if not ev:
+            continue
+        name = ev.group(1)
+        if name in ("follow", "unfollow"):
+            m = re.search(r'"follower":\s*\{\s*"id":\s*"(\d+)"', d)
+        elif name.startswith(("user_send_", "user_click_", "user_submit_")):
+            m = re.search(r'"sender":\s*\{\s*"id":\s*"(\d+)"', d)
+        else:
+            continue
+        if not m:
+            continue
+        with db.cursor() as cur:
+            cur.execute("INSERT INTO oa_seen_users (user_id, first_seen, last_interaction, followed) VALUES (%s,%s,%s,%s) "
+                        "ON CONFLICT (user_id) DO UPDATE SET last_interaction = GREATEST(oa_seen_users.last_interaction, EXCLUDED.last_interaction), "
+                        "followed = EXCLUDED.followed",
+                        (m.group(1), r["created_at"], r["created_at"], 0 if name == "unfollow" else 1))
+        added += 1
+    db.commit()
+    return added
+
+
 def _care_audience(period: str) -> dict:
     """Recipients for a period: Zalo's own list when the app may call it, else the webhook-recorded followers."""
     ids, total, err = _oa_follower_ids(period)
     if not err or ids:
         return {"ids": ids, "total": total if total is not None else len(ids), "source": "zalo", "apiError": ""}
+    with get_db().cursor() as cur:
+        cur.execute("SELECT COUNT(*) AS n FROM oa_seen_users")
+        if not cur.fetchone()["n"]:
+            _backfill_seen_from_log()
     seen = _oa_seen_ids(period)
     with get_db().cursor() as cur:
         cur.execute("SELECT COUNT(*) AS n FROM oa_seen_users WHERE followed = 1")
