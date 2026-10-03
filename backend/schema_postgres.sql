@@ -1477,3 +1477,10 @@ CREATE TABLE IF NOT EXISTS oa_care_campaigns (
     created_at TEXT,
     finished_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS oa_seen_users (
+    user_id TEXT PRIMARY KEY,
+    first_seen TEXT,
+    last_interaction TEXT,
+    followed INTEGER NOT NULL DEFAULT 1
+);

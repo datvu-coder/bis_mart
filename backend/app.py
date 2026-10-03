@@ -5416,6 +5416,20 @@ def api_zalo_oa_webhook():
             cur.execute("INSERT INTO zalo_oa_pending (app_user, oa_user, created_at) VALUES (%s,%s,%s) "
                         "ON CONFLICT (app_user) DO UPDATE SET oa_user = EXCLUDED.oa_user, created_at = EXCLUDED.created_at",
                         (app_user, oa_user, _now_iso()))
+    # Remember who interacted with the OA: a follow, or a message from the user (the OA's own messages carry the
+    # user as recipient and are not an interaction).
+    event = str(data.get("event_name") or "")
+    seen_user = ""
+    if event in ("follow", "unfollow"):
+        seen_user = str(follower.get("id") or "")
+    elif event.startswith("user_send_") or event.startswith("user_click_") or event.startswith("user_submit_"):
+        seen_user = str(sender.get("id") or "")
+    if seen_user:
+        with db.cursor() as cur:
+            cur.execute("INSERT INTO oa_seen_users (user_id, first_seen, last_interaction, followed) VALUES (%s,%s,%s,%s) "
+                        "ON CONFLICT (user_id) DO UPDATE SET last_interaction = EXCLUDED.last_interaction, "
+                        "followed = CASE WHEN %s = 'unfollow' THEN 0 WHEN %s = 'follow' THEN 1 ELSE oa_seen_users.followed END",
+                        (seen_user, _now_iso(), _now_iso(), 0 if event == "unfollow" else 1, event, event))
     with db.cursor() as cur:
         cur.execute("INSERT INTO zalo_oa_push_log (employee_id, ok, detail, created_at) VALUES (NULL, 2, %s, %s)",
                     (("webhook " + json.dumps(data, ensure_ascii=False))[:500], _now_iso()))
@@ -5471,7 +5485,6 @@ def api_zalo_oa_test():
 
 
 ZALO_OA_USERLIST_URL = "https://openapi.zalo.me/v3.0/oa/user/getlist"
-ZALO_OA_FOLLOWERS_V2_URL = "https://openapi.zalo.me/v2.0/oa/getfollowers"
 OA_CARE_PERIODS = {"TODAY", "YESTERDAY", "L7D", "L30D", "ALL"}
 OA_CARE_MAX_RECIPIENTS = int(os.getenv("OA_CARE_MAX_RECIPIENTS", "1000"))
 OA_CARE_DAILY_MAX = int(os.getenv("OA_CARE_DAILY_MAX", "3000"))
@@ -5513,19 +5526,6 @@ def _oa_follower_ids(period: str, limit: int = OA_CARE_MAX_RECIPIENTS) -> tuple[
         if period != "ALL":
             data["last_interaction_period"] = period
         ok, obj, raw = _oa_call_json(ZALO_OA_USERLIST_URL, query={"data": json.dumps(data)})
-        if not ok and period == "ALL":
-            # Older followers endpoint: registered separately from the v3 list, and has no interaction filter.
-            ok, obj, raw2 = _oa_call_json(ZALO_OA_FOLLOWERS_V2_URL, query={"data": json.dumps({"offset": offset, "count": 50})})
-            if ok:
-                body = obj.get("data") or {}
-                users = body.get("followers") or []
-                total = body.get("total", total)
-                ids += [str(u.get("user_id")) for u in users if u.get("user_id")]
-                if len(users) < 50:
-                    break
-                offset += 50
-                continue
-            raw = f"{raw} | v2: {raw2}"
         if not ok:
             return ids, total, raw
         body = obj.get("data") or {}
@@ -5536,6 +5536,37 @@ def _oa_follower_ids(period: str, limit: int = OA_CARE_MAX_RECIPIENTS) -> tuple[
             break
         offset += 50
     return ids[:limit], total, ""
+
+
+def _oa_seen_ids(period: str, limit: int = OA_CARE_MAX_RECIPIENTS) -> list[str]:
+    """Followers recorded from webhook events (follow / user messages), filtered by last interaction day."""
+    now = datetime.now(tz=VN_TZ)
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    fmt = "%Y-%m-%dT%H:%M:%S"
+    where, args = "followed = 1", []
+    if period == "TODAY":
+        where += " AND last_interaction >= %s"; args.append(today.strftime(fmt))
+    elif period == "YESTERDAY":
+        where += " AND last_interaction >= %s AND last_interaction < %s"; args += [(today - timedelta(days=1)).strftime(fmt), today.strftime(fmt)]
+    elif period == "L7D":
+        where += " AND last_interaction >= %s"; args.append((now - timedelta(days=7)).strftime(fmt))
+    elif period == "L30D":
+        where += " AND last_interaction >= %s"; args.append((now - timedelta(days=30)).strftime(fmt))
+    with get_db().cursor() as cur:
+        cur.execute(f"SELECT user_id FROM oa_seen_users WHERE {where} ORDER BY last_interaction DESC LIMIT %s", (*args, limit))
+        return [r["user_id"] for r in cur.fetchall()]
+
+
+def _care_audience(period: str) -> dict:
+    """Recipients for a period: Zalo's own list when the app may call it, else the webhook-recorded followers."""
+    ids, total, err = _oa_follower_ids(period)
+    if not err or ids:
+        return {"ids": ids, "total": total if total is not None else len(ids), "source": "zalo", "apiError": ""}
+    seen = _oa_seen_ids(period)
+    with get_db().cursor() as cur:
+        cur.execute("SELECT COUNT(*) AS n FROM oa_seen_users WHERE followed = 1")
+        known = cur.fetchone()["n"]
+    return {"ids": seen, "total": known, "source": "webhook", "apiError": _care_list_error(err)}
 
 
 def _care_list_error(raw: str) -> str:
@@ -5622,11 +5653,9 @@ def api_oa_care_audience():
     period = (request.args.get("period") or "L7D").upper()
     if period not in OA_CARE_PERIODS:
         return jsonify({"error": "Invalid period"}), 400
-    ids, total, err = _oa_follower_ids(period)
-    if err and not ids:
-        return jsonify({"error": _care_list_error(err), "detail": err}), 502
-    return jsonify({"period": period, "count": len(ids), "total": total if total is not None else len(ids),
-                    "capped": len(ids) >= OA_CARE_MAX_RECIPIENTS})
+    aud = _care_audience(period)
+    return jsonify({"period": period, "count": len(aud["ids"]), "total": aud["total"], "source": aud["source"],
+                    "apiError": aud["apiError"], "capped": len(aud["ids"]) >= OA_CARE_MAX_RECIPIENTS})
 
 
 def _care_payload() -> tuple[str, str] | tuple[None, None]:
@@ -5680,11 +5709,9 @@ def api_oa_care_send():
             return jsonify({"error": "Đang có một đợt gửi chạy. Hãy đợi đợt đó xong rồi gửi tiếp."}), 409
         cur.execute("SELECT COALESCE(SUM(total),0) AS n FROM oa_care_campaigns WHERE created_at >= %s", (now.strftime("%Y-%m-%d"),))
         sent_today = cur.fetchone()["n"]
-    ids, _total, err = _oa_follower_ids(period)
-    if err and not ids:
-        return jsonify({"error": _care_list_error(err), "detail": err}), 502
+    ids = _care_audience(period)["ids"]
     if not ids:
-        return jsonify({"error": "Không có người nhận phù hợp"}), 400
+        return jsonify({"error": "Chưa có người nhận phù hợp trong nhóm này"}), 400
     if sent_today + len(ids) > OA_CARE_DAILY_MAX:
         return jsonify({"error": f"Vượt giới hạn {OA_CARE_DAILY_MAX} tin mỗi ngày (hôm nay đã gửi {sent_today})"}), 429
     with db.cursor() as cur:

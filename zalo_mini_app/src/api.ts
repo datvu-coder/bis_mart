@@ -202,7 +202,7 @@ export const api = {
   oaInfo: () => request<{ oaId: string }>("GET", "/api/zalo/oa-info"),
   oaStatus: () => request<OaStatus>("GET", "/api/zalo/oa-status"),
   oaConnect: () => request<{ url: string }>("POST", "/api/zalo/oa-connect", {}),
-  careAudience: (period: string) => request<{ period: string; count: number; total: number; capped: boolean }>("GET", `/api/oa/care/audience?period=${period}`),
+  careAudience: (period: string) => request<{ period: string; count: number; total: number; capped: boolean; source: "zalo" | "webhook"; apiError: string }>("GET", `/api/oa/care/audience?period=${period}`),
   careTest: (body: string, imageName: string) => request<{ ok: boolean; detail: string }>("POST", "/api/oa/care/test", { body, imageName }),
   careSend: (body: string, imageName: string, period: string) => request<{ id: number; total: number }>("POST", "/api/oa/care/send", { body, imageName, period }),
   careCampaigns: () => request<{ campaigns: CareCampaign[] }>("GET", "/api/oa/care/campaigns"),

@@ -27,7 +27,7 @@ export default function CarePage() {
   const [body, setBody] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [period, setPeriod] = useState("YESTERDAY");
-  const [audience, setAudience] = useState<{ count: number; total: number; capped: boolean } | null>(null);
+  const [audience, setAudience] = useState<{ count: number; total: number; capped: boolean; source: "zalo" | "webhook" } | null>(null);
   const [audErr, setAudErr] = useState("");
   const [campaigns, setCampaigns] = useState<CareCampaign[]>([]);
   const [busy, setBusy] = useState(false);
@@ -91,8 +91,11 @@ export default function CarePage() {
           {PERIODS.map((p) => <button type="button" key={p.value} className={`chip ${period === p.value ? "active" : ""}`} onClick={() => setPeriod(p.value)}>{p.label}</button>)}
         </div>
         <div className="care-audience">
-          {audErr ? <div className="error inline">{audErr}</div> : audience ? <><b>{audience.count}{audience.capped ? "+" : ""}</b> người nhận · tổng {audience.total} người quan tâm</> : "Đang đếm..."}
+          {audErr ? <div className="error inline">{audErr}</div> : audience ? <><b>{audience.count}{audience.capped ? "+" : ""}</b> người nhận · {audience.source === "webhook" ? "đã ghi nhận" : "tổng"} {audience.total} người quan tâm</> : "Đang đếm..."}
         </div>
+        {audience?.source === "webhook" && (
+          <p className="hint nopad">Zalo chưa cho app lấy toàn bộ danh sách người quan tâm, nên đang dùng những người đã quan tâm hoặc nhắn tin cho OA từ khi app bắt đầu ghi nhận ({audience.total} người). Danh sách sẽ đầy dần theo thời gian.</p>
+        )}
         <p className="hint nopad">Tin tư vấn chỉ gửi được cho người đã tương tác với OA trong 48 giờ gần nhất. {hint}.</p>
       </section>
 
