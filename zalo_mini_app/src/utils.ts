@@ -117,3 +117,15 @@ export const todayYmd = (): string => {
 
 /** Keep only digits, so money fields accept pasted "1.250.000". */
 export const digits = (v: string): string => v.replace(/\D/g, "");
+
+/** "2 giờ 10 phút", "1 ngày 3 giờ" between two timestamps (or now). */
+export function spanText(fromIso: string, toIso?: string | null): string {
+  const ms = Math.max(0, (toIso ? parseLocal(toIso).getTime() : Date.now()) - parseLocal(fromIso).getTime());
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return "dưới 1 phút";
+  if (min < 60) return `${min} phút`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return min % 60 ? `${h} giờ ${min % 60} phút` : `${h} giờ`;
+  const d = Math.floor(h / 24);
+  return h % 24 ? `${d} ngày ${h % 24} giờ` : `${d} ngày`;
+}

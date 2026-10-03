@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Page, useSnackbar } from "zmp-ui";
 import { absoluteUrl, api } from "../api";
 import Icon from "../components/Icon";
+import { OrderProgress } from "../components/OrderTimeline";
 import Skeleton, { EmptyState } from "../components/Skeleton";
 import SubHero from "../components/SubHero";
 import { useDataVersion } from "../data";
@@ -103,6 +104,7 @@ export default function OrdersPage() {
                   <span className="meta-item"><Icon name="user" size={14} /> {o.createdByName}</span>
                   {o.supplier && <span className="meta-item"><Icon name="store" size={14} /> {o.supplier}</span>}
                 </div>
+                <OrderProgress order={o} />
               </button>
             ))}
           </div>

@@ -6286,7 +6286,7 @@ def _order_to_json(r: dict, items: list | None = None) -> dict:
         "approvedAt": r.get("approved_at"), "orderedAt": r.get("ordered_at"), "receivedAt": r.get("received_at"),
         "receivedByName": r.get("receiver_name") or "", "receiptNote": r.get("receipt_note") or "",
         "receiptPhotos": _json_list(r.get("receipt_photos")), "itemCount": int(r.get("item_count") or 0),
-        "totalQty": float(r.get("total_qty") or 0), "createdAt": r.get("created_at"),
+        "totalQty": float(r.get("total_qty") or 0), "createdAt": r.get("created_at"), "updatedAt": r.get("updated_at"),
     }
     if items is not None:
         out["items"] = items
