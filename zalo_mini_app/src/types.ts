@@ -54,6 +54,7 @@ export interface Assignee {
   employeeCode: string;
   position: string;
   storeCode: string;
+  storeName?: string;
 }
 
 export interface StoreSummary {

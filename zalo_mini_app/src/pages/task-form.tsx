@@ -58,7 +58,8 @@ export default function TaskFormPage() {
     const q = search.trim().toLowerCase();
     const list = employees.filter((e) => !q || e.fullName.toLowerCase().includes(q) || e.employeeCode.toLowerCase().includes(q));
     const map = new Map<string, Assignee[]>();
-    list.forEach((e) => map.set(e.storeCode || "Khác", [...(map.get(e.storeCode || "Khác") || []), e]));
+    const label = (e: Assignee) => e.storeName || (e.storeCode ? `Cửa hàng ${e.storeCode}` : "Khác");
+    list.forEach((e) => map.set(label(e), [...(map.get(label(e)) || []), e]));
     return Array.from(map.entries());
   }, [employees, search]);
 
