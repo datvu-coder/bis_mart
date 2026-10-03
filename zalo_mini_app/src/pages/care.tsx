@@ -91,7 +91,7 @@ export default function CarePage() {
           {PERIODS.map((p) => <button type="button" key={p.value} className={`chip ${period === p.value ? "active" : ""}`} onClick={() => setPeriod(p.value)}>{p.label}</button>)}
         </div>
         <div className="care-audience">
-          {audErr ? <span className="error inline">{audErr}</span> : audience ? <><b>{audience.count}{audience.capped ? "+" : ""}</b> người nhận · tổng {audience.total} người quan tâm</> : "Đang đếm..."}
+          {audErr ? <div className="error inline">{audErr}</div> : audience ? <><b>{audience.count}{audience.capped ? "+" : ""}</b> người nhận · tổng {audience.total} người quan tâm</> : "Đang đếm..."}
         </div>
         <p className="hint nopad">Tin tư vấn chỉ gửi được cho người đã tương tác với OA trong 48 giờ gần nhất. {hint}.</p>
       </section>
