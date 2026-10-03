@@ -49,6 +49,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         if (getToken()) {
           setUser((await api.me()).user);
+          // Sessions restored from a stored token were never tied to a Zalo account; do it silently once.
+          zaloAccessToken().then((z) => (z ? api.zaloLink(z) : null)).catch(() => {});
           return;
         }
         const zalo = await zaloAccessToken();

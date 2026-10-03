@@ -1456,3 +1456,9 @@ CREATE TABLE IF NOT EXISTS announcement_reads (
 ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_position_check;
 ALTER TABLE employees ADD CONSTRAINT employees_position_check
     CHECK (position IN ('ADM', 'PG', 'TLD', 'SM', 'MNG', 'CS'));
+
+CREATE TABLE IF NOT EXISTS zalo_oa_pending (
+    app_user TEXT PRIMARY KEY,
+    oa_user TEXT NOT NULL,
+    created_at TEXT
+);
