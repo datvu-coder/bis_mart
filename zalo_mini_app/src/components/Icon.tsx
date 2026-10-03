@@ -39,6 +39,7 @@ const PATHS = {
   download: "M12 4v11M7 11l5 5 5-5M5 20h14",
   minus: "M5 12h14",
   grid: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
+  minimize: "M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7",
   inbox: "M3 13l3-8h12l3 8M3 13v6h18v-6M3 13h5l1 3h6l1-3h5",
 } as const;
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../../api";
 import Icon from "../../components/Icon";
+import MinimizeButton from "../../components/MinimizeButton";
 import NotificationBell from "../../components/NotificationBell";
 import Skeleton, { EmptyState } from "../../components/Skeleton";
 import { useDataVersion } from "../../data";
@@ -52,6 +53,7 @@ export default function SummaryTab({ active, onOpenStore }: Props) {
             <h1>Tổng quan cửa hàng</h1>
           </div>
           <div className="hero-actions">
+            <MinimizeButton />
             <NotificationBell />
             <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
           </div>

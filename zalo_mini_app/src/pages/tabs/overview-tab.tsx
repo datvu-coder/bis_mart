@@ -4,6 +4,7 @@ import { useAuth } from "../../auth";
 import Avatar from "../../components/Avatar";
 import { DailyChart, RateBars, StatusBar } from "../../components/charts";
 import Icon from "../../components/Icon";
+import MinimizeButton from "../../components/MinimizeButton";
 import NotificationBell from "../../components/NotificationBell";
 import Sheet from "../../components/Sheet";
 import Skeleton, { EmptyState } from "../../components/Skeleton";
@@ -103,6 +104,7 @@ export default function OverviewTab({ active }: { active: boolean }) {
             <button className={`hero-btn ${filtered ? "has-filter" : ""}`} onClick={openFilter} aria-label="Bộ lọc">
             <Icon name="filter" size={19} />
           </button>
+          <MinimizeButton />
           <NotificationBell />
             <button className="hero-btn" onClick={load} aria-label="Làm mới"><Icon name="refresh" size={20} /></button>
           </div>
