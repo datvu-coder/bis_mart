@@ -310,10 +310,6 @@ export interface OaStatus {
   webhookKey: boolean;
   tokenExpiresAt: string | null;
   employees: { total: number; zaloLinked: number; oaMapped: number };
-  recent: { employeeId: number | null; ok: number; detail: string; at: string }[];
-  webhookEvents?: { name: string; at: string }[];
-  seen?: { total: number; lastAt: string | null; samples?: { userId: string; appUser: string; lastAt: string }[] };
-  me?: { zaloId: string; zaloOaId: string };
 }
 
 export interface CareCampaign {

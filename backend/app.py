@@ -5450,39 +5450,13 @@ def api_zalo_oa_status():
                     "COUNT(*) FILTER (WHERE zalo_oa_id IS NOT NULL) AS oa_mapped, COUNT(*) AS total "
                     "FROM employees WHERE is_active = 1")
         counts = cur.fetchone()
-        cur.execute("SELECT employee_id, ok, detail, created_at FROM zalo_oa_push_log ORDER BY id DESC LIMIT 5")
-        log = cur.fetchall()
-        cur.execute("SELECT detail, created_at FROM zalo_oa_push_log WHERE ok = 2 ORDER BY id DESC LIMIT 5")
-        hooks = cur.fetchall()
-        cur.execute("SELECT COUNT(*) FILTER (WHERE followed = 1) AS n, COUNT(*) AS all_n, MAX(last_interaction) AS last_at FROM oa_seen_users")
-        seen = cur.fetchone()
-    with db.cursor() as cur:
-        cur.execute("SELECT COUNT(*) FILTER (WHERE COALESCE(app_user,'') = '') AS missing FROM oa_seen_users")
-        missing_app = cur.fetchone()["missing"]
-    if (not seen["all_n"] or missing_app) and hooks:
-        _backfill_seen_from_log()
-        with db.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FILTER (WHERE followed = 1) AS n, COUNT(*) AS all_n, MAX(last_interaction) AS last_at FROM oa_seen_users")
-            seen = cur.fetchone()
-    with db.cursor() as cur:
-        cur.execute("SELECT user_id, app_user, last_interaction FROM oa_seen_users ORDER BY last_interaction DESC LIMIT 3")
-        samples = [{"userId": r["user_id"], "appUser": r["app_user"] or "", "lastAt": r["last_interaction"]} for r in cur.fetchall()]
-        cur.execute("SELECT zalo_id, zalo_oa_id FROM employees WHERE id = %s", ((g.current_user or {}).get("employee_id"),))
-        mine = cur.fetchone() or {}
-    events = []
-    for h in hooks:
-        m = re.search(r'"event_name":\s*"([^"]+)"', h["detail"] or "")
-        events.append({"name": m.group(1) if m else "?", "at": h["created_at"]})
     return jsonify({
-        "webhookEvents": events, "seen": {"total": seen["n"], "lastAt": seen["last_at"], "samples": samples},
-        "me": {"zaloId": mine.get("zalo_id") or "", "zaloOaId": mine.get("zalo_oa_id") or ""},
         "configured": bool(tokens.get("access_token") or tokens.get("refresh_token")),
         "canRefresh": bool(ZALO_OA_APP_ID and ZALO_OA_SECRET_KEY and tokens.get("refresh_token")),
         "oaId": ZALO_OA_ID or (tokens.get("oa_id") or ""), "webhookKey": bool(ZALO_OA_WEBHOOK_KEY),
         "appConfigured": bool(ZALO_OA_APP_ID and ZALO_OA_SECRET_KEY),
         "tokenExpiresAt": tokens.get("expires_at"),
         "employees": {"total": counts["total"], "zaloLinked": counts["linked"], "oaMapped": counts["oa_mapped"]},
-        "recent": [{"employeeId": r["employee_id"], "ok": r["ok"], "detail": r["detail"], "at": r["created_at"]} for r in log],
     })
 
 

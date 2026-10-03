@@ -12,17 +12,6 @@ import { clearDataCache, clearOps, useOpsSummary } from "../../data";
 import { OaStatus, Task } from "../../types";
 import { isOpen } from "../../utils";
 
-const logTime = (at: string) => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/.exec(at || "");
-  return m ? `${m[4]} · ${m[3]}/${m[2]}/${m[1]}` : at;
-};
-const logTitle = (r: { ok: number; detail: string }) => {
-  if (r.ok === 2) return "Zalo báo có người theo dõi / nhắn tin cho OA";
-  const test = r.detail.startsWith("test");
-  if (r.ok === 1) return test ? "Gửi tin thử thành công" : "Đã gửi thông báo đẩy";
-  return `${test ? "Tin thử" : "Thông báo đẩy"} bị Zalo từ chối`;
-};
-
 export default function MeTab({ tasks }: { tasks: Task[] }) {
   const { user, logout } = useAuth();
   const { openSnackbar } = useSnackbar();
@@ -141,38 +130,13 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
 
       {ops?.isAdmin && oaStatus && (
         <div className="panel">
-          <div className="panel-head"><h3>Thông báo đẩy (quản trị)</h3><span className={`tag-soft ${oaStatus.configured ? "ok" : "bad"}`}>{oaStatus.configured ? "Đã cấu hình" : "Chưa cấu hình"}</span></div>
+          <div className="panel-head"><h3>Thông báo qua Zalo OA</h3><span className={`tag-soft ${oaStatus.configured ? "ok" : "bad"}`}>{oaStatus.configured ? "Đã cấu hình" : "Chưa cấu hình"}</span></div>
           <div className="kv-list">
-            <div><span>Tự gia hạn mã OA</span><b>{oaStatus.canRefresh ? "Có" : "Chưa"}</b></div>
             <div><span>Nhân viên đã liên kết Zalo</span><b>{oaStatus.employees.zaloLinked}/{oaStatus.employees.total}</b></div>
-            <div><span>Đã nối với OA (nhận được tin)</span><b>{oaStatus.employees.oaMapped}</b></div>
-            <div><span>Khách đã ghi nhận qua webhook</span><b>{oaStatus.seen?.total ?? 0}</b></div>
           </div>
           <button className="btn wide soft" onClick={connect}><Icon name="refresh" size={16} /> {oaStatus.canRefresh ? "Kết nối lại OA" : "Kết nối OA"}</button>
           <button className="btn wide soft" disabled={testing || !oaStatus.configured} onClick={sendTest}>{testing ? "Đang gửi..." : "Gửi tin thử cho tôi"}</button>
           {testResult && <div className="hint">{testResult}</div>}
-          <details className="oa-tech">
-            <summary>Chi tiết kỹ thuật</summary>
-            <div className="kv-list">
-            <div><span>ID Zalo của tôi</span><b className="mono">{oaStatus.me?.zaloId || "chưa có"}</b></div>
-            <div><span>ID OA của tôi</span><b className="mono">{oaStatus.me?.zaloOaId || "chưa có"}</b></div>
-            {oaStatus.seen?.samples?.map((x) => (
-              <div key={x.userId}><span>Khách gần nhất</span><b className="mono">{x.userId}{x.appUser ? ` / ${x.appUser}` : ""}</b></div>
-            ))}
-            <div><span>Sự kiện webhook gần nhất</span><b>{oaStatus.webhookEvents?.[0] ? `${oaStatus.webhookEvents[0].name} · ${logTime(oaStatus.webhookEvents[0].at)}` : "chưa có"}</b></div>
-            </div>
-          </details>
-          {oaStatus.recent.length > 0 && (
-            <details className="oa-log">
-              <summary>Nhật ký gần đây</summary>
-              {oaStatus.recent.slice(0, 5).map((r, i) => (
-                <div key={i} className={`oa-log-row ${r.ok === 1 ? "ok" : r.ok === 2 ? "neutral" : "bad"}`}>
-                  <span className="dot" />
-                  <div><b>{logTitle(r)}</b><small>{logTime(r.at)}</small></div>
-                </div>
-              ))}
-            </details>
-          )}
         </div>
       )}
 
