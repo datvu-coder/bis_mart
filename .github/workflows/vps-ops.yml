@@ -52,16 +52,13 @@ jobs:
           ssh -i ~/.ssh/vps_key -o StrictHostKeyChecking=accept-new root@146.196.64.92 '
             set -e
             echo "=== containers ==="
-            docker ps -a --filter "name=bismart" --filter "name=bis_mart"
+            docker ps -a
             echo
             echo "=== backend logs (last 150 lines) ==="
             docker logs --tail 150 bis_mart_backend 2>&1 || echo "(khong tim thay container bis_mart_backend)"
             echo
             echo "=== backend health ==="
             docker inspect --format="Status: {{.State.Status}}  Health: {{if .State.Health}}{{.State.Health.Status}}{{else}}(no healthcheck){{end}}" bis_mart_backend 2>&1 || true
-            echo
-            echo "=== employees table constraints (read-only) ==="
-            docker exec -i bismart-postgres psql -U bismart -d bismart -c "SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = '"'"'employees'"'"'::regclass;" 2>&1 || echo "(khong truy van duoc)"
             echo
             echo "=== disk space ==="
             df -h /
