@@ -1,7 +1,7 @@
 import type {
   Analytics, Announcement, AnnouncementDetail, AppNotification, Assignee, CatalogProduct, FundEntry, FundReport,
   FundReportDetail, FundSuggest, MediaItem, Order, OrderDetail, OrderItem, OrderSummary, OpsSummary, StoreSummary,
-  StoreWithManagers, Task, TaskDetail, User,
+  OaStatus, StoreWithManagers, Task, TaskDetail, User,
 } from "./types";
 
 const BASE_URL: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "https://api.bismart.id.vn";
@@ -43,6 +43,7 @@ const ERROR_VI: Record<string, string> = {
   "Invalid denomination count": "Số tờ không hợp lệ.",
   "Invalid amount": "Số tiền không hợp lệ.",
   "Report already approved": "Báo cáo ngày này đã được duyệt, không sửa được nữa.",
+  "Webhook not configured": "Webhook chưa được cấu hình.",
   "Report not found": "Không tìm thấy báo cáo.",
   "Only an admin can delete an approved report": "Báo cáo đã duyệt chỉ admin mới xoá được.",
   "Report is not awaiting review": "Báo cáo này đã được xử lý rồi.",
@@ -197,6 +198,9 @@ export const api = {
     request<{ items: MediaItem[]; total: number }>("GET", `/api/media?${new URLSearchParams(q)}`),
   exportLink: (kind: "fund" | "orders", storeCode = "", from = "", to = "") =>
     request<{ path: string }>("POST", "/api/export-link", { kind, storeCode, from, to }),
+  oaInfo: () => request<{ oaId: string }>("GET", "/api/zalo/oa-info"),
+  oaStatus: () => request<OaStatus>("GET", "/api/zalo/oa-status"),
+  oaTest: () => request<{ ok: boolean; detail: string; target: string | null }>("POST", "/api/zalo/oa-test", {}),
   opsSummary: () => request<OpsSummary>("GET", "/api/ops/summary"),
   uploadPhoto: (file: File) => {
     const form = new FormData();
