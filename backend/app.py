@@ -5580,13 +5580,15 @@ def _valid_doer_ids(raw: Any, store_code: str | None) -> list[int] | None:
 @app.get("/api/tasks/stores")
 @login_required
 def api_task_stores():
-    """Stores in the caller's scope with their store managers (store_role SM), for 'assign by store'."""
+    """Stores in the caller's scope with their store managers (employees whose position is SM in that store, or
+    designated SM in store_managers), for 'assign by store'."""
     viewer = _task_viewer()
     if not viewer["can_manage"]:
         return _forbidden()
     sql = ("SELECT s.store_code, s.name, e.id AS emp_id, e.full_name FROM stores s "
-           "LEFT JOIN store_managers sm ON sm.store_id = s.id AND UPPER(sm.store_role) = 'SM' "
-           "LEFT JOIN employees e ON e.id = sm.employee_id AND e.is_active = 1 "
+           "LEFT JOIN employees e ON e.is_active = 1 AND ("
+           "  (UPPER(COALESCE(e.position,'')) = 'SM' AND UPPER(COALESCE(e.store_code,'')) = UPPER(s.store_code)) "
+           "  OR e.id IN (SELECT sm.employee_id FROM store_managers sm WHERE sm.store_id = s.id AND UPPER(sm.store_role) = 'SM')) "
            "WHERE NOT (COALESCE(s.status,'') ILIKE '%%đóng%%' OR COALESCE(s.status,'') ILIKE '%%ngừng%%') ")
     params: list[Any] = []
     if viewer["scope"] is not None:
@@ -5690,18 +5692,19 @@ def api_task_assignees():
     viewer = _task_viewer()
     if not viewer["can_manage"]:
         return _forbidden()
-    sql = "SELECT id, full_name, employee_code, position, store_code FROM employees WHERE is_active = 1 "
+    sql = ("SELECT e.id, e.full_name, e.employee_code, e.position, e.store_code, s.name AS store_name FROM employees e "
+           "LEFT JOIN stores s ON UPPER(s.store_code) = UPPER(e.store_code) WHERE e.is_active = 1 ")
     params: list[Any] = []
     if viewer["scope"] is not None:
-        sql += "AND UPPER(store_code) = ANY(%s) "
+        sql += "AND UPPER(e.store_code) = ANY(%s) "
         params.append(list(viewer["scope"]))
-    sql += "ORDER BY store_code, full_name"
+    sql += "ORDER BY e.store_code, e.full_name"
     with get_db().cursor() as cur:
         cur.execute(sql, params)
         rows = cur.fetchall()
     return jsonify({"employees": [
         {"id": r["id"], "fullName": r["full_name"], "employeeCode": r["employee_code"],
-         "position": r["position"], "storeCode": r.get("store_code") or ""} for r in rows
+         "position": r["position"], "storeCode": r.get("store_code") or "", "storeName": r.get("store_name") or ""} for r in rows
     ]})
 
 
