@@ -1417,3 +1417,17 @@ CREATE TABLE IF NOT EXISTS announcement_reads (
     read_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (announcement_id, employee_id)
 );
+
+-- Migration: production has an "employees_position_check" CHECK constraint
+-- that was never captured in this file (added directly on the VPS at some
+-- point, not through this script), so it only allowed whatever subset of
+-- position codes existed back then. It rejected 'SM' (Cửa hàng trưởng) with
+-- a 500 the moment that code was exposed in the Flutter position picker,
+-- even though 'SM' is already recognized everywhere else in the app
+-- (Permission.storeRoleLabels, Employee.positionLabel, Permission.
+-- defaultForPosition). Replace it with one that covers every code the
+-- picker can actually send. DROP+ADD is the idempotent way to redefine a
+-- CHECK constraint — Postgres has no "ADD CONSTRAINT IF NOT EXISTS".
+ALTER TABLE employees DROP CONSTRAINT IF EXISTS employees_position_check;
+ALTER TABLE employees ADD CONSTRAINT employees_position_check
+    CHECK (position IN ('ADM', 'PG', 'TLD', 'SM', 'MNG', 'CS'));
