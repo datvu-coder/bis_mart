@@ -26,7 +26,6 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
   const [oaId, setOaId] = useState("");
   const [oaStatus, setOaStatus] = useState<OaStatus | null>(null);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState("");
 
   useEffect(() => { api.oaInfo().then((r) => setOaId(r.oaId)).catch(() => {}); }, []);
   useEffect(() => { if (ops?.isAdmin) api.oaStatus().then(setOaStatus).catch(() => {}); }, [ops?.isAdmin]);
@@ -56,15 +55,13 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
   };
   const sendTest = async () => {
     setTesting(true);
-    setTestResult("");
     try {
       const r = await api.oaTest();
-      setTestResult(r.ok ? `Đã gửi tin thử (qua ${r.target === "oa" ? "ID của OA" : "ID Mini App"}). Kiểm tra Zalo trên điện thoại.` : `Zalo từ chối: ${r.detail}`);
+      openSnackbar({ text: r.ok ? "Đã gửi tin thử. Kiểm tra Zalo trên điện thoại." : `Zalo từ chối: ${r.detail}`, type: r.ok ? "success" : "error" });
     } catch (e) {
-      setTestResult(e instanceof Error ? e.message : "Không gửi được");
+      openSnackbar({ text: e instanceof Error ? e.message : "Không gửi được", type: "error" });
     } finally {
       setTesting(false);
-      api.oaStatus().then(setOaStatus).catch(() => {});
     }
   };
 
@@ -120,27 +117,20 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
         </dl>
       </div>
 
-      {oaId && (
-        <div className="panel">
-          <div className="panel-head"><h3>Thông báo trên điện thoại</h3></div>
-          <p className="hint nopad">Theo dõi trang Zalo OA của Bi'S MART để nhận việc mới và cảnh báo quan trọng ngay trên màn hình điện thoại.</p>
-          <button className="btn primary wide" onClick={follow}><Icon name="bell" size={18} /> Theo dõi OA</button>
-        </div>
-      )}
-
-      {ops?.isAdmin && oaStatus && (
-        <div className="panel">
-          <div className="panel-head"><h3>Thông báo qua Zalo OA</h3><span className={`tag-soft ${oaStatus.configured ? "ok" : "bad"}`}>{oaStatus.configured ? "Đã cấu hình" : "Chưa cấu hình"}</span></div>
-          <div className="kv-list">
-            <div><span>Nhân viên đã liên kết Zalo</span><b>{oaStatus.employees.zaloLinked}/{oaStatus.employees.total}</b></div>
-          </div>
-          <button className="btn wide soft" onClick={connect}><Icon name="refresh" size={16} /> {oaStatus.canRefresh ? "Kết nối lại OA" : "Kết nối OA"}</button>
-          <button className="btn wide soft" disabled={testing || !oaStatus.configured} onClick={sendTest}>{testing ? "Đang gửi..." : "Gửi tin thử cho tôi"}</button>
-          {testResult && <div className="hint">{testResult}</div>}
-        </div>
-      )}
-
       <div className="panel menu-panel">
+        {oaId && <button className="menu-row" onClick={follow}><Icon name="bell" size={20} /> Nhận thông báo qua Zalo OA <Icon name="chevron" size={16} className="chev" /></button>}
+        {ops?.isAdmin && oaStatus && (
+          <>
+            <button className="menu-row" onClick={connect}>
+              <Icon name="refresh" size={20} /> {oaStatus.canRefresh ? "Kết nối lại Zalo OA" : "Kết nối Zalo OA"}
+              <span className="row-meta">{oaStatus.employees.zaloLinked}/{oaStatus.employees.total} đã liên kết</span>
+              <Icon name="chevron" size={16} className="chev" />
+            </button>
+            <button className="menu-row" disabled={testing || !oaStatus.configured} onClick={sendTest}>
+              <Icon name="send" size={20} /> {testing ? "Đang gửi..." : "Gửi tin thử cho tôi"} <Icon name="chevron" size={16} className="chev" />
+            </button>
+          </>
+        )}
         <button className="menu-row" onClick={() => setPwOpen(true)}><Icon name="edit" size={20} /> Đổi mật khẩu <Icon name="chevron" size={16} className="chev" /></button>
         <button className="menu-row danger" onClick={() => setConfirm(true)}><Icon name="logout" size={20} /> Đăng xuất</button>
       </div>
