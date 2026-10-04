@@ -12,6 +12,7 @@ import math
 import mimetypes
 import os
 import re
+import unicodedata
 import shutil
 import urllib.error
 import urllib.parse
@@ -7926,8 +7927,31 @@ def _kpi_prev_months(month: str, n: int) -> list[str]:
     return out
 
 
-def _kpi_row_json(row: dict[str, Any]) -> dict[str, Any]:
-    out = {"storeCode": row["store_code"], "storeName": row.get("store_name") or row["store_code"], "region": row.get("region") or ""}
+def _kpi_norm(name: str | None) -> str:
+    """Store name -> comparable key: no accents, no brand prefix, letters and digits only."""
+    t = unicodedata.normalize("NFKD", (name or "").replace("Đ", "D").replace("đ", "d"))
+    t = "".join(c for c in t if not unicodedata.combining(c)).upper()
+    t = re.sub(r"BI'?S\s*MART", "", t)
+    return re.sub(r"[^A-Z0-9]", "", t)
+
+
+def _kpi_app_stores(cur) -> tuple[dict[str, dict], dict[str, dict]]:
+    """The app's own stores, indexed by code and by normalised name."""
+    cur.execute("SELECT store_code, name, province FROM stores")
+    by_code, by_name = {}, {}
+    for r in cur.fetchall():
+        st = {"code": r["store_code"], "name": r["name"], "region": r.get("province") or ""}
+        by_code[r["store_code"].upper()] = st
+        by_name.setdefault(_kpi_norm(r["name"]), st)
+    return by_code, by_name
+
+
+def _kpi_resolve(by_code: dict, by_name: dict, kpi_code: str, kpi_name: str | None) -> dict | None:
+    return by_code.get((kpi_code or "").upper()) or by_name.get(_kpi_norm(kpi_name))
+
+
+def _kpi_row_json(row: dict[str, Any], store: dict) -> dict[str, Any]:
+    out = {"storeCode": store["code"], "storeName": store["name"], "region": store["region"]}
     for k, col in KPI_FIELDS.items():
         out[k] = row.get(col)
     return out
@@ -7937,30 +7961,34 @@ def _kpi_row_json(row: dict[str, Any]) -> dict[str, Any]:
 @login_required
 def api_kpi():
     viewer = _task_viewer()
+    can_edit = _is_admin_user()
     db = get_db()
     with db.cursor() as cur:
         cur.execute("SELECT DISTINCT month FROM store_kpi ORDER BY month DESC")
         months = [r["month"] for r in cur.fetchall()]
         month = _kpi_month_arg(request.args.get("month")) or (months[0] if months else _now_iso()[:7])
+        by_code, by_name = _kpi_app_stores(cur)
         cur.execute("SELECT * FROM store_kpi WHERE month = %s ORDER BY store_code", (month,))
         rows = cur.fetchall()
-        can_edit = _is_admin_user()
         if not rows and can_edit:
-            # Empty month: list the stores of the latest filled month as blank rows so admins can start entering targets.
-            cur.execute("SELECT store_code, store_name, region FROM store_kpi WHERE month = (SELECT MAX(month) FROM store_kpi WHERE month < %s) ORDER BY store_code", (month,))
+            # Empty month: start from the stores of the latest filled month, with blank figures.
+            cur.execute("SELECT store_code, store_name FROM store_kpi WHERE month = (SELECT MAX(month) FROM store_kpi WHERE month < %s) ORDER BY store_code", (month,))
             rows = cur.fetchall()
         history_months = _kpi_prev_months(month, 3)
-        cur.execute("SELECT store_code, month, dst, ds_n1, dst_sb, dst_sbps FROM store_kpi WHERE month = ANY(%s)", (history_months,))
+        cur.execute("SELECT store_code, month, dst, ds_n1 FROM store_kpi WHERE month = ANY(%s)", (history_months,))
         history = cur.fetchall()
     scope = viewer["scope"]
-    if scope is not None:
-        rows = [r for r in rows if r["store_code"].upper() in scope]
     by_store: dict[str, dict[str, dict]] = {}
     for h in history:
         by_store.setdefault(h["store_code"], {})[h["month"]] = h
     stores = []
     for r in rows:
-        item = _kpi_row_json(r)
+        store = _kpi_resolve(by_code, by_name, r["store_code"], r.get("store_name"))
+        if not store:
+            continue  # not a store of the app
+        if scope is not None and store["code"].upper() not in scope:
+            continue
+        item = _kpi_row_json(r, store)
         hist = by_store.get(r["store_code"], {})
         prev = hist.get(history_months[0])
         past = [hist[m]["dst"] for m in history_months if m in hist and hist[m]["dst"]]
@@ -7995,29 +8023,29 @@ def api_kpi_upsert(store_code: str, month: str):
         if values[col] < 0:
             return jsonify({"error": "Giá trị không được âm"}), 400
     db = get_db()
-    code = store_code.strip()
     with db.cursor() as cur:
-        cur.execute("SELECT 1 FROM store_kpi WHERE store_code = %s AND month = %s", (code, month))
-        exists = cur.fetchone()
-        if not exists:
-            cur.execute("SELECT name, province FROM stores WHERE UPPER(store_code) = UPPER(%s)", (code,))
-            st = cur.fetchone()
-            if not st:
-                cur.execute("SELECT store_name, region FROM store_kpi WHERE store_code = %s LIMIT 1", (code,))
-                prev = cur.fetchone()
-                st = {"name": prev["store_name"], "province": prev["region"]} if prev else None
-            if not st:
-                return jsonify({"error": "Không tìm thấy cửa hàng"}), 404
-            cur.execute("INSERT INTO store_kpi (store_code, month, store_name, region) VALUES (%s, %s, %s, %s)",
-                        (code, month, st["name"], st.get("province")))
+        by_code, by_name = _kpi_app_stores(cur)
+        store = by_code.get(store_code.strip().upper())
+        if not store:
+            return jsonify({"error": "Không tìm thấy cửa hàng"}), 404
+        # The workbook import may key a store by its own code; reuse that key when it is the same store.
+        cur.execute("SELECT DISTINCT store_code, store_name FROM store_kpi")
+        key = store["code"]
+        for r in cur.fetchall():
+            hit = _kpi_resolve(by_code, by_name, r["store_code"], r["store_name"])
+            if hit and hit["code"] == store["code"]:
+                key = r["store_code"]
+                break
+        cur.execute("INSERT INTO store_kpi (store_code, month, store_name, region) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                    (key, month, store["name"], store["region"]))
         if values:
             sets = ", ".join(f"{c} = %s" for c in values)
             cur.execute(f"UPDATE store_kpi SET {sets}, updated_by = %s, updated_at = %s WHERE store_code = %s AND month = %s",
-                        [*values.values(), (g.current_user or {}).get("user_id"), _now_iso(), code, month])
-        cur.execute("SELECT * FROM store_kpi WHERE store_code = %s AND month = %s", (code, month))
+                        [*values.values(), (g.current_user or {}).get("user_id"), _now_iso(), key, month])
+        cur.execute("SELECT * FROM store_kpi WHERE store_code = %s AND month = %s", (key, month))
         row = cur.fetchone()
     db.commit()
-    return jsonify(_kpi_row_json(row))
+    return jsonify(_kpi_row_json(row, store))
 
 
 # ----------------------------- hub summary -----------------------------------
