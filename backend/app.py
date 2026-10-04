@@ -7971,8 +7971,9 @@ def api_kpi():
         cur.execute("SELECT * FROM store_kpi WHERE month = %s ORDER BY store_code", (month,))
         rows = cur.fetchall()
         if not rows and can_edit:
-            # Empty month: start from the stores of the latest filled month, with blank figures.
-            cur.execute("SELECT store_code, store_name FROM store_kpi WHERE month = (SELECT MAX(month) FROM store_kpi WHERE month < %s) ORDER BY store_code", (month,))
+            # Empty month: list the app's open stores with blank figures so admins can start entering them.
+            cur.execute("SELECT store_code, name AS store_name FROM stores "
+                        "WHERE NOT (COALESCE(status,'') ILIKE '%%đóng%%' OR COALESCE(status,'') ILIKE '%%ngừng%%') ORDER BY name")
             rows = cur.fetchall()
         history_months = _kpi_prev_months(month, 3)
         cur.execute("SELECT store_code, month, dst, ds_n1 FROM store_kpi WHERE month = ANY(%s)", (history_months,))
@@ -8017,7 +8018,7 @@ def _kpi_clean_values(data: dict) -> tuple[dict[str, Any] | None, str]:
     return values, ""
 
 
-def _kpi_save(cur, by_code: dict, by_name: dict, key_rows: list, store: dict, month: str, values: dict[str, Any]) -> dict:
+def _kpi_save(cur, by_code: dict, by_name: dict, key_rows: list, store: dict, month: str, values: dict[str, Any], skip_blank: bool = False) -> dict | None:
     # The workbook import may key a store by its own code; reuse that key when it is the same store.
     key = store["code"]
     for r in key_rows:
@@ -8025,6 +8026,11 @@ def _kpi_save(cur, by_code: dict, by_name: dict, key_rows: list, store: dict, mo
         if hit and hit["code"] == store["code"]:
             key = r["store_code"]
             break
+    if skip_blank and all(v is None for v in values.values()):
+        # A blank card only matters when the store already has a row to clear.
+        cur.execute("SELECT 1 FROM store_kpi WHERE store_code = %s AND month = %s", (key, month))
+        if not cur.fetchone():
+            return None
     cur.execute("INSERT INTO store_kpi (store_code, month, store_name, region) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
                 (key, month, store["name"], store["region"]))
     if values:
@@ -8086,8 +8092,8 @@ def api_kpi_bulk(month: str):
             store = by_code.get(code)
             if not store:
                 return jsonify({"error": f"Không tìm thấy cửa hàng {code}"}), 404
-            _kpi_save(cur, by_code, by_name, key_rows, store, month, values)
-            saved += 1
+            if _kpi_save(cur, by_code, by_name, key_rows, store, month, values, skip_blank=True):
+                saved += 1
     db.commit()
     return jsonify({"saved": saved})
 
