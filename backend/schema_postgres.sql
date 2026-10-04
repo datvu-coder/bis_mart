@@ -1508,6 +1508,15 @@ CREATE TABLE IF NOT EXISTS store_kpi (
     PRIMARY KEY (store_code, month)
 );
 
+CREATE TABLE IF NOT EXISTS members (
+    id SERIAL PRIMARY KEY,
+    zalo_id TEXT NOT NULL UNIQUE,
+    phone TEXT NOT NULL UNIQUE,
+    full_name TEXT NOT NULL,
+    birthday TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS app_migrations (
     name TEXT PRIMARY KEY,
     applied_at TEXT
