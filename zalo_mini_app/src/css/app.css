@@ -602,3 +602,6 @@ input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-
 .care-detail .care-err { color: var(--error); }
 .panel > h3 + .chip-row.nomargin { margin-top: 10px; }
 .panel .chip-row.care-chips { margin-top: 12px; }
+.menu-row .row-meta { margin-left: auto; font-size: 12px; font-weight: 500; color: var(--muted); }
+.menu-row .row-meta + .chev { margin-left: 8px; }
+.menu-row:disabled { opacity: 0.5; }
