@@ -548,7 +548,7 @@ input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-
 /* ---------- Brand ---------- */
 .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .brand span { font-size: 20px; font-weight: 800; letter-spacing: 1.2px; }
-.app-logo { border-radius: 14px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22); flex-shrink: 0; }
+.app-logo { display: block; border-radius: 22%; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.55), 0 8px 22px rgba(0, 0, 0, 0.25); flex-shrink: 0; }
 
 /* ---------- Pull to refresh ---------- */
 .ptr { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 6px); left: 50%; z-index: 15; width: 40px; height: 40px; border-radius: 50%; background: var(--surface); color: var(--primary); box-shadow: 0 4px 14px rgba(80, 50, 20, 0.22); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
@@ -606,3 +606,4 @@ input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-
 .menu-row .row-meta + .chev { margin-left: 8px; }
 .menu-row:disabled { opacity: 0.5; }
 .sheet-menu { box-shadow: none; padding: 0; margin: 0 0 6px; background: transparent; }
+.login-hero .brand { margin-top: 8px; }
