@@ -208,6 +208,8 @@ export const api = {
   kpi: (month?: string) => request<KpiResponse>("GET", `/api/kpi${month ? `?month=${month}` : ""}`),
   kpiSave: (storeCode: string, month: string, body: Partial<Record<keyof KpiStore, number | string | null>>) =>
     request<KpiStore>("PUT", `/api/kpi/${encodeURIComponent(storeCode)}/${month}`, body),
+  kpiBulk: (month: string, rows: Record<string, string>[]) =>
+    request<{ saved: number }>("PUT", `/api/kpi/${month}`, { rows }),
   careCampaigns: () => request<{ campaigns: CareCampaign[] }>("GET", "/api/oa/care/campaigns"),
   oaTest: () => request<{ ok: boolean; detail: string; target: string | null }>("POST", "/api/zalo/oa-test", {}),
   opsSummary: () => request<OpsSummary>("GET", "/api/ops/summary"),

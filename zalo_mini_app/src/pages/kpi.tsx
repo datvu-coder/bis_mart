@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Page, useSnackbar } from "zmp-ui";
 import { api } from "../api";
 import Icon from "../components/Icon";
@@ -25,13 +26,14 @@ const shiftMonth = (m: string, d: number) => {
   return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
 };
 
-const FIELDS: { key: keyof KpiStore; label: string }[] = [
-  { key: "kpiTotal", label: "KPI doanh số tổng" },
+// Same order as the "Thực hiện" sheet of the workbook, so a pasted range lines up column by column.
+export const FIELDS: { key: keyof KpiStore; label: string }[] = [
   { key: "dst", label: "Doanh số tổng" },
-  { key: "kpiN1", label: "KPI sữa nhóm 1" },
+  { key: "kpiTotal", label: "KPI doanh số tổng" },
   { key: "dsN1", label: "Doanh số sữa nhóm 1" },
-  { key: "kpiSbpsN1", label: "KPI SBPS nhóm 1" },
+  { key: "kpiN1", label: "KPI sữa nhóm 1" },
   { key: "dsSbpsN1", label: "Doanh số SBPS nhóm 1" },
+  { key: "kpiSbpsN1", label: "KPI SBPS nhóm 1" },
   { key: "dstSb", label: "Doanh số sữa bột" },
   { key: "dstSbps", label: "Doanh số SBPS" },
   { key: "stockTotal", label: "Tồn kho tổng" },
@@ -51,6 +53,7 @@ function Progress({ label, actual, target }: { label: string; actual: number | n
 
 export default function KpiPage() {
   const { openSnackbar } = useSnackbar();
+  const nav = useNavigate();
   const [month, setMonth] = useState("");
   const [data, setData] = useState<KpiResponse | null>(null);
   const [error, setError] = useState("");
@@ -119,6 +122,10 @@ export default function KpiPage() {
         <b>{month ? monthLabel(month) : "..."}</b>
         <button className="icon-btn" disabled={!canNext} onClick={() => go(1)} aria-label="Tháng sau"><Icon name="chevron" size={18} /></button>
       </section>
+
+      {data?.canEdit && month && (
+        <button className="btn wide kp-import-btn" onClick={() => nav(`/kpi/import?month=${month}`)}><Icon name="download" size={16} /> Nạp dữ liệu {monthLabel(month).toLowerCase()}</button>
+      )}
 
       {error && <div className="error inline" style={{ margin: "0 14px" }}>{error}</div>}
       {!data && !error && <Skeleton count={4} />}
