@@ -124,7 +124,7 @@ export default function KpiPage() {
       </section>
 
       {data?.canEdit && month && (
-        <button className="btn wide kp-import-btn" onClick={() => nav(`/kpi/import?month=${month}`)}><Icon name="download" size={16} /> Nạp dữ liệu {monthLabel(month).toLowerCase()}</button>
+        <button className="btn wide kp-import-btn" onClick={() => nav(`/kpi/import?month=${month}`)}><Icon name="edit" size={16} /> Nhập dữ liệu {monthLabel(month).toLowerCase()}</button>
       )}
 
       {error && <div className="error inline" style={{ margin: "0 14px" }}>{error}</div>}
