@@ -21,6 +21,7 @@ const growth = (a: number | null | undefined, b: number | null | undefined): num
 const signed = (x: number | null) => (x === null ? "—" : `${x >= 0 ? "+" : ""}${(x * 100).toFixed(1).replace(".", ",")}%`);
 const tone = (x: number | null) => (x === null ? "" : x >= 1 ? "ok" : x >= 0.9 ? "warn" : "bad");
 const monthLabel = (m: string) => `Tháng ${Number(m.slice(5))}/${m.slice(0, 4)}`;
+const thisMonth = () => new Date().toISOString().slice(0, 7);
 const shiftMonth = (m: string, d: number) => {
   const t = Number(m.slice(0, 4)) * 12 + Number(m.slice(5)) - 1 + d;
   return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
@@ -77,8 +78,9 @@ export default function KpiPage() {
   const latest = data?.months[0] || "";
   const oldest = data?.months[data.months.length - 1] || "";
   const go = (d: number) => { const m = shiftMonth(month, d); setData(null); load(m); };
-  const canPrev = !!data && !!oldest && month > oldest;
-  const canNext = !!data && !!latest && (month < latest || (data.canEdit && month === latest));
+  // Admins can step through any month to start entering it; others only see months that have data.
+  const canPrev = !!data && (data.canEdit ? month > shiftMonth(thisMonth(), -24) : !!oldest && month > oldest);
+  const canNext = !!data && (data.canEdit ? month < shiftMonth(thisMonth(), 1) : !!latest && month < latest);
 
   const stores = useMemo(() => {
     const list = [...(data?.stores || [])];
@@ -130,7 +132,7 @@ export default function KpiPage() {
       {error && <div className="error inline" style={{ margin: "0 14px" }}>{error}</div>}
       {!data && !error && <Skeleton count={4} />}
 
-      {data && stores.length === 0 && <EmptyState icon={<Icon name="chart" size={28} />} title="Chưa có dữ liệu KPI" hint="Tháng này chưa được cập nhật." />}
+      {data && stores.length === 0 && <EmptyState icon={<Icon name="chart" size={28} />} title="Chưa có dữ liệu KPI" hint={data.canEdit ? "Bấm \"Nhập dữ liệu\" ở trên để bắt đầu." : "Tháng này chưa được cập nhật."} />}
 
       {data && stores.length > 0 && (
         <>
