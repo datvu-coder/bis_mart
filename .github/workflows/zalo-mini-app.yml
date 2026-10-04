@@ -2,6 +2,12 @@ name: Zalo Mini App Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Which version to upload (Testing is the one you submit to Zalo for review before publishing)'
+        type: choice
+        options: [development, testing]
+        default: development
   push:
     branches: [main]
     paths:
@@ -61,12 +67,19 @@ jobs:
       - name: Install zmp-cli
         run: npm install -g zmp-cli
 
-      # Uploads the Development version; the Zalo app picks it up on next open.
+      # Pushes to main upload the Development version; the Zalo app picks it up on next open.
+      # A manual run with target=testing uploads the Testing version instead, which is what gets
+      # submitted for Zalo's review and then published to everyone from the Mini App console.
       # Zalo caps the version description at 500 chars, so send only the commit's first line.
       # The message goes through an env var so it is never interpolated into the shell script.
       - name: Deploy to Zalo Mini App
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          TARGET: ${{ github.event.inputs.target }}
         run: |
           FIRST_LINE=$(printf '%s' "${COMMIT_MESSAGE:-manual deploy}" | head -n 1 | cut -c1-120)
-          zmp deploy -e -p -m "${GITHUB_SHA::7} ${FIRST_LINE}"
+          if [ "$TARGET" = "testing" ]; then
+            zmp deploy -e -p -t -m "${GITHUB_SHA::7} ${FIRST_LINE}"
+          else
+            zmp deploy -e -p -m "${GITHUB_SHA::7} ${FIRST_LINE}"
+          fi
