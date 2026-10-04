@@ -19,6 +19,7 @@ import BoardDetailPage from "../pages/board-detail";
 import GalleryPage from "../pages/gallery";
 import CarePage from "../pages/care";
 import KpiPage from "../pages/kpi";
+import KpiImportPage from "../pages/kpi-import";
 
 function Routes() {
   const { user, loading } = useAuth();
@@ -46,6 +47,7 @@ function Routes() {
         <Route path="/gallery" element={<GalleryPage />} />
         <Route path="/care" element={<CarePage />} />
         <Route path="/kpi" element={<KpiPage />} />
+        <Route path="/kpi/import" element={<KpiImportPage />} />
       </AnimationRoutes>
     </ZMPRouter>
   );

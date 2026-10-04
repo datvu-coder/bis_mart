@@ -7999,15 +7999,7 @@ def api_kpi():
     return jsonify({"month": month, "months": months, "canEdit": can_edit, "stores": stores})
 
 
-@app.put("/api/kpi/<store_code>/<month>")
-@login_required
-def api_kpi_upsert(store_code: str, month: str):
-    if not _is_admin_user():
-        return jsonify({"error": "Chỉ quản trị viên được cập nhật KPI"}), 403
-    month = _kpi_month_arg(month)
-    if not month:
-        return jsonify({"error": "Tháng không hợp lệ"}), 400
-    data = request.get_json(silent=True) or {}
+def _kpi_clean_values(data: dict) -> tuple[dict[str, Any] | None, str]:
     values: dict[str, Any] = {}
     for key, col in KPI_FIELDS.items():
         if key not in data:
@@ -8019,33 +8011,85 @@ def api_kpi_upsert(store_code: str, month: str):
         try:
             values[col] = int(round(float(raw)))
         except (TypeError, ValueError):
-            return jsonify({"error": "Giá trị phải là số"}), 400
+            return None, "Giá trị phải là số"
         if values[col] < 0:
-            return jsonify({"error": "Giá trị không được âm"}), 400
+            return None, "Giá trị không được âm"
+    return values, ""
+
+
+def _kpi_save(cur, by_code: dict, by_name: dict, key_rows: list, store: dict, month: str, values: dict[str, Any]) -> dict:
+    # The workbook import may key a store by its own code; reuse that key when it is the same store.
+    key = store["code"]
+    for r in key_rows:
+        hit = _kpi_resolve(by_code, by_name, r["store_code"], r["store_name"])
+        if hit and hit["code"] == store["code"]:
+            key = r["store_code"]
+            break
+    cur.execute("INSERT INTO store_kpi (store_code, month, store_name, region) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
+                (key, month, store["name"], store["region"]))
+    if values:
+        sets = ", ".join(f"{c} = %s" for c in values)
+        cur.execute(f"UPDATE store_kpi SET {sets}, updated_by = %s, updated_at = %s WHERE store_code = %s AND month = %s",
+                    [*values.values(), (g.current_user or {}).get("user_id"), _now_iso(), key, month])
+    cur.execute("SELECT * FROM store_kpi WHERE store_code = %s AND month = %s", (key, month))
+    return cur.fetchone()
+
+
+@app.put("/api/kpi/<store_code>/<month>")
+@login_required
+def api_kpi_upsert(store_code: str, month: str):
+    if not _is_admin_user():
+        return jsonify({"error": "Chỉ quản trị viên được cập nhật KPI"}), 403
+    month = _kpi_month_arg(month)
+    if not month:
+        return jsonify({"error": "Tháng không hợp lệ"}), 400
+    values, err = _kpi_clean_values(request.get_json(silent=True) or {})
+    if values is None:
+        return jsonify({"error": err}), 400
     db = get_db()
     with db.cursor() as cur:
         by_code, by_name = _kpi_app_stores(cur)
         store = by_code.get(store_code.strip().upper())
         if not store:
             return jsonify({"error": "Không tìm thấy cửa hàng"}), 404
-        # The workbook import may key a store by its own code; reuse that key when it is the same store.
         cur.execute("SELECT DISTINCT store_code, store_name FROM store_kpi")
-        key = store["code"]
-        for r in cur.fetchall():
-            hit = _kpi_resolve(by_code, by_name, r["store_code"], r["store_name"])
-            if hit and hit["code"] == store["code"]:
-                key = r["store_code"]
-                break
-        cur.execute("INSERT INTO store_kpi (store_code, month, store_name, region) VALUES (%s, %s, %s, %s) ON CONFLICT DO NOTHING",
-                    (key, month, store["name"], store["region"]))
-        if values:
-            sets = ", ".join(f"{c} = %s" for c in values)
-            cur.execute(f"UPDATE store_kpi SET {sets}, updated_by = %s, updated_at = %s WHERE store_code = %s AND month = %s",
-                        [*values.values(), (g.current_user or {}).get("user_id"), _now_iso(), key, month])
-        cur.execute("SELECT * FROM store_kpi WHERE store_code = %s AND month = %s", (key, month))
-        row = cur.fetchone()
+        row = _kpi_save(cur, by_code, by_name, cur.fetchall(), store, month, values)
     db.commit()
     return jsonify(_kpi_row_json(row, store))
+
+
+@app.put("/api/kpi/<month>")
+@login_required
+def api_kpi_bulk(month: str):
+    """Saves the whole month for many stores at once: {rows: [{storeCode, <fields>}]}."""
+    if not _is_admin_user():
+        return jsonify({"error": "Chỉ quản trị viên được cập nhật KPI"}), 403
+    month = _kpi_month_arg(month)
+    if not month:
+        return jsonify({"error": "Tháng không hợp lệ"}), 400
+    items = (request.get_json(silent=True) or {}).get("rows")
+    if not isinstance(items, list) or not items:
+        return jsonify({"error": "Không có dữ liệu để lưu"}), 400
+    prepared = []
+    for it in items:
+        values, err = _kpi_clean_values(it if isinstance(it, dict) else {})
+        if values is None:
+            return jsonify({"error": err}), 400
+        prepared.append((str((it or {}).get("storeCode") or "").strip().upper(), values))
+    db = get_db()
+    saved = 0
+    with db.cursor() as cur:
+        by_code, by_name = _kpi_app_stores(cur)
+        cur.execute("SELECT DISTINCT store_code, store_name FROM store_kpi")
+        key_rows = cur.fetchall()
+        for code, values in prepared:
+            store = by_code.get(code)
+            if not store:
+                return jsonify({"error": f"Không tìm thấy cửa hàng {code}"}), 404
+            _kpi_save(cur, by_code, by_name, key_rows, store, month, values)
+            saved += 1
+    db.commit()
+    return jsonify({"saved": saved})
 
 
 # ----------------------------- hub summary -----------------------------------
