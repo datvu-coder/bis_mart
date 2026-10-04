@@ -7901,6 +7901,125 @@ def api_export_csv(kind: str):
                            r["product_name"], r.get("unit") or "", r["qty"], "" if r["qty_received"] is None else r["qty_received"]] for r in rows])
 
 
+# ----------------------------- store KPI -------------------------------------
+
+KPI_FIELDS = {
+    "kpiTotal": "kpi_total", "kpiN1": "kpi_n1", "kpiSbpsN1": "kpi_sbps_n1",
+    "dst": "dst", "dstSb": "dst_sb", "dstSbps": "dst_sbps", "dsN1": "ds_n1", "dsSbpsN1": "ds_sbps_n1",
+    "stockTotal": "stock_total", "stockN1": "stock_n1",
+}
+
+
+def _kpi_month_arg(raw: str | None) -> str | None:
+    m = (raw or "").strip()
+    return m if re.fullmatch(r"20\d\d-(0[1-9]|1[0-2])", m) else None
+
+
+def _kpi_prev_months(month: str, n: int) -> list[str]:
+    y, m = int(month[:4]), int(month[5:])
+    out = []
+    for _ in range(n):
+        m -= 1
+        if m == 0:
+            y, m = y - 1, 12
+        out.append(f"{y}-{m:02d}")
+    return out
+
+
+def _kpi_row_json(row: dict[str, Any]) -> dict[str, Any]:
+    out = {"storeCode": row["store_code"], "storeName": row.get("store_name") or row["store_code"], "region": row.get("region") or ""}
+    for k, col in KPI_FIELDS.items():
+        out[k] = row.get(col)
+    return out
+
+
+@app.get("/api/kpi")
+@login_required
+def api_kpi():
+    viewer = _task_viewer()
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT DISTINCT month FROM store_kpi ORDER BY month DESC")
+        months = [r["month"] for r in cur.fetchall()]
+        month = _kpi_month_arg(request.args.get("month")) or (months[0] if months else _now_iso()[:7])
+        cur.execute("SELECT * FROM store_kpi WHERE month = %s ORDER BY store_code", (month,))
+        rows = cur.fetchall()
+        can_edit = _is_admin_user()
+        if not rows and can_edit:
+            # Empty month: list the stores of the latest filled month as blank rows so admins can start entering targets.
+            cur.execute("SELECT store_code, store_name, region FROM store_kpi WHERE month = (SELECT MAX(month) FROM store_kpi WHERE month < %s) ORDER BY store_code", (month,))
+            rows = cur.fetchall()
+        history_months = _kpi_prev_months(month, 3)
+        cur.execute("SELECT store_code, month, dst, ds_n1, dst_sb, dst_sbps FROM store_kpi WHERE month = ANY(%s)", (history_months,))
+        history = cur.fetchall()
+    scope = viewer["scope"]
+    if scope is not None:
+        rows = [r for r in rows if r["store_code"].upper() in scope]
+    by_store: dict[str, dict[str, dict]] = {}
+    for h in history:
+        by_store.setdefault(h["store_code"], {})[h["month"]] = h
+    stores = []
+    for r in rows:
+        item = _kpi_row_json(r)
+        hist = by_store.get(r["store_code"], {})
+        prev = hist.get(history_months[0])
+        past = [hist[m]["dst"] for m in history_months if m in hist and hist[m]["dst"]]
+        item["prevDst"] = prev["dst"] if prev else None
+        item["prevDsN1"] = prev["ds_n1"] if prev else None
+        item["moa"] = round(sum(past) / len(past)) if past else None
+        stores.append(item)
+    return jsonify({"month": month, "months": months, "canEdit": can_edit, "stores": stores})
+
+
+@app.put("/api/kpi/<store_code>/<month>")
+@login_required
+def api_kpi_upsert(store_code: str, month: str):
+    if not _is_admin_user():
+        return jsonify({"error": "Chỉ quản trị viên được cập nhật KPI"}), 403
+    month = _kpi_month_arg(month)
+    if not month:
+        return jsonify({"error": "Tháng không hợp lệ"}), 400
+    data = request.get_json(silent=True) or {}
+    values: dict[str, Any] = {}
+    for key, col in KPI_FIELDS.items():
+        if key not in data:
+            continue
+        raw = data[key]
+        if raw in (None, ""):
+            values[col] = None
+            continue
+        try:
+            values[col] = int(round(float(raw)))
+        except (TypeError, ValueError):
+            return jsonify({"error": "Giá trị phải là số"}), 400
+        if values[col] < 0:
+            return jsonify({"error": "Giá trị không được âm"}), 400
+    db = get_db()
+    code = store_code.strip()
+    with db.cursor() as cur:
+        cur.execute("SELECT 1 FROM store_kpi WHERE store_code = %s AND month = %s", (code, month))
+        exists = cur.fetchone()
+        if not exists:
+            cur.execute("SELECT name, province FROM stores WHERE UPPER(store_code) = UPPER(%s)", (code,))
+            st = cur.fetchone()
+            if not st:
+                cur.execute("SELECT store_name, region FROM store_kpi WHERE store_code = %s LIMIT 1", (code,))
+                prev = cur.fetchone()
+                st = {"name": prev["store_name"], "province": prev["region"]} if prev else None
+            if not st:
+                return jsonify({"error": "Không tìm thấy cửa hàng"}), 404
+            cur.execute("INSERT INTO store_kpi (store_code, month, store_name, region) VALUES (%s, %s, %s, %s)",
+                        (code, month, st["name"], st.get("province")))
+        if values:
+            sets = ", ".join(f"{c} = %s" for c in values)
+            cur.execute(f"UPDATE store_kpi SET {sets}, updated_by = %s, updated_at = %s WHERE store_code = %s AND month = %s",
+                        [*values.values(), (g.current_user or {}).get("user_id"), _now_iso(), code, month])
+        cur.execute("SELECT * FROM store_kpi WHERE store_code = %s AND month = %s", (code, month))
+        row = cur.fetchone()
+    db.commit()
+    return jsonify(_kpi_row_json(row))
+
+
 # ----------------------------- hub summary -----------------------------------
 
 @app.get("/api/ops/summary")

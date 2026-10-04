@@ -1,7 +1,7 @@
 import type {
   Analytics, Announcement, AnnouncementDetail, AppNotification, Assignee, CatalogProduct, FundEntry, FundReport,
   FundReportDetail, FundSuggest, MediaItem, Order, OrderDetail, OrderItem, OrderSummary, OpsSummary, StoreSummary,
-  CareCampaign, OaStatus, StoreWithManagers, Task, TaskDetail, User,
+  CareCampaign, KpiResponse, KpiStore, OaStatus, StoreWithManagers, Task, TaskDetail, User,
 } from "./types";
 
 const BASE_URL: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) || "https://api.bismart.id.vn";
@@ -205,6 +205,9 @@ export const api = {
   careAudience: (period: string) => request<{ period: string; count: number; total: number; capped: boolean; source: "zalo" | "webhook"; apiError: string }>("GET", `/api/oa/care/audience?period=${period}`),
   careTest: (body: string, imageName: string) => request<{ ok: boolean; detail: string }>("POST", "/api/oa/care/test", { body, imageName }),
   careSend: (body: string, imageName: string, period: string) => request<{ id: number; total: number }>("POST", "/api/oa/care/send", { body, imageName, period }),
+  kpi: (month?: string) => request<KpiResponse>("GET", `/api/kpi${month ? `?month=${month}` : ""}`),
+  kpiSave: (storeCode: string, month: string, body: Partial<Record<keyof KpiStore, number | string | null>>) =>
+    request<KpiStore>("PUT", `/api/kpi/${encodeURIComponent(storeCode)}/${month}`, body),
   careCampaigns: () => request<{ campaigns: CareCampaign[] }>("GET", "/api/oa/care/campaigns"),
   oaTest: () => request<{ ok: boolean; detail: string; target: string | null }>("POST", "/api/zalo/oa-test", {}),
   opsSummary: () => request<OpsSummary>("GET", "/api/ops/summary"),
