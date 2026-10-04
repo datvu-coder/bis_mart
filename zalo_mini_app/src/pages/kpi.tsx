@@ -9,7 +9,7 @@ import SubHero from "../components/SubHero";
 import { KpiResponse, KpiStore } from "../types";
 
 // Figures come from the sales workbook and are expressed in thousands of VND.
-const money = (k: number | null | undefined): string => {
+export const money = (k: number | null | undefined): string => {
   const v = (Number(k) || 0) * 1000;
   if (Math.abs(v) >= 1e9) return `${(v / 1e9).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} tỷ`;
   if (Math.abs(v) >= 1e6) return `${(v / 1e6).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} triệu`;
