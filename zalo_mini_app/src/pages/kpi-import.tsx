@@ -71,7 +71,7 @@ export default function KpiImportPage() {
 
   return (
     <Page className="page with-bar">
-      <SubHero title="Nạp dữ liệu KPI" note={month ? `${monthLabel(month)} · số theo nghìn đồng` : ""} />
+      <SubHero title="Nhập dữ liệu KPI" note={month ? `${monthLabel(month)} · số theo nghìn đồng` : ""} />
       {error && <div className="error inline" style={{ margin: "14px" }}>{error}</div>}
       {!stores && !error && <Skeleton count={4} />}
       {stores && (
