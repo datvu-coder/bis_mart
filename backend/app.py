@@ -1583,6 +1583,36 @@ def api_get_stores():
     ])
 
 
+@app.get("/api/public/stores")
+def api_public_stores():
+    """Store locator for the customer-facing Mini App: no login, no staff data."""
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, province, latitude, longitude, address, phone "
+            "FROM stores WHERE status = 'Hoạt động' ORDER BY province NULLS LAST, name ASC"
+        )
+        rows = cur.fetchall()
+    return jsonify([
+        {
+            "id": str(r["id"]),
+            "name": r.get("name") or "",
+            "province": r.get("province"),
+            "latitude": r.get("latitude"),
+            "longitude": r.get("longitude"),
+            "address": r.get("address"),
+            "phone": r.get("phone"),
+        }
+        for r in rows
+    ])
+
+
+@app.get("/api/public/oa-info")
+def api_public_oa_info():
+    """OA id for the 'follow our OA' button (no secrets)."""
+    return jsonify({"oaId": ZALO_OA_ID or (_oa_load_tokens().get("oa_id") or "")})
+
+
 @app.post("/api/stores")
 @login_required
 def api_create_store():
