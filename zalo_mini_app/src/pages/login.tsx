@@ -28,7 +28,7 @@ export default function LoginPage() {
   return (
     <div className="login">
       <header className="hero login-hero">
-        <div className="brand"><Logo size={56} /><span>Bi'S MART</span></div>
+        <div className="brand"><Logo size={104} /></div>
         <h1>Giao việc &amp; theo dõi công việc cửa hàng</h1>
         <div className="hero-note">Đăng nhập một lần, lần sau vào thẳng bằng Zalo</div>
       </header>
