@@ -26,6 +26,7 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
   const [oaId, setOaId] = useState("");
   const [oaStatus, setOaStatus] = useState<OaStatus | null>(null);
   const [testing, setTesting] = useState(false);
+  const [oaSheet, setOaSheet] = useState(false);
 
   useEffect(() => { api.oaInfo().then((r) => setOaId(r.oaId)).catch(() => {}); }, []);
   useEffect(() => { if (ops?.isAdmin) api.oaStatus().then(setOaStatus).catch(() => {}); }, [ops?.isAdmin]);
@@ -118,23 +119,35 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
       </div>
 
       <div className="panel menu-panel">
-        {oaId && <button className="menu-row" onClick={follow}><Icon name="bell" size={20} /> Nhận thông báo qua Zalo OA <Icon name="chevron" size={16} className="chev" /></button>}
-        {ops?.isAdmin && oaStatus && (
-          <>
-            <button className="menu-row" onClick={connect}>
-              <Icon name="refresh" size={20} /> {oaStatus.canRefresh ? "Kết nối lại Zalo OA" : "Kết nối Zalo OA"}
-              <span className="row-meta">{oaStatus.employees.zaloLinked}/{oaStatus.employees.total} đã liên kết</span>
-              <Icon name="chevron" size={16} className="chev" />
-            </button>
-            <button className="menu-row" disabled={testing || !oaStatus.configured} onClick={sendTest}>
-              <Icon name="send" size={20} /> {testing ? "Đang gửi..." : "Gửi tin thử cho tôi"} <Icon name="chevron" size={16} className="chev" />
-            </button>
-          </>
+        {(oaId || ops?.isAdmin) && (
+          <button className="menu-row" onClick={() => setOaSheet(true)}><Icon name="bell" size={20} /> Thông báo Zalo OA <Icon name="chevron" size={16} className="chev" /></button>
         )}
         <button className="menu-row" onClick={() => setPwOpen(true)}><Icon name="edit" size={20} /> Đổi mật khẩu <Icon name="chevron" size={16} className="chev" /></button>
         <button className="menu-row danger" onClick={() => setConfirm(true)}><Icon name="logout" size={20} /> Đăng xuất</button>
       </div>
       <div className="foot-note">Bi'S MART · Công việc</div>
+
+      <Sheet open={oaSheet} title="Thông báo Zalo OA" onClose={() => setOaSheet(false)}>
+        <div className="menu-panel sheet-menu">
+          {oaId && (
+            <button className="menu-row" onClick={() => { setOaSheet(false); follow(); }}>
+              <Icon name="bell" size={20} /> Nhận thông báo qua Zalo OA <Icon name="chevron" size={16} className="chev" />
+            </button>
+          )}
+          {ops?.isAdmin && oaStatus && (
+            <>
+              <button className="menu-row" onClick={() => { setOaSheet(false); connect(); }}>
+                <Icon name="refresh" size={20} /> {oaStatus.canRefresh ? "Kết nối lại Zalo OA" : "Kết nối Zalo OA"}
+                <span className="row-meta">{oaStatus.employees.zaloLinked}/{oaStatus.employees.total} đã liên kết</span>
+                <Icon name="chevron" size={16} className="chev" />
+              </button>
+              <button className="menu-row" disabled={testing || !oaStatus.configured} onClick={() => { setOaSheet(false); sendTest(); }}>
+                <Icon name="send" size={20} /> {testing ? "Đang gửi..." : "Gửi tin thử cho tôi"} <Icon name="chevron" size={16} className="chev" />
+              </button>
+            </>
+          )}
+        </div>
+      </Sheet>
 
       <Sheet open={pwOpen} title="Đổi mật khẩu" onClose={closePw}>
         <label className="field"><span>Mật khẩu hiện tại</span><input type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></label>
