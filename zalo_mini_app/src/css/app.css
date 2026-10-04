@@ -605,3 +605,35 @@ input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-
 .menu-row .row-meta + .chev { margin-left: 8px; }
 .menu-row:disabled { opacity: 0.5; }
 .sheet-menu { box-shadow: none; padding: 0; margin: 0 0 6px; background: transparent; }
+
+/* KPI */
+.kp-month { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; }
+.kp-month b { font-size: 16px; }
+.kp-month .icon-btn:disabled { opacity: 0.3; }
+.kp-big { display: flex; align-items: baseline; gap: 10px; margin: 8px 0 4px; }
+.kp-big b { font-size: 40px; line-height: 1; }
+.kp-big span { color: var(--muted); font-size: 13px; }
+.kp-line { margin-top: 12px; }
+.kp-line-top { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px; }
+.kp-line small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.kp-fill { background: var(--muted); }
+.kp-big .ok, .kp-line .ok, .kp-pct.ok, .kp-facts .ok { color: var(--success); }
+.kp-big .warn, .kp-line .warn, .kp-pct.warn, .kp-facts .warn { color: var(--warning); }
+.kp-big .bad, .kp-line .bad, .kp-pct.bad, .kp-facts .bad { color: var(--error); }
+.care-bar i.kp-fill.ok { background: var(--success); }
+.care-bar i.kp-fill.warn { background: var(--warning); }
+.care-bar i.kp-fill.bad { background: var(--error); }
+.kp-row { padding: 12px 0; border-top: 1px solid var(--border); }
+.kp-row:first-of-type { border-top: 0; }
+.kp-row-main { display: flex; align-items: center; gap: 10px; width: 100%; background: none; font: inherit; color: inherit; text-align: left; margin-bottom: 8px; }
+.kp-rank { width: 24px; height: 24px; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-weight: 700; font-size: 12px; display: grid; place-items: center; flex-shrink: 0; }
+.kp-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.kp-name small { color: var(--muted); font-size: 11.5px; }
+.kp-pct { font-size: 18px; }
+.kp-detail { margin-top: 6px; padding: 4px 12px 12px; border-radius: 14px; background: var(--bg); }
+.kp-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+.kp-facts > div { display: flex; flex-direction: column; gap: 2px; }
+.kp-facts small { color: var(--muted); font-size: 11.5px; }
+.kp-facts em { font-style: normal; color: var(--muted); font-size: 11.5px; }
+.kp-unit { margin: 12px 0 0; color: var(--muted); font-size: 11.5px; }
+.kp-form { max-height: 52vh; overflow-y: auto; padding-bottom: 4px; }

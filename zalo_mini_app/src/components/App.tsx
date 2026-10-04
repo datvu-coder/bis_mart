@@ -18,6 +18,7 @@ import BoardFormPage from "../pages/board-form";
 import BoardDetailPage from "../pages/board-detail";
 import GalleryPage from "../pages/gallery";
 import CarePage from "../pages/care";
+import KpiPage from "../pages/kpi";
 
 function Routes() {
   const { user, loading } = useAuth();
@@ -44,6 +45,7 @@ function Routes() {
         <Route path="/board/:id/edit" element={<BoardFormPage />} />
         <Route path="/gallery" element={<GalleryPage />} />
         <Route path="/care" element={<CarePage />} />
+        <Route path="/kpi" element={<KpiPage />} />
       </AnimationRoutes>
     </ZMPRouter>
   );

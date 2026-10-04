@@ -325,3 +325,29 @@ export interface CareCampaign {
   createdAt: string;
   finishedAt: string | null;
 }
+
+export interface KpiStore {
+  storeCode: string;
+  storeName: string;
+  region: string;
+  kpiTotal: number | null;
+  kpiN1: number | null;
+  kpiSbpsN1: number | null;
+  dst: number | null;
+  dstSb: number | null;
+  dstSbps: number | null;
+  dsN1: number | null;
+  dsSbpsN1: number | null;
+  stockTotal: number | null;
+  stockN1: number | null;
+  prevDst?: number | null;
+  prevDsN1?: number | null;
+  moa?: number | null;
+}
+
+export interface KpiResponse {
+  month: string;
+  months: string[];
+  canEdit: boolean;
+  stores: KpiStore[];
+}
