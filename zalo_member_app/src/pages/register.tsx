@@ -22,21 +22,19 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="page register">
-      <div className="hero">
-        <h1>Bi'S MART Member</h1>
-        <p>Đăng ký thành viên để tích điểm và nhận ưu đãi tại hơn 60 cửa hàng.</p>
-      </div>
-      <div className="card form">
-        <label>Họ và tên</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Nguyễn Văn A" maxLength={120} />
-        <label>Ngày sinh (không bắt buộc)</label>
-        <input type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
-        <p className="muted">Số điện thoại Zalo sẽ được dùng để tích điểm các đơn mua tại cửa hàng.</p>
-        {error && <p className="error">{error}</p>}
-        <button className="primary-btn" disabled={busy} onClick={submit}>
-          {busy ? "Đang đăng ký..." : "Đăng ký bằng số điện thoại Zalo"}
-        </button>
+    <div className="app">
+      <div className="scroll reg">
+        <h1 className="h1">Bi'S MART Member</h1>
+        <p className="muted">Đăng ký thành viên để tích điểm, đặt hàng và nhận ưu đãi tại hơn 60 cửa hàng.</p>
+        <section className="box stack">
+          <label className="label" htmlFor="rn">Họ và tên</label>
+          <input id="rn" className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nguyễn Văn A" maxLength={120} />
+          <label className="label" htmlFor="rb">Ngày sinh (không bắt buộc)</label>
+          <input id="rb" className="field" type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
+          <p className="muted">Số điện thoại Zalo sẽ được dùng để tích điểm các đơn mua tại cửa hàng.</p>
+          {error && <p className="note error left">{error}</p>}
+          <button className="cta" disabled={busy} onClick={submit}>{busy ? "Đang đăng ký..." : "Đăng ký bằng số điện thoại Zalo"}</button>
+        </section>
       </div>
     </div>
   );

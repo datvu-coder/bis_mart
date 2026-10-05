@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
+import type { Go } from "../components/App";
+import Icon from "../components/Icon";
 import { api } from "../api";
 import type { Purchase } from "../types";
-import { formatDate, formatVnd } from "../utils";
+import { formatDate, money } from "../utils";
 
-export default function PurchasesPage() {
+export default function PurchasesPage({ go }: { go: Go }) {
   const [rows, setRows] = useState<Purchase[] | null>(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState<number | null>(null);
@@ -12,35 +14,32 @@ export default function PurchasesPage() {
     api.purchases().then(setRows).catch((e) => setError(e.message));
   }, []);
 
-  if (error) return <div className="center-note error">{error}</div>;
-  if (!rows) return <div className="center-note">Đang tải...</div>;
-  if (!rows.length) return <div className="center-note">Chưa có đơn mua nào gắn với số điện thoại của bạn.</div>;
   return (
-    <div className="list">
-      <h2 className="title">Lịch sử mua hàng</h2>
-      {rows.map((p) => (
-        <div key={p.id} className="card" onClick={() => setOpen(open === p.id ? null : p.id)}>
-          <div className="row">
-            <div>
-              <strong>{p.storeName}</strong>
-              <div className="muted">{formatDate(p.date)}</div>
+    <>
+      <header className="top row-gap">
+        <button className="sq" aria-label="Quay lại" onClick={() => go({ tab: "profile" })}><Icon name="back" strokeWidth={2} /></button>
+        <h1 className="h1 sm">Lịch sử mua tại cửa hàng</h1>
+      </header>
+      <div className="scroll">
+        {error && <p className="note error">{error}</p>}
+        {!rows && !error && <p className="note">Đang tải...</p>}
+        {rows && !rows.length && <p className="note">Chưa có đơn mua nào gắn với số điện thoại của bạn.</p>}
+        {(rows || []).map((p) => (
+          <button key={p.id} className="box pbtn" aria-expanded={open === p.id} onClick={() => setOpen(open === p.id ? null : p.id)}>
+            <div className="row-between">
+              <div className="stack tiny"><b>{p.storeName}</b><span className="muted">{formatDate(p.date)}</span></div>
+              <div className="stack tiny right"><b>{money(p.total)}</b><span className="delta">+{p.points} điểm</span></div>
             </div>
-            <div className="right">
-              <strong>{formatVnd(p.total)}</strong>
-              <div className="muted">+{p.points} điểm</div>
-            </div>
-          </div>
-          {open === p.id && p.items.length > 0 && (
-            <ul className="items">
-              {p.items.map((it, i) => (
-                <li key={i}>
-                  {it.name} × {it.quantity} <span>{formatVnd(it.unitPrice * it.quantity)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      ))}
-    </div>
+            {open === p.id && p.items.length > 0 && (
+              <ul className="items">
+                {p.items.map((it, i) => (
+                  <li key={i}>{it.name} × {it.quantity}<span>{money(it.unitPrice * it.quantity)}</span></li>
+                ))}
+              </ul>
+            )}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }

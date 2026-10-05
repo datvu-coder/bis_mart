@@ -4,6 +4,7 @@ export interface Member {
   fullName: string;
   phone: string;
   birthday: string | null;
+  address: string;
   joinedAt: string;
   totalSpent: number;
   orderCount: number;
@@ -11,6 +12,7 @@ export interface Member {
   tier: string;
   nextTier: string | null;
   spentToNextTier: number;
+  tierProgress: number;
 }
 
 export interface PurchaseItem {
@@ -36,4 +38,42 @@ export interface Store {
   phone: string;
   latitude: number | null;
   longitude: number | null;
+}
+
+export interface Product {
+  id: number;
+  name: string;
+  unit: string;
+  price: number;
+  group: string;
+  imageUrl: string;
+}
+
+export type OrderStatus = "placed" | "confirmed" | "shipping" | "delivered" | "cancelled";
+export type PaymentMethod = "cod" | "bank" | "card";
+
+export interface Order {
+  id: number;
+  code: string;
+  status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  total: number;
+  note: string;
+  recipient: string;
+  phone: string;
+  address: string;
+  createdAt: string;
+  items: { productId: number; name: string; quantity: number; unitPrice: number }[];
+}
+
+export interface Reward {
+  id: number;
+  name: string;
+  points: number;
+}
+
+export interface Redemption {
+  name: string;
+  points: number;
+  date: string;
 }
