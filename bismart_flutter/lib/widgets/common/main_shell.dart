@@ -116,12 +116,14 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-/// Bottom nav as a floating pill in a deep espresso-ink finish — a dark,
-/// jewel-box surface (instead of a plain white card) is what reads as
-/// premium next to the warm-ivory background, with the active tab glowing
-/// in a terracotta gradient medallion rather than a flat colour swap.
-/// Icon-only (the active tab's icon sits in the medallion) instead of a
-/// full-width bar with icon+label flush to the edges.
+/// Bottom nav as a floating pill in the app's own brand gradient — the
+/// same primary→primaryDark terracotta used for CTAs and active states
+/// elsewhere, instead of an off-palette near-black that had nothing else
+/// in the (otherwise all warm-ivory/white) app to relate to. The active
+/// tab sits in an ivory medallion — the page's own background colour —
+/// so it reads as "cut from the same cloth" rather than a bolted-on dark
+/// bar. Icon-only (the active tab's icon sits in the medallion) instead
+/// of a full-width bar with icon+label flush to the edges.
 class _FloatingNavBar extends StatelessWidget {
   final List<_NavItem> items;
   final int selectedIndex;
@@ -135,31 +137,27 @@ class _FloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A faint top-lit gradient instead of a flat fill — the single biggest
-    // thing that reads as "cheap" on a dark bar is no tonal variation at
-    // all, so the top edge catches a hint of light like a lacquered surface.
-    final topTone = Color.lerp(AppColors.textDark, AppColors.white, 0.1)!;
     const radius = 33.0;
     return Container(
       height: 66,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [topTone, AppColors.textDark],
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, AppColors.primaryDark],
         ),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: AppColors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: AppColors.white.withValues(alpha: 0.18)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.26),
-            blurRadius: 30,
-            offset: const Offset(0, 14),
+            color: AppColors.primaryDark.withValues(alpha: 0.38),
+            blurRadius: 26,
+            offset: const Offset(0, 12),
           ),
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.16),
-            blurRadius: 22,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -229,9 +227,9 @@ class _FloatingNavItem extends StatelessWidget {
         child: Center(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            // Selected tab gets a gradient medallion — a thin light ring
-            // plus a tight glow and a softer, wider halo behind it — a
-            // richer "you are here" cue than a flat colour fill.
+            // Selected tab gets an ivory medallion — the app's own
+            // background colour — so it reads as a bright "cutout" against
+            // the terracotta bar instead of a same-hue-on-same-hue blob.
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 220),
               curve: Curves.easeOutCubic,
@@ -239,30 +237,19 @@ class _FloatingNavItem extends StatelessWidget {
               height: 46,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: isSelected
-                    ? const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [AppColors.primary, AppColors.primaryDark],
-                      )
-                    : null,
+                color: isSelected ? AppColors.background : null,
                 border: isSelected
                     ? Border.all(
-                        color: AppColors.white.withValues(alpha: 0.22),
+                        color: AppColors.white.withValues(alpha: 0.7),
                         width: 1.2,
                       )
                     : null,
                 boxShadow: isSelected
                     ? [
                         BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.55),
-                          blurRadius: 14,
-                          offset: const Offset(0, 4),
-                        ),
-                        BoxShadow(
-                          color: AppColors.primary.withValues(alpha: 0.28),
-                          blurRadius: 30,
-                          spreadRadius: 2,
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
                         ),
                       ]
                     : null,
@@ -273,8 +260,8 @@ class _FloatingNavItem extends StatelessWidget {
                 item.selectedIcon,
                 size: isSelected ? 24 : 22,
                 color: isSelected
-                    ? AppColors.white
-                    : AppColors.white.withValues(alpha: 0.45),
+                    ? AppColors.primaryDark
+                    : AppColors.white.withValues(alpha: 0.78),
                 semanticLabel: item.label,
               ),
             ),
