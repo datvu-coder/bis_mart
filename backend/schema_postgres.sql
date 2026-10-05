@@ -1508,6 +1508,56 @@ CREATE TABLE IF NOT EXISTS store_kpi (
     PRIMARY KEY (store_code, month)
 );
 
+CREATE TABLE IF NOT EXISTS members (
+    id SERIAL PRIMARY KEY,
+    zalo_id TEXT NOT NULL UNIQUE,
+    phone TEXT NOT NULL UNIQUE,
+    full_name TEXT NOT NULL,
+    birthday TEXT,
+    address TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+ALTER TABLE members ADD COLUMN IF NOT EXISTS address TEXT;
+
+CREATE TABLE IF NOT EXISTS member_orders (
+    id SERIAL PRIMARY KEY,
+    member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'placed',
+    payment_method TEXT NOT NULL DEFAULT 'cod',
+    note TEXT,
+    recipient TEXT,
+    phone TEXT,
+    address TEXT,
+    total REAL NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_member_orders_member ON member_orders(member_id);
+
+CREATE TABLE IF NOT EXISTS member_order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES member_orders(id) ON DELETE CASCADE,
+    product_id INTEGER,
+    name TEXT NOT NULL,
+    unit_price REAL NOT NULL DEFAULT 0,
+    quantity INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS member_rewards (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    points INTEGER NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS member_redemptions (
+    id SERIAL PRIMARY KEY,
+    member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+    reward_id INTEGER,
+    name TEXT NOT NULL,
+    points INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS app_migrations (
     name TEXT PRIMARY KEY,
     applied_at TEXT

@@ -122,7 +122,7 @@ def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         g.current_user = get_current_user()
-        if not g.current_user:
+        if not g.current_user or g.current_user.get("typ") == "member":
             return jsonify({"error": "Unauthorized"}), 401
         return f(*args, **kwargs)
     return decorated
@@ -8194,6 +8194,482 @@ def healthz():
         return jsonify({"status": "ok", "backend": "postgres", "employees": count}), 200
     except Exception as e:
         return jsonify({"status": "error", "error": str(e)}), 500
+
+# ---------------------------------------------------------------------------
+# Bismart Member (customer loyalty Zalo Mini App)
+# ---------------------------------------------------------------------------
+
+ZALO_APP_SECRET = os.getenv("ZALO_APP_SECRET", "")
+ZALO_PHONE_URL = "https://graph.zalo.me/v2.0/me/info"
+MEMBER_JWT_EXP_DAYS = 90
+MEMBER_POINT_UNIT = 10000  # 1 point per 10,000 VND of net spend
+# (min lifetime spend in VND, tier name), highest first
+MEMBER_TIERS = ((50_000_000, "Kim cương"), (20_000_000, "Vàng"), (5_000_000, "Bạc"), (0, "Thành viên"))
+
+
+def _normalize_phone(raw: str) -> str:
+    """Digits only, local format 0xxxxxxxxx; '' if it doesn't look like a VN mobile number."""
+    digits = re.sub(r"\D", "", raw or "")
+    if digits.startswith("84"):
+        digits = "0" + digits[2:]
+    return digits if re.fullmatch(r"0\d{9}", digits) else ""
+
+
+def _zalo_phone_from_token(access_token: str, phone_token: str) -> str:
+    """Exchange the Mini App phone token for the verified number (needs the app secret)."""
+    if not (ZALO_APP_SECRET and access_token and phone_token):
+        return ""
+    req = urllib.request.Request(
+        ZALO_PHONE_URL,
+        headers={"access_token": access_token, "code": phone_token, "secret_key": ZALO_APP_SECRET},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            body = json.loads(resp.read().decode("utf-8"))
+    except Exception:
+        return ""
+    if not isinstance(body, dict) or body.get("error"):
+        return ""
+    return _normalize_phone(str((body.get("data") or {}).get("number") or ""))
+
+
+def _create_member_token(member_id: int) -> str:
+    return jwt.encode({
+        "typ": "member",
+        "member_id": member_id,
+        "exp": datetime.now(tz=VN_TZ) + timedelta(days=MEMBER_JWT_EXP_DAYS),
+    }, JWT_SECRET, algorithm="HS256")
+
+
+def member_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        claims = get_current_user()
+        if not claims or claims.get("typ") != "member" or not claims.get("member_id"):
+            return jsonify({"error": "Unauthorized"}), 401
+        g.member_id = claims["member_id"]
+        return f(*args, **kwargs)
+    return decorated
+
+
+def _member_spend(cur, member: dict[str, Any]) -> tuple[float, int, int]:
+    """Lifetime net spend, order count and redeemed points: POS purchases matched by phone (revenue minus
+    returns) plus delivered online orders."""
+    cur.execute(
+        "SELECT COALESCE(SUM(sr.revenue - COALESCE(rr.returned, 0)), 0) AS spent, COUNT(*) AS orders "
+        "FROM sales_reports sr "
+        "LEFT JOIN (SELECT report_id, SUM(amount) AS returned FROM report_returns GROUP BY report_id) rr "
+        "ON rr.report_id = sr.id "
+        "WHERE RIGHT(REGEXP_REPLACE(COALESCE(sr.customer_phone, ''), '\\D', '', 'g'), 9) = %s",
+        (member["phone"][-9:],),
+    )
+    row = cur.fetchone() or {}
+    spent, orders = float(row.get("spent") or 0), int(row.get("orders") or 0)
+    cur.execute(
+        "SELECT COALESCE(SUM(total) FILTER (WHERE status = 'delivered'), 0) AS spent, COUNT(*) AS orders "
+        "FROM member_orders WHERE member_id = %s AND status <> 'cancelled'",
+        (member["id"],),
+    )
+    row = cur.fetchone() or {}
+    spent += float(row.get("spent") or 0)
+    orders += int(row.get("orders") or 0)
+    cur.execute("SELECT COALESCE(SUM(points), 0) AS used FROM member_redemptions WHERE member_id = %s", (member["id"],))
+    return spent, orders, int((cur.fetchone() or {}).get("used") or 0)
+
+
+def _member_to_api_json(member: dict[str, Any], spent: float, orders: int, redeemed: int = 0) -> dict[str, Any]:
+    tier_idx = next(i for i, (floor, _) in enumerate(MEMBER_TIERS) if spent >= floor)
+    next_tier = MEMBER_TIERS[tier_idx - 1] if tier_idx > 0 else None
+    return {
+        "id": member["id"],
+        "memberCode": f"BM{member['id']:07d}",
+        "fullName": member.get("full_name") or "",
+        "phone": member.get("phone") or "",
+        "birthday": member.get("birthday"),
+        "address": member.get("address") or "",
+        "joinedAt": member.get("created_at"),
+        "totalSpent": round(spent),
+        "orderCount": orders,
+        "points": max(0, int(spent // MEMBER_POINT_UNIT) - redeemed),
+        "tier": MEMBER_TIERS[tier_idx][1],
+        "nextTier": next_tier[1] if next_tier else None,
+        "spentToNextTier": round(next_tier[0] - spent) if next_tier else 0,
+        "tierProgress": round(min(1.0, spent / next_tier[0]), 3) if next_tier else 1.0,
+    }
+
+
+def _member_json(cur, member: dict[str, Any]) -> dict[str, Any]:
+    return _member_to_api_json(member, *_member_spend(cur, member))
+
+
+def _member_session(cur, member: dict[str, Any]):
+    return jsonify({"token": _create_member_token(member["id"]), "member": _member_json(cur, member)})
+
+
+@app.post("/api/member/register")
+def api_member_register():
+    """Sign up (or re-link) a customer from the Mini App: Zalo token + verified phone token."""
+    data = request.get_json(silent=True) or {}
+    access_token = (data.get("accessToken") or "").strip()
+    zalo = _verify_zalo_access_token(access_token)
+    if not zalo:
+        return jsonify({"error": "Invalid Zalo access token"}), 401
+    if not ZALO_APP_SECRET:
+        return jsonify({"error": "Member registration is not configured"}), 503
+    phone = _zalo_phone_from_token(access_token, (data.get("phoneToken") or "").strip())
+    if not phone:
+        return jsonify({"error": "Could not verify phone number"}), 400
+    full_name = (data.get("fullName") or zalo.get("name") or "").strip()[:120]
+    if not full_name:
+        return jsonify({"error": "Name is required"}), 400
+    birthday = (data.get("birthday") or "").strip() or None
+    if birthday:
+        try:
+            datetime.strptime(birthday, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Invalid birthday"}), 400
+    zalo_id = str(zalo["id"])
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM members WHERE phone = %s OR zalo_id = %s", (phone, zalo_id))
+        existing = cur.fetchall()
+        # A phone and a Zalo account each belong to at most one member.
+        if len(existing) > 1:
+            return jsonify({"error": "Phone or Zalo account already registered"}), 409
+        if existing:
+            cur.execute(
+                "UPDATE members SET zalo_id = %s, phone = %s, full_name = %s, birthday = COALESCE(%s, birthday) "
+                "WHERE id = %s RETURNING *",
+                (zalo_id, phone, full_name, birthday, existing[0]["id"]),
+            )
+        else:
+            cur.execute(
+                "INSERT INTO members (zalo_id, phone, full_name, birthday, created_at) "
+                "VALUES (%s, %s, %s, %s, %s) RETURNING *",
+                (zalo_id, phone, full_name, birthday, _now_iso()),
+            )
+        member = cur.fetchone()
+        resp = _member_session(cur, member)
+    db.commit()
+    return resp
+
+
+@app.post("/api/member/login")
+def api_member_login():
+    data = request.get_json(silent=True) or {}
+    zalo = _verify_zalo_access_token((data.get("accessToken") or "").strip())
+    if not zalo:
+        return jsonify({"error": "Invalid Zalo access token"}), 401
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM members WHERE zalo_id = %s", (str(zalo["id"]),))
+        member = cur.fetchone()
+        if not member:
+            return jsonify({"error": "Not registered", "code": "NOT_REGISTERED"}), 404
+        return _member_session(cur, member)
+
+
+@app.get("/api/member/me")
+@member_required
+def api_member_me():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM members WHERE id = %s", (g.member_id,))
+        member = cur.fetchone()
+        if not member:
+            return jsonify({"error": "Unauthorized"}), 401
+        payload = _member_json(cur, member)
+    return jsonify({"member": payload})
+
+
+@app.put("/api/member/me")
+@member_required
+def api_member_update():
+    data = request.get_json(silent=True) or {}
+    full_name = (data.get("fullName") or "").strip()[:120]
+    if not full_name:
+        return jsonify({"error": "Name is required"}), 400
+    birthday = (data.get("birthday") or "").strip() or None
+    if birthday:
+        try:
+            datetime.strptime(birthday, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({"error": "Invalid birthday"}), 400
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "UPDATE members SET full_name = %s, birthday = %s, address = %s WHERE id = %s RETURNING *",
+            (full_name, birthday, (data.get("address") or "").strip()[:300], g.member_id),
+        )
+        member = cur.fetchone()
+        if not member:
+            return jsonify({"error": "Unauthorized"}), 401
+        payload = _member_json(cur, member)
+    db.commit()
+    return jsonify({"member": payload})
+
+
+@app.get("/api/member/purchases")
+@member_required
+def api_member_purchases():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT phone FROM members WHERE id = %s", (g.member_id,))
+        member = cur.fetchone()
+        if not member:
+            return jsonify({"error": "Unauthorized"}), 401
+        cur.execute(
+            "SELECT sr.id, sr.report_date, sr.store_name, sr.store_code, sr.revenue, "
+            "COALESCE(rr.returned, 0) AS returned_amount "
+            "FROM sales_reports sr "
+            "LEFT JOIN (SELECT report_id, SUM(amount) AS returned FROM report_returns GROUP BY report_id) rr "
+            "ON rr.report_id = sr.id "
+            "WHERE RIGHT(REGEXP_REPLACE(COALESCE(sr.customer_phone, ''), '\\D', '', 'g'), 9) = %s "
+            "ORDER BY sr.report_date DESC, sr.id DESC LIMIT 100",
+            (member["phone"][-9:],),
+        )
+        rows = cur.fetchall()
+        ids = [r["id"] for r in rows]
+        items: dict[int, list[dict[str, Any]]] = {i: [] for i in ids}
+        if ids:
+            cur.execute(
+                "SELECT report_id, product_name, quantity, unit_price FROM sale_items "
+                "WHERE report_id = ANY(%s::int[]) ORDER BY id ASC",
+                (ids,),
+            )
+            for it in cur.fetchall():
+                items[it["report_id"]].append({
+                    "name": it["product_name"],
+                    "quantity": it["quantity"],
+                    "unitPrice": round(float(it["unit_price"] or 0)),
+                })
+    return jsonify([
+        {
+            "id": r["id"],
+            "date": r["report_date"],
+            "storeName": r.get("store_name") or r.get("store_code") or "",
+            "total": round(float(r["revenue"] or 0) - float(r["returned_amount"] or 0)),
+            "points": max(0, int((float(r["revenue"] or 0) - float(r["returned_amount"] or 0)) // MEMBER_POINT_UNIT)),
+            "items": items[r["id"]],
+        }
+        for r in rows
+    ])
+
+
+MEMBER_ORDER_STATUSES = ("placed", "confirmed", "shipping", "delivered", "cancelled")
+MEMBER_PAYMENT_METHODS = ("cod", "bank", "card")
+
+
+@app.get("/api/member/products")
+@member_required
+def api_member_products():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT id, name, unit, price_with_vat, product_group, image_url FROM products "
+            "WHERE price_with_vat > 0 ORDER BY product_group, name"
+        )
+        rows = cur.fetchall()
+    return jsonify([
+        {
+            "id": r["id"], "name": r["name"], "unit": r.get("unit") or "",
+            "price": round(float(r["price_with_vat"] or 0)), "group": r.get("product_group") or "",
+            "imageUrl": r.get("image_url") or "",
+        }
+        for r in rows
+    ])
+
+
+def _member_order_to_api_json(order: dict[str, Any], items: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "id": order["id"],
+        "code": f"DH{order['id']:06d}",
+        "status": order["status"],
+        "paymentMethod": order["payment_method"],
+        "total": round(float(order["total"] or 0)),
+        "note": order.get("note") or "",
+        "recipient": order.get("recipient") or "",
+        "phone": order.get("phone") or "",
+        "address": order.get("address") or "",
+        "createdAt": order["created_at"],
+        "items": [
+            {"productId": it["product_id"], "name": it["name"], "quantity": it["quantity"],
+             "unitPrice": round(float(it["unit_price"] or 0))}
+            for it in items
+        ],
+    }
+
+
+def _load_member_orders(cur, where: str, params: tuple) -> list[dict[str, Any]]:
+    cur.execute(f"SELECT * FROM member_orders {where} ORDER BY id DESC LIMIT 100", params)
+    orders = cur.fetchall()
+    ids = [o["id"] for o in orders]
+    by_order: dict[int, list[dict[str, Any]]] = {i: [] for i in ids}
+    if ids:
+        cur.execute(
+            "SELECT * FROM member_order_items WHERE order_id = ANY(%s::int[]) ORDER BY id ASC", (ids,)
+        )
+        for it in cur.fetchall():
+            by_order[it["order_id"]].append(it)
+    return [_member_order_to_api_json(o, by_order[o["id"]]) for o in orders]
+
+
+@app.get("/api/member/orders")
+@member_required
+def api_member_orders():
+    db = get_db()
+    with db.cursor() as cur:
+        return jsonify(_load_member_orders(cur, "WHERE member_id = %s", (g.member_id,)))
+
+
+@app.post("/api/member/orders")
+@member_required
+def api_member_create_order():
+    data = request.get_json(silent=True) or {}
+    raw_items = data.get("items")
+    if not isinstance(raw_items, list) or not raw_items:
+        return jsonify({"error": "At least one item is required"}), 400
+    if len(raw_items) > 50:
+        return jsonify({"error": "Too many items"}), 400
+    qty_by_product: dict[int, int] = {}
+    for it in raw_items:
+        try:
+            pid, qty = int(it.get("productId")), int(it.get("quantity"))
+        except (TypeError, ValueError, AttributeError):
+            return jsonify({"error": "Invalid item"}), 400
+        if qty < 1 or qty > 99:
+            return jsonify({"error": "Invalid quantity"}), 400
+        qty_by_product[pid] = qty_by_product.get(pid, 0) + qty
+    method = (data.get("paymentMethod") or "cod").strip()
+    if method not in MEMBER_PAYMENT_METHODS:
+        return jsonify({"error": "Invalid payment method"}), 400
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT * FROM members WHERE id = %s", (g.member_id,))
+        member = cur.fetchone()
+        if not member:
+            return jsonify({"error": "Unauthorized"}), 401
+        cur.execute(
+            "SELECT id, name, price_with_vat FROM products WHERE id = ANY(%s::int[]) AND price_with_vat > 0",
+            (list(qty_by_product),),
+        )
+        products = {p["id"]: p for p in cur.fetchall()}
+        if len(products) != len(qty_by_product):
+            return jsonify({"error": "Product not found"}), 404
+        address = (data.get("address") or member.get("address") or "").strip()[:300]
+        if not address:
+            return jsonify({"error": "Address is required"}), 400
+        total = sum(float(products[pid]["price_with_vat"]) * q for pid, q in qty_by_product.items())
+        cur.execute(
+            "INSERT INTO member_orders (member_id, status, payment_method, note, recipient, phone, address, total, created_at) "
+            "VALUES (%s, 'placed', %s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            (member["id"], method, (data.get("note") or "").strip()[:300],
+             (data.get("recipient") or member["full_name"]).strip()[:120],
+             _normalize_phone(data.get("phone") or "") or member["phone"], address, total, _now_iso()),
+        )
+        order_id = cur.fetchone()["id"]
+        for pid, q in qty_by_product.items():
+            cur.execute(
+                "INSERT INTO member_order_items (order_id, product_id, name, unit_price, quantity) VALUES (%s, %s, %s, %s, %s)",
+                (order_id, pid, products[pid]["name"], products[pid]["price_with_vat"], q),
+            )
+        if not member.get("address"):
+            cur.execute("UPDATE members SET address = %s WHERE id = %s", (address, member["id"]))
+        result = _load_member_orders(cur, "WHERE id = %s", (order_id,))[0]
+    db.commit()
+    return jsonify(result), 201
+
+
+@app.get("/api/member/rewards")
+@member_required
+def api_member_rewards():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("SELECT id, name, points FROM member_rewards WHERE active = 1 ORDER BY points, id")
+        rewards = cur.fetchall()
+        cur.execute(
+            "SELECT name, points, created_at FROM member_redemptions WHERE member_id = %s ORDER BY id DESC LIMIT 20",
+            (g.member_id,),
+        )
+        redemptions = cur.fetchall()
+    return jsonify({
+        "rewards": [{"id": r["id"], "name": r["name"], "points": r["points"]} for r in rewards],
+        "redemptions": [{"name": r["name"], "points": r["points"], "date": r["created_at"]} for r in redemptions],
+    })
+
+
+@app.post("/api/member/rewards/<int:reward_id>/redeem")
+@member_required
+def api_member_redeem(reward_id: int):
+    db = get_db()
+    with db.cursor() as cur:
+        # Serialise per member so two taps can't spend the same points twice.
+        cur.execute("SELECT * FROM members WHERE id = %s FOR UPDATE", (g.member_id,))
+        member = cur.fetchone()
+        if not member:
+            return jsonify({"error": "Unauthorized"}), 401
+        cur.execute("SELECT id, name, points FROM member_rewards WHERE id = %s AND active = 1", (reward_id,))
+        reward = cur.fetchone()
+        if not reward:
+            return jsonify({"error": "Reward not found"}), 404
+        if _member_json(cur, member)["points"] < reward["points"]:
+            return jsonify({"error": "Not enough points"}), 400
+        cur.execute(
+            "INSERT INTO member_redemptions (member_id, reward_id, name, points, created_at) VALUES (%s, %s, %s, %s, %s)",
+            (member["id"], reward["id"], reward["name"], reward["points"], _now_iso()),
+        )
+        payload = _member_json(cur, member)
+    db.commit()
+    return jsonify({"member": payload})
+
+
+@app.get("/api/member-orders")
+@login_required
+def api_staff_member_orders():
+    """Staff: online member orders to fulfil (managers only)."""
+    if not _task_viewer()["can_manage"]:
+        return jsonify({"error": "Forbidden"}), 403
+    db = get_db()
+    with db.cursor() as cur:
+        return jsonify(_load_member_orders(cur, "", ()))
+
+
+@app.post("/api/member-orders/<int:order_id>/status")
+@login_required
+def api_staff_member_order_status(order_id: int):
+    if not _task_viewer()["can_manage"]:
+        return jsonify({"error": "Forbidden"}), 403
+    status = ((request.get_json(silent=True) or {}).get("status") or "").strip()
+    if status not in MEMBER_ORDER_STATUSES:
+        return jsonify({"error": "Invalid status"}), 400
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute("UPDATE member_orders SET status = %s WHERE id = %s RETURNING id", (status, order_id))
+        if not cur.fetchone():
+            return jsonify({"error": "Order not found"}), 404
+    db.commit()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/member/stores")
+@member_required
+def api_member_stores():
+    db = get_db()
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT name, store_code, province, address, phone, latitude, longitude FROM stores "
+            "WHERE status = 'Hoạt động' ORDER BY province, name"
+        )
+        rows = cur.fetchall()
+    return jsonify([
+        {
+            "code": r["store_code"], "name": r["name"], "province": r.get("province") or "",
+            "address": r.get("address") or "", "phone": r.get("phone") or "",
+            "latitude": r.get("latitude"), "longitude": r.get("longitude"),
+        }
+        for r in rows
+    ])
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 8000)), debug=False)
