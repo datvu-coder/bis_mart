@@ -5508,7 +5508,7 @@ def api_zalo_oa_test():
     target = row.get("zalo_oa_id") or row.get("zalo_id")
     if not target:
         return jsonify({"error": "Tài khoản này chưa liên kết Zalo. Hãy thoát app, mở lại từ Zalo rồi thử lại.", "ok": False, "detail": "not linked", "target": None}), 400
-    ok, detail = _oa_send_text(str(target), "Tin thử từ Bi'S MART Công việc. Nếu bạn thấy tin này trên điện thoại thì thông báo đẩy đã hoạt động.")
+    ok, detail = _oa_send_text(str(target), "Tin thử từ Bismart Team. Nếu bạn thấy tin này trên điện thoại thì thông báo đẩy đã hoạt động.")
     with db.cursor() as cur:
         cur.execute("INSERT INTO zalo_oa_push_log (employee_id, ok, detail, created_at) VALUES (%s,%s,%s,%s)",
                     (employee_id, 1 if ok else 0, ("test " + detail)[:500], _now_iso()))

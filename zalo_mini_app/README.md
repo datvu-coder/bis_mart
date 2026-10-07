@@ -1,4 +1,4 @@
-# Bi'S MART Công việc — Zalo Mini App
+# Bismart Team — Zalo Mini App
 
 Assign tasks to store staff and track store work. Talks to the existing backend (`../backend`).
 
