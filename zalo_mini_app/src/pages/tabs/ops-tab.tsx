@@ -60,14 +60,6 @@ export default function OpsTab({ active }: { active: boolean }) {
         </div>
       ) : null}
 
-      {!ops?.canManage && fund && !fund.reportedToday && (
-        <button className="cta-card" onClick={() => nav("/fund/new")}>
-          <Icon name="wallet" size={22} />
-          <span><b>Báo cáo quỹ hôm nay</b><small>Đếm tiền, đối chiếu và gửi quản lý</small></span>
-          <Icon name="chevron" size={18} />
-        </button>
-      )}
-
       <div className="tile-grid">
         {tiles.map((t) => (
           <button key={t.key} className={`tile ${t.tone || ""}`} onClick={() => nav(t.to)}>
