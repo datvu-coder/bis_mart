@@ -791,12 +791,15 @@ def api_create_store_manager():
             )
             row = cur.fetchone()
 
-            # Đồng bộ hồ sơ nhân viên: store_code là định danh chính, work_location là tên cửa hàng
+            # Đồng bộ hồ sơ nhân viên: store_code là định danh chính, work_location là tên cửa hàng.
+            # keepHome=true (gán thêm cửa hàng cho người quản lý nhiều cửa hàng) chỉ điền khi nhân viên
+            # chưa có cửa hàng gốc; mặc định giữ hành vi cũ là chuyển cửa hàng gốc sang cửa hàng này.
             cur.execute("SELECT store_code, name FROM stores WHERE id = %s LIMIT 1", (store_id,))
             store_row = cur.fetchone()
             if store_row:
+                only_if_empty = " AND COALESCE(TRIM(store_code), '') = ''" if data.get("keepHome") else ""
                 cur.execute(
-                    "UPDATE employees SET store_code = %s, work_location = %s WHERE id = %s",
+                    "UPDATE employees SET store_code = %s, work_location = %s WHERE id = %s" + only_if_empty,
                     (store_row.get("store_code"), store_row.get("name") or "", employee_id),
                 )
         db.commit()
