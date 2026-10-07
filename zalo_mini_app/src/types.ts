@@ -28,6 +28,7 @@ export interface Task {
   recurrence: Recurrence;
   requirePhoto: boolean;
   photoUrls: string[];
+  startedAt: string | null;
   completedAt: string | null;
   completionNote: string;
   createdAt: string;

@@ -1326,6 +1326,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 CREATE INDEX IF NOT EXISTS idx_tasks_assignee ON tasks(assignee_id, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_store ON tasks(store_code, status);
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS doer_ids TEXT NOT NULL DEFAULT '[]';  -- JSON array of employee ids who carried the task out
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS started_at TEXT;  -- when the task first moved to 'doing' (NULL = never started or reopened)
 
 CREATE TABLE IF NOT EXISTS task_comments (
     id SERIAL PRIMARY KEY,
