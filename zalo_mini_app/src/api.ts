@@ -116,6 +116,7 @@ export interface TaskInput {
   title: string;
   description: string;
   assigneeId: number | null;
+  storeCode?: string;
   priority: string;
   dueAt: string | null;
   recurrence: string;

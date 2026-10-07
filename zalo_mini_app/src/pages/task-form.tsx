@@ -82,7 +82,7 @@ export default function TaskFormPage() {
         await api.updateTask(editId, { ...base, assigneeId: selected[0] ?? null });
       } else if (mode === "store") {
         const targets = stores.filter((st) => pickedStores.includes(st.storeCode) && st.managers.length > 0);
-        const results = await Promise.allSettled(targets.map((st) => api.createTask({ ...base, assigneeId: st.managers[0].id })));
+        const results = await Promise.allSettled(targets.map((st) => api.createTask({ ...base, assigneeId: st.managers[0].id, storeCode: st.storeCode })));
         const failed = results.filter((r) => r.status === "rejected").length;
         if (failed) throw new Error(`Giao thành công ${targets.length - failed}/${targets.length} cửa hàng, ${failed} lần lỗi`);
       } else if (selected.length === 0) {
