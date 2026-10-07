@@ -1056,6 +1056,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
                 'storeId': selectedStore.id,
                 'employeeId': selectedEmployee.id,
                 'storeRole': storeRole,
+                'keepHome': true,
               });
               if (!ctx.mounted) return;
               Navigator.pop(ctx);
@@ -1220,6 +1221,7 @@ class _PhanQuyenScreenState extends State<PhanQuyenScreen>
               'storeId': storeId,
               'employeeId': employeeId,
               'storeRole': role,
+              'keepHome': true,
             });
             success++;
           } catch (_) {
