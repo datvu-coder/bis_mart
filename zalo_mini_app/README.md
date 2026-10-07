@@ -16,6 +16,8 @@ Every push to `main` that touches `zalo_mini_app/` runs `.github/workflows/zalo-
 type-checks, builds and uploads the Development version with `zmp deploy -e`.
 One-time setup: run `zmp login --app-id <id>` locally, then add the `ZMP_TOKEN` value from the generated
 `.env` as a GitHub Actions repository secret named `ZMP_TOKEN`. If the token expires, log in again and update the secret.
+To do both steps in one go, run `bash zalo_mini_app/refresh-token.sh` (add `--deploy` to start a Development deploy afterwards);
+it needs `zmp-cli` and the GitHub CLI (`gh auth login`).
 
 ## Auth
 1. First open: employee logs in with their Bi'S MART code/password; the app then calls
