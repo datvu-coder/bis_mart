@@ -531,6 +531,7 @@ input[type="datetime-local"]::-webkit-date-and-time-value, input[type="date"]::-
 .otl li:not(.done):not(.current) .otl-body b { color: var(--muted); font-weight: 600; }
 .otl-body small { color: var(--muted); font-size: 12px; }
 .otl-body small.wait { color: var(--warning); font-weight: 600; }
+.otl-body small.late { color: var(--error); font-weight: 600; }
 .otl li.skipped .otl-body b { text-decoration: line-through; }
 .hint.total { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
 @media (prefers-reduced-motion: reduce) { .otl .pulse { animation: none; } }

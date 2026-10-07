@@ -5896,6 +5896,7 @@ def _task_to_api_json(row: dict[str, Any]) -> dict[str, Any]:
         "recurrence": row.get("recurrence") or "none",
         "requirePhoto": bool(row.get("require_photo")),
         "photoUrls": photos,
+        "startedAt": row.get("started_at"),
         "completedAt": row.get("completed_at"),
         "completionNote": row.get("completion_note") or "",
         "createdAt": row.get("created_at"),
@@ -6449,15 +6450,22 @@ def api_set_task_status(task_id: int):
             return jsonify({"error": "Invalid doers"}), 400
 
     done_now = status == "done" and task["status"] != "done"
+    # started_at keeps the first time the task went to 'doing'; reopening to 'todo' clears it.
+    if status == "todo":
+        started_at = None
+    elif status == "doing":
+        started_at = task.get("started_at") or _now_iso()
+    else:
+        started_at = task.get("started_at")
     db = get_db()
     with db.cursor() as cur:
         cur.execute(
             "UPDATE tasks SET status=%s, photo_urls=%s, completion_note=%s, completed_at=%s, updated_at=%s, "
-            "doer_ids=%s WHERE id=%s",
+            "doer_ids=%s, started_at=%s WHERE id=%s",
             (
                 status, json.dumps(photos),
                 (data.get("note") if "note" in data else task.get("completion_note")),
-                _now_iso() if status == "done" else None, _now_iso(), json.dumps(doer_ids), task_id,
+                _now_iso() if status == "done" else None, _now_iso(), json.dumps(doer_ids), started_at, task_id,
             ),
         )
     db.commit()

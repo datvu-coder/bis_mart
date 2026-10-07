@@ -11,6 +11,7 @@ import PhotoViewer from "../components/PhotoViewer";
 import Sheet, { ConfirmSheet } from "../components/Sheet";
 import { Assignee, PRIORITY_LABEL, RECURRENCE_LABEL, STATUS_LABEL, TaskDetail } from "../types";
 import { dueInfo, formatDateTime } from "../utils";
+import TaskTimeline from "../components/TaskTimeline";
 
 const STEPS: { key: "todo" | "doing" | "done"; label: string }[] = [
   { key: "todo", label: "Chưa làm" },
@@ -170,6 +171,8 @@ export default function TaskDetailPage() {
           {task.completedAt && <div><Icon name="checkCircle" size={18} /><dt>Hoàn thành lúc</dt><dd>{formatDateTime(task.completedAt)}</dd></div>}
         </dl>
       </div>
+
+      <TaskTimeline task={task} />
 
       {(canAct || photos.length > 0) && (
         <div className="panel">
