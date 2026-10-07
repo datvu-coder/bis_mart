@@ -12,8 +12,8 @@ export default () => {
       // app-config.json, whose asset lists are empty, over the generated www/app-config.json.
       zaloMiniApp({
         app: {
-          title: "Bi'S MART Công việc",
-          headerTitle: "Bi'S MART Công việc",
+          title: "Bismart Team",
+          headerTitle: "Bismart Team",
           headerColor: "#C1622B",
           textColor: "white",
           statusBar: "normal",

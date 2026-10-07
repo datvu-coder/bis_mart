@@ -125,7 +125,7 @@ export default function MeTab({ tasks }: { tasks: Task[] }) {
         <button className="menu-row" onClick={() => setPwOpen(true)}><Icon name="edit" size={20} /> Đổi mật khẩu <Icon name="chevron" size={16} className="chev" /></button>
         <button className="menu-row danger" onClick={() => setConfirm(true)}><Icon name="logout" size={20} /> Đăng xuất</button>
       </div>
-      <div className="foot-note">Bi'S MART · Công việc</div>
+      <div className="foot-note">Bismart Team</div>
 
       <Sheet open={oaSheet} title="Thông báo Zalo OA" onClose={() => setOaSheet(false)}>
         <div className="menu-panel sheet-menu">
