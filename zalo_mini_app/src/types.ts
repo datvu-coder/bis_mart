@@ -184,12 +184,13 @@ export interface FundSuggest {
 }
 
 // ---------- operations: purchase orders ----------
-export type OrderStatus = "submitted" | "approved" | "ordered" | "partial" | "delivered" | "cancelled";
+export type OrderStatus = "submitted" | "approved" | "ordered" | "partial" | "closed_short" | "delivered" | "cancelled";
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   submitted: "Chờ duyệt",
   approved: "Đã duyệt",
   ordered: "Đã đặt NCC",
   partial: "Nhận thiếu",
+  closed_short: "Đã chốt thiếu",
   delivered: "Đã nhận đủ",
   cancelled: "Đã huỷ",
 };
@@ -219,6 +220,9 @@ export interface Order {
   receiptPhotos: string[];
   itemCount: number;
   totalQty: number;
+  receivedQty: number;
+  closedAt: string | null;
+  closedByName: string;
   createdAt: string;
   updatedAt: string | null;
   approvedAt: string | null;
@@ -233,6 +237,7 @@ export interface OrderDetail extends Order {
   canEdit: boolean;
   canCancel: boolean;
   canReceive: boolean;
+  canClose: boolean;
 }
 
 export interface CatalogProduct {

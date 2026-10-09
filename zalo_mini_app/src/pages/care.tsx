@@ -99,7 +99,7 @@ export default function CarePage() {
 
   return (
     <Page className="page with-bar">
-      <SubHero title="Chăm sóc khách hàng" note="Gửi tin từ OA cho người đã quan tâm" />
+      <SubHero title="Chăm sóc khách hàng" />
 
       <section className="panel">
         <h3>Gửi cho ai</h3>

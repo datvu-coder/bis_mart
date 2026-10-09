@@ -46,7 +46,7 @@ export default function BoardPage() {
   const unread = (items || []).filter((a) => !a.isRead).length;
   return (
     <Page className="page">
-      <SubHero title="Bảng tin" note={items ? (unread ? `${unread} thông báo chưa đọc` : "Bạn đã đọc hết thông báo") : "Đang tải..."}
+      <SubHero title="Bảng tin" chip={unread ? `${unread} chưa đọc` : undefined}
         right={canManage ? <button className="hero-btn" onClick={() => nav("/board/new")} aria-label="Đăng thông báo"><Icon name="plus" size={22} /></button> : undefined} />
       {error && <div className="error">{error} <button className="link" onClick={load}>Thử lại</button></div>}
       {!items && !error && <Skeleton count={3} />}

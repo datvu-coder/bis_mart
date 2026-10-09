@@ -58,12 +58,12 @@ export default function FundDetailPage() {
   };
 
   if (error) return <Page className="page"><SubHero title="Báo cáo quỹ" /><div className="error">{error}</div></Page>;
-  if (!r) return <Page className="page"><SubHero title="Báo cáo quỹ" note="Đang tải..." /></Page>;
+  if (!r) return <Page className="page"><SubHero title="Báo cáo quỹ" /></Page>;
 
   const rows = FUND_DENOMS.filter((d) => r.counts[String(d)]);
   return (
     <Page className={`page ${r.canReview ? "with-bar" : ""}`}>
-      <SubHero title={`${r.storeName} · ${dmy(r.reportDate)}`} note={`${r.submittedByName} gửi lúc ${formatDateTime(r.createdAt)}`}
+      <SubHero title={r.storeName} chip={dmy(r.reportDate)}
         right={<>
           {r.canEdit && <button className="hero-btn" onClick={() => nav(`/fund/new?store=${r.storeCode}&date=${r.reportDate}`)} aria-label="Sửa"><Icon name="edit" size={20} /></button>}
           {r.canDelete && <button className="hero-btn" onClick={() => setDeleting(true)} aria-label="Xoá báo cáo"><Icon name="trash" size={20} /></button>}
@@ -77,6 +77,7 @@ export default function FundDetailPage() {
 
       <section className="panel">
         <div className="panel-head"><h3>Trạng thái</h3><span className={`badge fund-${r.status}`}>{FUND_STATUS_LABEL[r.status]}</span></div>
+        <div className="hint">{r.submittedByName} gửi lúc {formatDateTime(r.createdAt)}</div>
         {r.reviewedByName && <div className="hint">{r.reviewedByName} xử lý {r.reviewedAt ? formatDateTime(r.reviewedAt) : ""}</div>}
         {r.reviewNote && <p className="desc">Ghi chú quản lý: {r.reviewNote}</p>}
         {r.note && <p className="desc">Ghi chú: {r.note}</p>}

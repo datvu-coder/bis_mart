@@ -50,17 +50,19 @@ export default function BoardDetailPage() {
   };
 
   if (error) return <Page className="page"><SubHero title="Thông báo" /><div className="error">{error}</div></Page>;
-  if (!a) return <Page className="page"><SubHero title="Thông báo" note="Đang tải..." /></Page>;
+  if (!a) return <Page className="page"><SubHero title="Thông báo" /></Page>;
 
   const unread = a.unread || [];
   const readers = a.readers || [];
   const total = a.audienceCount || 0;
   return (
     <Page className="page">
-      <SubHero title={a.title} note={`${a.authorName} · ${formatDateTime(a.createdAt)}`}
+      <SubHero title="Thông báo"
         right={a.canManage ? <button className="hero-btn" onClick={() => setDel(true)} aria-label="Xoá thông báo"><Icon name="trash" size={20} /></button> : undefined} />
 
       <section className="panel">
+        <h3>{a.title}</h3>
+        <div className="hint">{a.authorName} · {formatDateTime(a.createdAt)}</div>
         {a.body ? <p className="desc">{a.body}</p> : <div className="hint">Không có nội dung chi tiết.</div>}
         <PhotoStrip photos={a.imageUrls} />
       </section>

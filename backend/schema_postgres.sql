@@ -1396,7 +1396,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
     id SERIAL PRIMARY KEY,
     store_code TEXT NOT NULL,
     order_date TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'submitted',  -- submitted | approved | ordered | partial | delivered | cancelled
+    status TEXT NOT NULL DEFAULT 'submitted',  -- submitted | approved | ordered | partial | closed_short | delivered | cancelled
     supplier TEXT,
     note TEXT,
     created_by INTEGER REFERENCES employees(id) ON DELETE SET NULL,
@@ -1411,6 +1411,8 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_store ON purchase_orders(store_code, order_date);
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS closed_at TEXT;  -- a manager closed a short-received order without waiting for the rest
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS closed_by INTEGER REFERENCES employees(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS purchase_order_items (
     id SERIAL PRIMARY KEY,

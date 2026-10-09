@@ -117,7 +117,7 @@ export default function KpiPage() {
 
   return (
     <Page className="page">
-      <SubHero title="KPI cửa hàng" note="Doanh số so với chỉ tiêu tháng" />
+      <SubHero title="KPI cửa hàng" />
 
       <section className="panel kp-month">
         <button className="icon-btn" disabled={!canPrev} onClick={() => go(-1)} aria-label="Tháng trước"><Icon name="back" size={18} /></button>

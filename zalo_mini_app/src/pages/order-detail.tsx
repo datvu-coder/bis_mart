@@ -24,6 +24,7 @@ export default function OrderDetailPage() {
   const [note, setNote] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [cancel, setCancel] = useState(false);
+  const [closeShort, setCloseShort] = useState(false);
 
   const load = useCallback(() => {
     api.order(orderId).then(setO).catch((e) => setError(e instanceof Error ? e.message : "Không tải được đơn"));
@@ -62,13 +63,13 @@ export default function OrderDetailPage() {
     }, "Đã xác nhận nhận hàng");
 
   if (error) return <Page className="page"><SubHero title="Đơn đặt hàng" /><div className="error">{error}</div></Page>;
-  if (!o) return <Page className="page"><SubHero title="Đơn đặt hàng" note="Đang tải..." /></Page>;
+  if (!o) return <Page className="page"><SubHero title="Đơn đặt hàng" /></Page>;
 
-  const hasBar = o.canReceive || o.canManage;
+  const hasBar = o.canReceive || o.canManage || o.canClose;
   const shortCount = o.items.filter((i) => i.qtyReceived != null && i.qtyReceived < i.qty).length;
   return (
     <Page className={`page ${hasBar ? "with-bar" : ""}`}>
-      <SubHero title={`${o.storeName} · ${dmy(o.orderDate)}`} note={`${o.createdByName}${o.supplier ? ` · ${o.supplier}` : ""}`}
+      <SubHero title={o.storeName} chip={dmy(o.orderDate)}
         right={<>
           {o.canEdit && <button className="hero-btn" onClick={() => nav(`/orders/${o.id}/edit`)} aria-label="Sửa"><Icon name="edit" size={20} /></button>}
           {o.canCancel && <button className="hero-btn" onClick={() => setCancel(true)} aria-label="Huỷ đơn"><Icon name="trash" size={20} /></button>}
@@ -78,6 +79,10 @@ export default function OrderDetailPage() {
 
       <section className="panel">
         <div className="panel-head"><h3>Trạng thái</h3><span className={`badge order-${o.status}`}>{ORDER_STATUS_LABEL[o.status]}</span></div>
+        <div className="hint">Tạo bởi {o.createdByName || "-"}{o.supplier ? ` · NCC: ${o.supplier}` : ""}</div>
+        {(o.status === "partial" || o.status === "closed_short") && o.totalQty > 0 && (
+          <div className="hint">Đã nhận {o.receivedQty}/{o.totalQty} · còn thiếu {Math.max(0, o.totalQty - o.receivedQty)}</div>
+        )}
         {o.note && <p className="desc">Ghi chú: {o.note}</p>}
         {o.receivedAt && <div className="hint">{o.receivedByName} nhận hàng lúc {formatDateTime(o.receivedAt)}{shortCount ? ` · thiếu ${shortCount} mặt hàng` : ""}</div>}
         {o.receiptNote && <p className="desc">Ghi chú nhận hàng: {o.receiptNote}</p>}
@@ -105,7 +110,8 @@ export default function OrderDetailPage() {
         <div className="action-bar">
           {o.canManage && o.status === "submitted" && <button className="btn" disabled={busy} onClick={() => act(() => api.setOrderStatus(o.id, "approved"), "Đã duyệt đơn")}>Duyệt</button>}
           {o.canManage && (o.status === "submitted" || o.status === "approved") && <button className="btn" disabled={busy} onClick={() => act(() => api.setOrderStatus(o.id, "ordered"), "Đã đánh dấu đặt NCC")}>Đã đặt NCC</button>}
-          {o.canReceive && <button className="btn primary" disabled={busy} onClick={openReceive}><Icon name="box" size={18} /> Nhận hàng</button>}
+          {o.canClose && <button className="btn" disabled={busy} onClick={() => setCloseShort(true)}>Chốt đơn thiếu</button>}
+          {o.canReceive && <button className="btn primary" disabled={busy} onClick={openReceive}><Icon name="box" size={18} /> {o.status === "partial" ? "Nhận tiếp" : "Nhận hàng"}</button>}
         </div>
       )}
 
@@ -125,6 +131,9 @@ export default function OrderDetailPage() {
           <button className="btn primary" disabled={busy} onClick={submitReceive}>{busy ? "Đang lưu..." : "Xác nhận"}</button>
         </div>
       </Sheet>
+
+      <ConfirmSheet open={closeShort} title="Chốt đơn thiếu hàng?" message="Đơn sẽ đóng với số lượng đã nhận, không chờ phần còn thiếu nữa và rời khỏi mục Chờ hàng. Không thể mở lại." confirmLabel="Chốt đơn" busy={busy}
+        onConfirm={() => { setCloseShort(false); act(() => api.setOrderStatus(o.id, "closed_short"), "Đã chốt đơn thiếu hàng"); }} onClose={() => setCloseShort(false)} />
 
       <ConfirmSheet open={cancel} title="Huỷ đơn đặt hàng?" message="Đơn sẽ chuyển sang trạng thái đã huỷ và không thể mở lại." confirmLabel="Huỷ đơn" danger busy={busy}
         onConfirm={() => { setCancel(false); act(() => api.setOrderStatus(o.id, "cancelled"), "Đã huỷ đơn"); }} onClose={() => setCancel(false)} />

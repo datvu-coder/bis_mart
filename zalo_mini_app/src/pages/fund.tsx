@@ -126,7 +126,6 @@ export default function FundPage() {
     <Page className="page">
       <SubHero
         title="Quỹ cuối ngày"
-        note={canManage ? "Theo dõi báo cáo quỹ các cửa hàng" : "Báo cáo quỹ và thu/chi của cửa hàng"}
         right={<>
           {canManage && <button className="hero-btn" onClick={exportCsv} aria-label="Xuất Excel (CSV)"><Icon name="download" size={20} /></button>}
           <button className="hero-btn" onClick={() => nav(`/fund/new?store=${store || mine}`)} aria-label="Báo cáo quỹ mới"><Icon name="plus" size={22} /></button>

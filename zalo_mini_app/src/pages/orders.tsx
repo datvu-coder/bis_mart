@@ -61,7 +61,7 @@ export default function OrdersPage() {
 
   return (
     <Page className="page">
-      <SubHero title="Đặt hàng & nhận hàng" note="Tạo đơn, theo dõi và xác nhận hàng về"
+      <SubHero title="Đặt hàng & nhận hàng"
         right={<>
           <button className="hero-btn" onClick={() => nav("/orders/new")} aria-label="Tạo đơn mới"><Icon name="plus" size={22} /></button>
         </>} />
