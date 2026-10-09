@@ -6534,7 +6534,7 @@ from datetime import date as _date_cls
 FUND_DENOMS = (500000, 200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000)
 ORDER_OPEN_STATUSES = ("submitted", "approved", "ordered", "partial")
 ORDER_LABELS = {"approved": "đã được duyệt", "ordered": "đã đặt nhà cung cấp", "cancelled": "đã bị huỷ",
-                "delivered": "đã nhận đủ hàng", "partial": "nhận thiếu hàng"}
+                "delivered": "đã nhận đủ hàng", "partial": "nhận thiếu hàng", "closed_short": "đã chốt thiếu hàng"}
 CASH_EXCLUDED_METHODS = ("transfer", "bank_transfer", "chuyen_khoan", "ck")
 ADMIN_POSITIONS = ("ADM", "ADMIN", "TMK")
 
@@ -7044,11 +7044,14 @@ def api_delete_fund_entry(entry_id: int):
 _ORDER_SELECT = (
     "SELECT o.*, s.name AS store_name, cb.full_name AS creator_name, rb.full_name AS receiver_name, "
     "(SELECT COUNT(*) FROM purchase_order_items i WHERE i.order_id = o.id) AS item_count, "
-    "(SELECT COALESCE(SUM(i.qty), 0) FROM purchase_order_items i WHERE i.order_id = o.id) AS total_qty "
+    "(SELECT COALESCE(SUM(i.qty), 0) FROM purchase_order_items i WHERE i.order_id = o.id) AS total_qty, "
+    "(SELECT COALESCE(SUM(LEAST(COALESCE(i.qty_received, 0), i.qty)), 0) FROM purchase_order_items i WHERE i.order_id = o.id) AS received_qty, "
+    "xb.full_name AS closer_name "
     "FROM purchase_orders o "
     "LEFT JOIN stores s ON UPPER(s.store_code) = UPPER(o.store_code) "
     "LEFT JOIN employees cb ON cb.id = o.created_by "
     "LEFT JOIN employees rb ON rb.id = o.received_by "
+    "LEFT JOIN employees xb ON xb.id = o.closed_by "
 )
 
 
@@ -7060,7 +7063,9 @@ def _order_to_json(r: dict, items: list | None = None) -> dict:
         "approvedAt": r.get("approved_at"), "orderedAt": r.get("ordered_at"), "receivedAt": r.get("received_at"),
         "receivedByName": r.get("receiver_name") or "", "receiptNote": r.get("receipt_note") or "",
         "receiptPhotos": _json_list(r.get("receipt_photos")), "itemCount": int(r.get("item_count") or 0),
-        "totalQty": float(r.get("total_qty") or 0), "createdAt": r.get("created_at"), "updatedAt": r.get("updated_at"),
+        "totalQty": float(r.get("total_qty") or 0), "receivedQty": float(r.get("received_qty") or 0),
+        "closedAt": r.get("closed_at"), "closedByName": r.get("closer_name") or "",
+        "createdAt": r.get("created_at"), "updatedAt": r.get("updated_at"),
     }
     if items is not None:
         out["items"] = items
@@ -7196,7 +7201,7 @@ def api_list_orders():
     if status == "open":
         where.append("o.status = ANY(%s)")
         params.append(list(ORDER_OPEN_STATUSES))
-    elif status in ("submitted", "approved", "ordered", "partial", "delivered", "cancelled"):
+    elif status in ("submitted", "approved", "ordered", "partial", "closed_short", "delivered", "cancelled"):
         where.append("o.status = %s")
         params.append(status)
     date = _valid_date(request.args.get("date")) if request.args.get("date") else None
@@ -7272,6 +7277,7 @@ def api_get_order(order_id: int):
     out["canDelete"] = admin
     out["canCancel"] = row["status"] in ("submitted", "approved", "ordered") and (manages or (mine and row["status"] == "submitted"))
     out["canReceive"] = row["status"] in ("submitted", "approved", "ordered", "partial")
+    out["canClose"] = row["status"] == "partial" and manages
     return jsonify(out)
 
 
@@ -7350,6 +7356,14 @@ def api_set_order_status(order_id: int):
             return _bad("Order cannot be cancelled", 409)
         if not (manages or (mine and row["status"] == "submitted")):
             return _forbidden()
+    elif status == "closed_short":
+        # A manager stops waiting for the missing goods of a short-received order.
+        if not manages:
+            return _forbidden()
+        if row["status"] != "partial":
+            return _bad("Only a short-received order can be closed", 409)
+        sets += ["closed_at = %s", "closed_by = %s"]
+        params += [now, viewer["employee_id"]]
     else:
         return _bad("Invalid status")
     db = get_db()

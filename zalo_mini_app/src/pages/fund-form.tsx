@@ -80,7 +80,7 @@ export default function FundFormPage() {
 
   return (
     <Page className="page with-bar">
-      <SubHero title={existing ? "Sửa báo cáo quỹ" : "Báo cáo quỹ"} note={`Ngày ${dmy(date)}`} />
+      <SubHero title={existing ? "Sửa báo cáo quỹ" : "Báo cáo quỹ"} />
 
       <section className="panel">
         <h3>Cửa hàng & ngày</h3>

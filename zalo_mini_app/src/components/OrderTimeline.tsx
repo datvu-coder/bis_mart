@@ -9,19 +9,25 @@ interface Step {
   at: string | null;
 }
 
+/** Received, but not everything: the order is either waiting for the rest or was closed short. */
+const isShort = (o: Order) => o.status === "partial" || o.status === "closed_short";
+
 /** The four milestones of an order, in order. A missing time means the step has not happened (or was skipped). */
 export const orderSteps = (o: Order): Step[] => [
   { key: "created", label: "Tạo đơn", at: o.createdAt },
   { key: "approved", label: "Duyệt đơn", at: o.approvedAt },
   { key: "ordered", label: "Đặt nhà cung cấp", at: o.orderedAt },
-  { key: "received", label: o.status === "partial" ? "Nhận hàng (thiếu)" : "Nhận hàng", at: o.receivedAt },
+  { key: "received", label: isShort(o) ? "Nhận hàng (thiếu)" : "Nhận hàng", at: o.receivedAt },
 ];
 
 /** Index of the last completed step, or -1. */
 const lastDone = (steps: Step[]) => steps.reduce((acc, s, i) => (s.at ? i : acc), -1);
 
+/** 100% only when everything arrived; a short order shows how much of the goods arrived (never 100). */
 export const orderPercent = (o: Order): number => {
   if (o.status === "cancelled") return 0;
+  if (o.status === "delivered") return 100;
+  if (isShort(o)) return o.totalQty > 0 ? Math.min(99, Math.floor((o.receivedQty / o.totalQty) * 100)) : 0;
   const steps = orderSteps(o);
   return Math.round(((lastDone(steps) + 1) / steps.length) * 100);
 };
@@ -30,7 +36,7 @@ export const orderPercent = (o: Order): number => {
 export function OrderProgress({ order }: { order: Order }) {
   const steps = orderSteps(order);
   const done = order.status === "cancelled" ? -1 : lastDone(steps);
-  const short = order.status === "partial";
+  const short = isShort(order);
   return (
     <div className={`oprog ${order.status === "cancelled" ? "cancelled" : ""}`} aria-label={`Tiến độ ${orderPercent(order)}%`}>
       {steps.map((s, i) => <i key={s.key} className={`${i <= done ? "on" : ""} ${short && i === 3 ? "short" : ""}`} />)}
@@ -43,10 +49,13 @@ export function OrderProgress({ order }: { order: Order }) {
 export default function OrderTimeline({ order }: { order: Order }) {
   const steps = orderSteps(order);
   const cancelled = order.status === "cancelled";
-  const done = cancelled ? lastDone(steps) : lastDone(steps);
+  const done = lastDone(steps);
   const pct = orderPercent(order);
   const nextIdx = done + 1;
-  const finished = !cancelled && done === steps.length - 1;
+  const short = isShort(order);
+  const finished = !cancelled && order.status === "delivered";
+  const waitingRest = order.status === "partial" && !!order.receivedAt;
+  const closed = order.status === "closed_short" && !!order.closedAt;
 
   return (
     <section className="panel">
@@ -55,16 +64,16 @@ export default function OrderTimeline({ order }: { order: Order }) {
         <span className={`count ${cancelled ? "bad" : ""}`}>{cancelled ? "Đã huỷ" : `${pct}%`}</span>
       </div>
       <div className={`oprog big ${cancelled ? "cancelled" : ""}`}>
-        {steps.map((s, i) => <i key={s.key} className={`${i <= done ? "on" : ""} ${order.status === "partial" && i === 3 ? "short" : ""}`} />)}
+        {steps.map((s, i) => <i key={s.key} className={`${i <= done ? "on" : ""} ${short && i === 3 ? "short" : ""}`} />)}
       </div>
       <ol className="otl">
         {steps.map((s, i) => {
           const happened = !!s.at;
           const skipped = !happened && i < done; // a later step is done, this one never happened
-          const current = !cancelled && !finished && i === nextIdx;
+          const current = !cancelled && !finished && !short && i === nextIdx;
           const prev = [...steps.slice(0, i)].reverse().find((x) => x.at);
           return (
-            <li key={s.key} className={`${happened ? "done" : ""} ${current ? "current" : ""} ${skipped ? "skipped" : ""} ${happened && order.status === "partial" && i === 3 ? "warn" : ""}`}>
+            <li key={s.key} className={`${happened ? "done" : ""} ${current ? "current" : ""} ${skipped ? "skipped" : ""} ${happened && short && i === 3 ? "warn" : ""}`}>
               <span className="otl-dot">{happened ? <Icon name="check" size={13} /> : current ? <i className="pulse" /> : null}</span>
               <div className="otl-body">
                 <b>{s.label}</b>
@@ -78,6 +87,22 @@ export default function OrderTimeline({ order }: { order: Order }) {
             </li>
           );
         })}
+        {waitingRest && (
+          <li className="current">
+            <span className="otl-dot"><i className="pulse" /></span>
+            <div className="otl-body"><b>Chờ phần hàng còn thiếu</b><small className="wait">Đang chờ {spanText(order.receivedAt!)}</small></div>
+          </li>
+        )}
+        {closed && (
+          <li className="done warn">
+            <span className="otl-dot"><Icon name="check" size={13} /></span>
+            <div className="otl-body">
+              <b>Chốt đơn thiếu hàng</b>
+              <small>{formatDateTime(order.closedAt)}{order.receivedAt ? ` · sau ${spanText(order.receivedAt, order.closedAt)}` : ""}</small>
+              {order.closedByName && <small>{order.closedByName}</small>}
+            </div>
+          </li>
+        )}
         {cancelled && (
           <li className="cancelled">
             <span className="otl-dot"><Icon name="close" size={13} /></span>

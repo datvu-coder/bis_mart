@@ -71,7 +71,7 @@ export default function BoardFormPage() {
 
   return (
     <Page className="page with-bar">
-      <SubHero title={editId ? "Sửa thông báo" : "Đăng thông báo"} note={editId ? "Nội dung mới hiện cho mọi người đã nhận" : "Nhân viên sẽ nhận thông báo và bạn xem được ai đã đọc"} />
+      <SubHero title={editId ? "Sửa thông báo" : "Đăng thông báo"} />
       <section className="panel">
         <h3>Nội dung</h3>
         <label className="field"><span>Tiêu đề *</span><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Khuyến mãi tuần này" maxLength={200} /></label>

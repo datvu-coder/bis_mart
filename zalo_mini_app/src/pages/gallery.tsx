@@ -33,7 +33,7 @@ export default function GalleryPage() {
 
   return (
     <Page className="page">
-      <SubHero title="Kho ảnh" note={items ? `${total} ảnh` : "Đang tải..."} />
+      <SubHero title="Kho ảnh" chip={items ? `${total} ảnh` : undefined} />
       <div className="chip-scroll">
         {KINDS.map(([k, v]) => <button key={k} className={`chip ${kind === k ? "active" : ""}`} onClick={() => setKind(k)}>{v}</button>)}
       </div>

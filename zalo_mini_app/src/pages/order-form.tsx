@@ -84,7 +84,7 @@ export default function OrderFormPage() {
   const valid = items.some((i) => i.qty > 0);
   return (
     <Page className="page with-bar">
-      <SubHero title={editId ? "Sửa đơn đặt hàng" : "Đơn đặt hàng mới"} note="Chọn sản phẩm và số lượng cần đặt" />
+      <SubHero title={editId ? "Sửa đơn đặt hàng" : "Đơn đặt hàng mới"} />
 
       {!editId && (
         <section className="panel">

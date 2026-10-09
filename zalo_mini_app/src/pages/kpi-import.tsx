@@ -106,7 +106,7 @@ export default function KpiImportPage() {
 
   return (
     <Page className="page with-bar">
-      <SubHero title="Nhập dữ liệu KPI" note={month ? `${monthLabel(month)} · đơn vị nghìn đồng` : ""} />
+      <SubHero title="Nhập dữ liệu KPI" chip={month ? monthLabel(month) : undefined} />
       {error && <div className="error inline" style={{ margin: "14px" }}>{error}</div>}
       {!stores && !error && <Skeleton count={4} />}
       {stores && (
@@ -122,7 +122,7 @@ export default function KpiImportPage() {
               );
             })}
           </div>
-          <div className="kp-progress">Đã nhập {doneCount}/{stores.length} cửa hàng</div>
+          <div className="kp-progress">Đã nhập {doneCount}/{stores.length} cửa hàng · đơn vị: nghìn đồng</div>
 
           {store && (
             <section className="panel kp-store">
