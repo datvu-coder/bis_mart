@@ -30,7 +30,6 @@ export default function TaskDetailPage() {
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
-  const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
   const [viewer, setViewer] = useState<string | null>(null);
   const [menu, setMenu] = useState(false);
@@ -212,36 +211,6 @@ export default function TaskDetailPage() {
         </div>
       )}
 
-      <div className="panel">
-        <div className="panel-head"><h3>Trao đổi</h3><span className="count">{task.comments.length}</span></div>
-        {task.comments.length === 0 && <div className="hint">Chưa có trao đổi nào</div>}
-        {task.comments.map((c) => (
-          <div key={c.id} className="comment">
-            <Avatar name={c.authorName || "?"} size={30} />
-            <div className="bubble">
-              <div className="bubble-head"><b>{c.authorName || "Ẩn danh"}</b><small>{formatDateTime(c.createdAt)}</small></div>
-              <div>{c.body}</div>
-            </div>
-          </div>
-        ))}
-        <div className="composer">
-          <input
-            placeholder="Viết trao đổi..."
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && comment.trim() && !busy) run(async () => { await api.addComment(task.id, comment.trim()); setComment(""); }); }}
-          />
-          <button
-            className="send"
-            disabled={busy || !comment.trim()}
-            onClick={() => run(async () => { await api.addComment(task.id, comment.trim()); setComment(""); })}
-            aria-label="Gửi"
-          >
-            <Icon name="send" size={18} />
-          </button>
-        </div>
-      </div>
-
       {canAct && (
         <div className="action-bar">
           {task.status === "todo" && (
@@ -284,7 +253,7 @@ export default function TaskDetailPage() {
         open={confirm !== null}
         title={confirm === "delete" ? "Xoá công việc?" : confirm === "cancel" ? "Huỷ công việc?" : "Mở lại công việc?"}
         message={
-          confirm === "delete" ? "Công việc, ảnh và trao đổi sẽ bị xoá vĩnh viễn."
+          confirm === "delete" ? "Công việc và ảnh sẽ bị xoá vĩnh viễn."
           : confirm === "cancel" ? "Công việc sẽ chuyển sang trạng thái đã huỷ."
           : "Công việc sẽ quay lại trạng thái chưa làm."
         }

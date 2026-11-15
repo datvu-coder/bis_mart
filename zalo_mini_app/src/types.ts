@@ -35,18 +35,9 @@ export interface Task {
   updatedAt: string;
 }
 
-export interface TaskComment {
-  id: number;
-  body: string;
-  createdAt: string;
-  authorId: number | null;
-  authorName: string;
-}
-
 export interface TaskDetail extends Task {
   canManage: boolean;
   doers: { id: number; name: string }[];
-  comments: TaskComment[];
 }
 
 export interface Assignee {
@@ -112,7 +103,7 @@ export interface Analytics {
 }
 
 export type NotificationKind =
-  | "assigned" | "done" | "comment" | "cancelled" | "reopened" | "due_soon" | "overdue" | "info"
+  | "assigned" | "done" | "cancelled" | "reopened" | "due_soon" | "overdue" | "info"
   | "fund_new" | "fund_diff" | "fund_review" | "fund_missing"
   | "order_new" | "order_status" | "order_short" | "order_received"
   | "announcement" | "ann_remind";

@@ -192,12 +192,7 @@ h1, h2, h3 { margin: 0; }
 .viewer img { max-width: 100%; max-height: 90vh; object-fit: contain; }
 .viewer-close { position: absolute; top: 16px; right: 16px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); color: #fff; display: flex; align-items: center; justify-content: center; }
 
-.comment { display: flex; gap: 10px; margin-bottom: 12px; }
-.bubble { background: #f6efe5; border-radius: 4px 14px 14px 14px; padding: 8px 12px; font-size: 14px; line-height: 1.45; min-width: 0; word-break: break-word; }
-.bubble-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
-.bubble-head small { color: var(--muted); font-size: 11px; }
 .composer { display: flex; gap: 8px; margin-top: 8px; }
-.send { width: 46px; flex-shrink: 0; border-radius: 14px; background: var(--primary); color: #fff; display: inline-flex; align-items: center; justify-content: center; }
 
 .action-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1px solid var(--border); display: flex; gap: 10px; z-index: 7; box-shadow: 0 -4px 14px rgba(80, 50, 20, 0.06); }
 .action-bar .btn { flex: 1; }
@@ -492,7 +487,6 @@ h1, h2, h3 { margin: 0; }
 .gal-big img { width: 100%; max-height: 46vh; object-fit: contain; display: block; }
 .sheet .composer { margin-top: 10px; }
 .sheet .composer input { flex: 1; }
-.sheet .send:disabled { opacity: 0.4; }
 .sheet .chip-row { margin-top: 12px; }
 .entry-actions .btn { padding: 12px 8px; font-size: 13px; white-space: nowrap; }
 .entry-actions .btn svg { flex-shrink: 0; }

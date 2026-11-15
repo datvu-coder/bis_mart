@@ -34,7 +34,6 @@ const ERROR_VI: Record<string, string> = {
   "Invalid status": "Trạng thái không hợp lệ.",
   "Invalid doers": "Danh sách nhân viên thực hiện không hợp lệ (chỉ chọn nhân viên của cửa hàng).",
   "Invalid priority or recurrence": "Mức ưu tiên hoặc lịch lặp không hợp lệ.",
-  "Empty comment": "Nội dung trao đổi đang trống.",
   "file too large": "Ảnh quá lớn (tối đa 10MB).",
   "Zalo account already linked to another employee": "Tài khoản Zalo này đã liên kết với nhân viên khác.",
   "Store is required": "Vui lòng chọn cửa hàng.",
@@ -142,8 +141,6 @@ export const api = {
     request<Task>("POST", `/api/tasks/${id}/status`, { status, note, photoUrls, ...(doerIds ? { doerIds } : {}) }),
   taskStores: () => request<{ stores: StoreWithManagers[] }>("GET", "/api/tasks/stores"),
   taskStaff: (id: number) => request<{ employees: Assignee[] }>("GET", `/api/tasks/${id}/staff`),
-  addComment: (id: number, body: string) =>
-    request<{ id: number }>("POST", `/api/tasks/${id}/comments`, { body }),
   summary: () => request<{ stores: StoreSummary[] }>("GET", "/api/tasks/summary"),
   notifications: () => request<{ items: AppNotification[]; unread: number }>("GET", "/api/notifications"),
   unreadCount: () => request<{ unread: number }>("GET", "/api/notifications/unread-count"),

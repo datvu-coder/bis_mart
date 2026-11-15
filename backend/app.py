@@ -5257,7 +5257,7 @@ def _notification_to_api_json(row: dict) -> dict:
 
 def _unread_count(employee_id: int) -> int:
     with get_db().cursor() as cur:
-        cur.execute("SELECT COUNT(*) AS c FROM notifications WHERE employee_id = %s AND is_read = 0", (employee_id,))
+        cur.execute("SELECT COUNT(*) AS c FROM notifications WHERE employee_id = %s AND is_read = 0 AND kind <> 'comment'", (employee_id,))
         return int(cur.fetchone()["c"])
 
 
@@ -5284,7 +5284,7 @@ def api_list_notifications():
         cur.execute("DELETE FROM notifications WHERE employee_id = %s AND created_at < %s", (emp, cutoff))
         cur.execute(
             "SELECT id, kind, title, body, task_id, link, is_read, created_at FROM notifications "
-            "WHERE employee_id = %s ORDER BY id DESC LIMIT 60",
+            "WHERE employee_id = %s AND kind <> 'comment' ORDER BY id DESC LIMIT 60",
             (emp,),
         )
         rows = cur.fetchall()
@@ -6368,20 +6368,9 @@ def api_get_task(task_id: int):
         return jsonify({"error": "Task not found"}), 404
     if not _can_view_task(task, viewer):
         return _forbidden()
-    with get_db().cursor() as cur:
-        cur.execute(
-            "SELECT c.id, c.body, c.created_at, c.author_id, e.full_name FROM task_comments c "
-            "LEFT JOIN employees e ON e.id = c.author_id WHERE c.task_id = %s ORDER BY c.id ASC",
-            (task_id,),
-        )
-        comments = cur.fetchall()
     out = _task_to_api_json(task)
     out["canManage"] = _can_manage_task(task, viewer)
     out["doers"] = _employee_names(out["doerIds"])
-    out["comments"] = [
-        {"id": c["id"], "body": c["body"], "createdAt": c["created_at"],
-         "authorId": c["author_id"], "authorName": c.get("full_name") or ""} for c in comments
-    ]
     return jsonify(out)
 
 
@@ -6487,27 +6476,8 @@ def api_set_task_status(task_id: int):
 @app.post("/api/tasks/<int:task_id>/comments")
 @login_required
 def api_add_task_comment(task_id: int):
-    viewer = _task_viewer()
-    task = _fetch_task(task_id)
-    if not task:
-        return jsonify({"error": "Task not found"}), 404
-    if not _can_view_task(task, viewer):
-        return _forbidden()
-    body = ((request.get_json(silent=True) or {}).get("body") or "").strip()
-    if not body:
-        return jsonify({"error": "Empty comment"}), 400
-    db = get_db()
-    with db.cursor() as cur:
-        cur.execute(
-            "INSERT INTO task_comments (task_id, author_id, body, created_at) VALUES (%s,%s,%s,%s) RETURNING id",
-            (task_id, viewer["employee_id"], body, _now_iso()),
-        )
-        cid = cur.fetchone()["id"]
-    db.commit()
-    for target in {task.get("assignee_id"), task.get("assigned_by")} - {viewer["employee_id"], None}:
-        _notify(target, "comment", f"{viewer['name']} đã trao đổi", f"{task['title']}: {body[:160]}", task_id)
-    return jsonify({"id": cid, "body": body, "authorId": viewer["employee_id"],
-                    "authorName": viewer["name"], "createdAt": _now_iso()}), 201
+    """Task chat was removed (Zalo Mini App policy 4.6); old rows stay in task_comments but are no longer shown."""
+    return jsonify({"error": "Tính năng này đã được gỡ"}), 410
 
 
 @app.delete("/api/tasks/<int:task_id>")
