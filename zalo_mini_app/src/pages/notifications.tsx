@@ -11,7 +11,6 @@ import { timeAgo } from "../utils";
 const KIND: Record<NotificationKind, { icon: IconName; tone: string }> = {
   assigned: { icon: "tasks", tone: "primary" },
   done: { icon: "checkCircle", tone: "success" },
-  comment: { icon: "message", tone: "info" },
   overdue: { icon: "alert", tone: "danger" },
   due_soon: { icon: "clock", tone: "warning" },
   cancelled: { icon: "close", tone: "muted" },
@@ -84,7 +83,7 @@ export default function NotificationsPage() {
       {error && <div className="error">{error} <button className="link" onClick={load}>Thử lại</button></div>}
       {!items && !error && <Skeleton count={4} />}
       {items && items.length === 0 && (
-        <EmptyState icon={<Icon name="bell" size={34} />} title="Chưa có thông báo" hint="Việc mới, trao đổi và nhắc hạn sẽ hiện ở đây" />
+        <EmptyState icon={<Icon name="bell" size={34} />} title="Chưa có thông báo" hint="Việc mới và nhắc hạn sẽ hiện ở đây" />
       )}
       {items && items.length > 0 && (
         <div className="notif-list">

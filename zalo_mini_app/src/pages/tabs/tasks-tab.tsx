@@ -204,7 +204,7 @@ export default function TasksTab({ tasks, canManage, loading, error, reload, jum
           </div>
         </section>
       ))}
-      <ConfirmSheet open={!!delTask} title="Xoá công việc?" message={delTask ? `"${delTask.title}" sẽ bị xoá cùng toàn bộ trao đổi và không khôi phục được.` : ""} confirmLabel="Xoá" danger onConfirm={removeTask} onClose={() => setDelTask(null)} />
+      <ConfirmSheet open={!!delTask} title="Xoá công việc?" message={delTask ? `"${delTask.title}" sẽ bị xoá và không khôi phục được.` : ""} confirmLabel="Xoá" danger onConfirm={removeTask} onClose={() => setDelTask(null)} />
     </>
   );
 }
