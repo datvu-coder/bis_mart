@@ -27,7 +27,7 @@ jobs:
         working-directory: zalo_member_mini_app
     env:
       APP_ID: '142578969708561965'
-      ZMP_TOKEN: ${{ secrets.ZMP_TOKEN }}
+      ZMP_TOKEN: ${{ secrets.ZMP_TOKEN_MEMBER }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,7 +44,7 @@ jobs:
       - name: Check and clean ZMP_TOKEN secret
         run: |
           if [ -z "$ZMP_TOKEN" ]; then
-            echo "::error::Missing repository secret ZMP_TOKEN. Run 'zmp login' once and add the token from .env as a secret."
+            echo "::error::Missing repository secret ZMP_TOKEN_MEMBER. Run 'zmp login' once and add the token from .env as a secret."
             exit 1
           fi
           CLEAN=$(printf '%s' "$ZMP_TOKEN" | tr -d '[:space:]"'"'"'')
